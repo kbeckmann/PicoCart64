@@ -99,3 +99,5 @@ ENV/
 *.txt
 *.hex
 *.z64
+
+*-backups/
