@@ -101,3 +101,5 @@ ENV/
 *.z64
 
 *-backups/
+
+build/
