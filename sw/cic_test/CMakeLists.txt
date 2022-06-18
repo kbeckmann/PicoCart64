@@ -1,13 +1,18 @@
 if (TARGET tinyusb_device)
     add_executable(cic_test
             cic_test.c
+            cic.c
             )
 
     # pull in common dependencies
-    target_link_libraries(cic_test pico_stdlib)
+    target_link_libraries(
+        cic_test
+        pico_multicore
+        pico_stdlib
+    )
 
     # enable usb output, disable uart output
-    pico_enable_stdio_usb(cic_test 1)
+    pico_enable_stdio_usb(cic_test 0)
     pico_enable_stdio_uart(cic_test 0)
 
     # create map/bin/hex/uf2 file etc.
