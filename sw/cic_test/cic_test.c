@@ -14,6 +14,9 @@
 #include "hardware/pio.h"
 #include "hardware/clocks.h"
 #include "hardware/uart.h"
+#include "hardware/irq.h"
+
+#include "hardware/structs/scb.h"
 
 #include "cic_test.pio.h"
 
@@ -76,7 +79,7 @@ typedef struct {
 } ringbuf_entry_t;
 
 
-ringbuf_entry_t ringbuf[16];
+ringbuf_entry_t ringbuf[128];
 uint32_t ringbuf_idx;
 uint32_t ringbuf_ctr;
 
@@ -100,7 +103,7 @@ static void ringbuf_print_and_reset(void)
             break;
 
         case ENTRY_TYPE_ADDRESS:
-            printf("%-4d: Address = %08lX\r\n", idx, swap16(entry.address));
+            printf("%-4d: Address = %08lX\r\n", idx, entry.address);
             break;
         
         default:
@@ -141,9 +144,48 @@ static void cart_pin_forever(PIO pio, uint sm, uint offset) {
     pio_sm_set_enabled(pio, sm, true);
 }
 
+// static void foo(void)
+// {
+//     // irq_init_priorities();
+//     // multicore_fifo_clear_irq();
+//     // printf("Hello from the other side\r\n");
+//     cic_run();
+
+//     while (1) {
+//         cic_process();
+//     }
+// }
+
+
+// uint32_t my_core1_stack[1024*4];
+
+// int core1_wrapperz(int (*entry)(void), void *stack_base)
+// {
+//     irq_init_priorities();
+//     return (*entry)();
+// }
+// static void __attribute__ ((naked)) core1_trampoline(void)
+// {
+//     __asm("pop {r0, r1, pc}");
+// }
+
+// void start(void (*entry)(void), uint32_t *stack_bottom, size_t stack_size_bytes)
+// {
+//     uint32_t *stack_ptr = stack_bottom + stack_size_bytes / sizeof(uint32_t);
+//     // push 2 values onto top of stack for core1_trampoline
+//     stack_ptr -= 3;
+//     stack_ptr[0] = (uintptr_t) entry;
+//     stack_ptr[1] = (uintptr_t) stack_bottom;
+//     stack_ptr[2] = (uintptr_t) core1_wrapperz;
+//     multicore_launch_core1_raw(core1_trampoline, stack_ptr, scb_hw->vtor);
+// }
 
 int main(void)
 {
+    // Overclock!
+    // set_sys_clock_khz(250000, true); // 171us
+
+
     stdio_init_all();
 
     for (int i = 0; i <= 27; i++) {
@@ -151,6 +193,13 @@ int main(void)
         gpio_set_dir(i, GPIO_IN);
         // gpio_set_pulls(i, false, false);
     }
+
+    gpio_init(N64_CIC_DCLK);
+    gpio_init(N64_CIC_DIO);
+    gpio_init(N64_COLD_RESET);
+
+    gpio_pull_up(N64_CIC_DIO);
+
 
     // gpio_set_dir(PICO_LA1, GPIO_OUT);
     // gpio_put(PICO_LA1, 0);
@@ -162,9 +211,27 @@ int main(void)
     stdio_uart_init_full(UART_ID, BAUD_RATE, UART_TX_PIN, UART_RX_PIN);
     printf("PicoCart64 Booting!\r\n");
 
+    // sleep_ms(10);
+
+    // irq_set_enabled(SIO_IRQ_PROC0, false);
 
 
-    cic_run();
+    // FIXME: This is extremely weird, but if i launch it like this, twice, then it works??
+    // start(foo, my_core1_stack, sizeof(my_core1_stack));
+    // multicore_launch_core1(foo);
+    // multicore_launch_core1(foo);
+    // multicore_launch_core1(foo);
+
+    // cic_run();
+
+
+    // Wait for reset to be released
+    while (gpio_get(N64_COLD_RESET) == 0) {
+        // sleep_us(1);
+    }
+
+    // printf("main 1!\r\n");
+
 
     // N64_COLD_RESET = 1, n64 booted
 
@@ -176,7 +243,8 @@ int main(void)
     // pio_sm_put_blocking(pio, 0, 0x00000000); // AD0 -> AD15 = IN
 #endif
 
-    // multicore_launch_core1(cic_run);
+    // printf("main 2!\r\n");
+
 
     cart_state_t state = STATE_INIT;
 
@@ -184,11 +252,39 @@ int main(void)
     uint32_t n64_addr_h = 0;
     uint32_t n64_addr_l = 0;
 
+    // uint32_t last_addr = 0;
+    // uint32_t get_msb = 0;
+
     while (1) {
 
 #ifdef PIO_MODE
 
+        // TX = c code to PIO
+        // RX = PIO to c code
+        // pio_sm_is_tx_fifo_empty(PIO pio, uint sm)
+        // pio_sm_is_rx_fifo_empty(pio, sm)
+
         uint32_t addr = swap16(pio_sm_get_blocking(pio, 0));
+
+        // if (addr != 0) {
+        //     // We got a legitimate start addres
+        //     last_addr = addr;
+        //     get_msb = 1;
+        // } else {
+        //     // We got a "Give me next 16 bits" command
+        //     static uint32_t word;
+        //     if (get_msb) {
+        //         word = rom_file_32[(last_addr & 0xFFFFFF) >> 2];
+        //         // pio_sm_put_blocking(pio, 0, ((word << 8) & 0xFF00)  | ((word >> 8) & 0xFF));
+        //         pio_sm_put_blocking(pio, 0, (word & 8) | 1);
+        //     } else {
+        //         // pio_sm_put_blocking(pio, 0, ((word >> 8) & 0xFF00)  | (word >> 24));
+        //         pio_sm_put_blocking(pio, 0, (word & 8) | 2);
+        //         last_addr += 4;
+        //     }
+
+        //     get_msb = !get_msb;
+        // }
 
         if (addr == 0x10000000) {
             pio_sm_put_blocking(pio, 0, 0x8037); // Data MSB
@@ -204,12 +300,14 @@ int main(void)
 
             pio_sm_put_blocking(pio, 0, ((word << 8) & 0xFF00)  | ((word >> 8) & 0xFF));
             pio_sm_put_blocking(pio, 0, ((word >> 8) & 0xFF00)  | (word >> 24));
+            // pio_sm_put_blocking(pio, 0, (word & 8) | 1);
+            // pio_sm_put_blocking(pio, 0, (word & 8) | 2);
 
         }
 
         // ringbuf_put((ringbuf_entry_t) {
         //     .type = ENTRY_TYPE_ADDRESS,
-        //     .address = data,
+        //     .address = addr,
         // });
 
 

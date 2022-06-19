@@ -52,6 +52,10 @@ cart_start:
     push
     ; set pins, 2
 
+; get_next_halfword:
+
+;     ; TODO optimize
+
 wait_for_not_read_or_aleh:
 
     ; Read N64_ALEH
@@ -73,17 +77,21 @@ wait_for_not_read_or_aleh:
     ; wait for ~N64_READ
     ; wait 0 gpio 18
 
-    ; set pins, 3
+    ; Send a "give me 16 bits!" command (null address)
+    ; isr should be 0 since we just pushed the address previously
+    ; push
 
-    ; Set pindirs to 0xFFFFFFFF
-    mov osr, ~null
-    out pindirs, 32
+    ; set pins, 3
 
     ; Read data from c code into OSR
     pull
 
     ; Write 32 bits from OSR to pins
     out pins, 32
+
+    ; Set pindirs to 0xFFFFFFFF
+    mov osr, ~null
+    out pindirs, 32
 
     ; wait for N64_READ
     wait 1 gpio 18
@@ -92,6 +100,7 @@ wait_for_not_read_or_aleh:
 
 
     jmp wait_for_not_read_or_aleh
+    ; jmp get_next_halfword
 
 
 
