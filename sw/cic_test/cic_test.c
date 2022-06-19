@@ -252,8 +252,8 @@ int main(void)
     uint32_t n64_addr_h = 0;
     uint32_t n64_addr_l = 0;
 
-    // uint32_t last_addr = 0;
-    // uint32_t get_msb = 0;
+    uint32_t last_addr = 0;
+    uint32_t get_msb = 0;
 
     while (1) {
 
@@ -266,44 +266,49 @@ int main(void)
 
         uint32_t addr = swap16(pio_sm_get_blocking(pio, 0));
 
-        // if (addr != 0) {
-        //     // We got a legitimate start addres
-        //     last_addr = addr;
-        //     get_msb = 1;
-        // } else {
-        //     // We got a "Give me next 16 bits" command
-        //     static uint32_t word;
-        //     if (get_msb) {
-        //         word = rom_file_32[(last_addr & 0xFFFFFF) >> 2];
-        //         // pio_sm_put_blocking(pio, 0, ((word << 8) & 0xFF00)  | ((word >> 8) & 0xFF));
-        //         pio_sm_put_blocking(pio, 0, (word & 8) | 1);
-        //     } else {
-        //         // pio_sm_put_blocking(pio, 0, ((word >> 8) & 0xFF00)  | (word >> 24));
-        //         pio_sm_put_blocking(pio, 0, (word & 8) | 2);
-        //         last_addr += 4;
-        //     }
-
-        //     get_msb = !get_msb;
-        // }
-
-        if (addr == 0x10000000) {
-            pio_sm_put_blocking(pio, 0, 0x8037); // Data MSB
-            pio_sm_put_blocking(pio, 0, 0xFF40); // Data LSB <- extra slow bus config
+        if (addr != 0) {
+            // We got a legitimate start addres
+            last_addr = addr;
+            get_msb = 1;
         } else {
+            // We got a "Give me next 16 bits" command
+            static uint32_t word;
+            if (get_msb) {
+                // if (addr == 0x10000000) {
+                //     // word = 0x8037FF40;
+                //     word = 0x40FF3780;
+                // } else {
+                    word = rom_file_32[(last_addr & 0xFFFFFF) >> 2];
+                // }
+                pio_sm_put_blocking(pio, 0, ((word << 8) & 0xFF00)  | ((word >> 8) & 0xFF));
+                // pio_sm_put_blocking(pio, 0, (word & 8) | 1);
+            } else {
+                pio_sm_put_blocking(pio, 0, ((word >> 8) & 0xFF00)  | (word >> 24));
+                // pio_sm_put_blocking(pio, 0, (word & 8) | 2);
+                last_addr += 4;
+            }
 
-            uint32_t word = rom_file_32[(addr & 0xFFFFFF) >> 2];
-
-            // TODO: Do byteswap compile time instead
-            // 80 37 12 40 => 0x40123780 in 'word'
-            // => 0x8037
-            // => 0x1240
-
-            pio_sm_put_blocking(pio, 0, ((word << 8) & 0xFF00)  | ((word >> 8) & 0xFF));
-            pio_sm_put_blocking(pio, 0, ((word >> 8) & 0xFF00)  | (word >> 24));
-            // pio_sm_put_blocking(pio, 0, (word & 8) | 1);
-            // pio_sm_put_blocking(pio, 0, (word & 8) | 2);
-
+            get_msb = !get_msb;
         }
+
+        // if (addr == 0x10000000) {
+        //     pio_sm_put_blocking(pio, 0, 0x8037); // Data MSB
+        //     pio_sm_put_blocking(pio, 0, 0xFF40); // Data LSB <- extra slow bus config
+        // } else {
+
+        //     uint32_t word = rom_file_32[(addr & 0xFFFFFF) >> 2];
+
+        //     // TODO: Do byteswap compile time instead
+        //     // 80 37 12 40 => 0x40123780 in 'word'
+        //     // => 0x8037
+        //     // => 0x1240
+
+        //     pio_sm_put_blocking(pio, 0, ((word << 8) & 0xFF00)  | ((word >> 8) & 0xFF));
+        //     pio_sm_put_blocking(pio, 0, ((word >> 8) & 0xFF00)  | (word >> 24));
+        //     // pio_sm_put_blocking(pio, 0, (word & 8) | 1);
+        //     // pio_sm_put_blocking(pio, 0, (word & 8) | 2);
+
+        // }
 
         // ringbuf_put((ringbuf_entry_t) {
         //     .type = ENTRY_TYPE_ADDRESS,

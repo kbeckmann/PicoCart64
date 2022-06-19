@@ -1,10 +1,8 @@
 ;
-; Copyright (c) 2020 Raspberry Pi (Trading) Ltd.
+; Copyright (c) 2022 Konrad Beckmann
 ;
 ; SPDX-License-Identifier: BSD-3-Clause
 ;
-
-; SET pin 0 should be mapped to your LED GPIO
 
 .program cart
 
@@ -52,10 +50,6 @@ cart_start:
     push
     ; set pins, 2
 
-; get_next_halfword:
-
-;     ; TODO optimize
-
 wait_for_not_read_or_aleh:
 
     ; Read N64_ALEH
@@ -74,14 +68,9 @@ wait_for_not_read_or_aleh:
     out x, 1
     jmp x-- wait_for_not_read_or_aleh
 
-    ; wait for ~N64_READ
-    ; wait 0 gpio 18
-
     ; Send a "give me 16 bits!" command (null address)
-    ; isr should be 0 since we just pushed the address previously
-    ; push
-
-    ; set pins, 3
+    ; isr should be 0 since we just pushed the address (or a null cmd) previously
+    push
 
     ; Read data from c code into OSR
     pull
@@ -100,11 +89,10 @@ wait_for_not_read_or_aleh:
 
 
     jmp wait_for_not_read_or_aleh
-    ; jmp get_next_halfword
 
 
 
-.wrap             ; Blink forever!
+.wrap             ; Handle PI transactions forever!
 
 
 % c-sdk {
