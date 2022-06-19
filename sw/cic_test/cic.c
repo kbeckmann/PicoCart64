@@ -531,7 +531,7 @@ void cic_run(void)
 
     gpio_pull_up(N64_CIC_DIO);
 
-    printf("Waiting for reset...\n");
+    printf("Waiting for reset...\r\n");
 
     // Wait for reset to be released
     while (gpio_get(N64_COLD_RESET) == 0) {

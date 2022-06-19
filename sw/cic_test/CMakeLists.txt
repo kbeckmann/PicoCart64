@@ -16,9 +16,11 @@ if (TARGET tinyusb_device)
     pico_generate_pio_header(cic_test ${CMAKE_CURRENT_LIST_DIR}/cic_test.pio)
 
 
-    # enable usb output, disable uart output
-    pico_enable_stdio_usb(cic_test 1)
-    pico_enable_stdio_uart(cic_test 0)
+    # disable usb output (interrupt heavy)
+    pico_enable_stdio_usb(cic_test 0)
+
+    # enable uart output
+    pico_enable_stdio_uart(cic_test 1)
 
     # create map/bin/hex/uf2 file etc.
     pico_add_extra_outputs(cic_test)
