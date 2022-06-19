@@ -1,0 +1,136 @@
+;
+; Copyright (c) 2020 Raspberry Pi (Trading) Ltd.
+;
+; SPDX-License-Identifier: BSD-3-Clause
+;
+
+; SET pin 0 should be mapped to your LED GPIO
+
+.program cart
+
+cart_start:
+
+    ; Change IO dir of all pins to INPUT
+    mov osr, null
+    out pindirs, 32
+
+.wrap_target
+
+    ; set pins, 0
+    ; state => STATE_START
+
+    ; wait for N64_ALEH
+    wait 1 gpio 17
+    ; set pins, 1
+
+    ; wait for N64_ALEL
+    wait 1 gpio 16
+    ; set pins, 2
+
+    ; state => STATE_WAIT_ADDR_H
+
+    ; wait for ~N64_ALEH
+    wait 0 gpio 17
+    ; Sample AD0 -> AD15, put in ISR
+    ; 
+    in pins, 16
+
+    ; set pins, 3
+
+
+    ; state => STATE_WAIT_ADDR_L
+
+    ; wait for ~N64_ALEL
+    wait 0 gpio 16
+
+    ; Sample AD0 -> AD15, put in ISR
+    in pins, 16
+
+    ; push 32 bits of high and low parts
+    ; TODO: Can use autopush?
+    ; set pins, 1
+    push
+    ; set pins, 2
+
+wait_for_not_read_or_aleh:
+
+    ; Read N64_ALEH
+    ; if N64_ALEH:
+    ;   jmp cart_start
+    ; else:
+    ;   if N64_READ:
+    ;     jmp wait_for_not_read_or_aleh
+
+    jmp pin cart_start
+
+    mov osr, pins
+    ; Dump 16 bits of OSR contents
+    out null, 18
+    ; Read gpio 18
+    out x, 1
+    jmp x-- wait_for_not_read_or_aleh
+
+    ; wait for ~N64_READ
+    ; wait 0 gpio 18
+
+    ; set pins, 3
+
+    ; Set pindirs to 0xFFFFFFFF
+    mov osr, ~null
+    out pindirs, 32
+
+    ; Read data from c code into OSR
+    pull
+
+    ; Write 32 bits from OSR to pins
+    out pins, 32
+
+    ; wait for N64_READ
+    wait 1 gpio 18
+
+    ; state => WAIT_READ_H
+
+
+    jmp wait_for_not_read_or_aleh
+
+
+
+.wrap             ; Blink forever!
+
+
+% c-sdk {
+void cart_program_init(PIO pio, uint sm, uint offset) {
+
+    // gpio0 -> 22 input
+    for (int i = 0; i <= 22; i++) {
+        pio_gpio_init(pio, i);
+    }
+
+    // LA1, LA2
+    pio_gpio_init(pio, 26);
+    pio_gpio_init(pio, 27);
+
+    // AD0 -> AD15 input
+    // gpio 0 -> 22 are input for now
+    pio_sm_set_consecutive_pindirs(pio, sm, 0, 23, false);
+
+    // Set 26, 27 as outputs
+    pio_sm_set_consecutive_pindirs(pio, sm, 26, 2, true);
+
+    pio_sm_config c = cart_program_get_default_config(offset);
+
+    // 26, 27 = set pins
+    sm_config_set_set_pins(&c, 26, 2);
+
+    // AD0 -> AD16 as in pins
+    sm_config_set_in_pins(&c, 0);
+
+    // AD0 -> AD16 as out pins
+    sm_config_set_out_pins(&c, 0, 16);
+
+    // JMP pin = ALEH
+    sm_config_set_jmp_pin(&c, 17);
+
+    pio_sm_init(pio, sm, offset, &c);
+}
+%}
