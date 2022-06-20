@@ -144,17 +144,17 @@ static void cart_pin_forever(PIO pio, uint sm, uint offset) {
     pio_sm_set_enabled(pio, sm, true);
 }
 
-// static void foo(void)
-// {
-//     // irq_init_priorities();
-//     // multicore_fifo_clear_irq();
-//     // printf("Hello from the other side\r\n");
-//     cic_run();
+static void foo(void)
+{
+    // FIXME: Load-bearing print - remove this and it stops working
+    printf("CIC Emulator core running!\r\n");
 
-//     while (1) {
-//         cic_process();
-//     }
-// }
+    cic_run();
+
+    while (1) {
+        cic_process();
+    }
+}
 
 
 // uint32_t my_core1_stack[1024*4];
@@ -215,10 +215,16 @@ int main(void)
 
     // irq_set_enabled(SIO_IRQ_PROC0, false);
 
+#ifdef PIO_MODE
+    // Init PIO before starting the second core
+    PIO pio = pio0;
+    uint offset = pio_add_program(pio, &cart_program);
+    cart_pin_forever(pio, 0, offset);
+#endif
 
     // FIXME: This is extremely weird, but if i launch it like this, twice, then it works??
     // start(foo, my_core1_stack, sizeof(my_core1_stack));
-    // multicore_launch_core1(foo);
+    multicore_launch_core1(foo);
     // multicore_launch_core1(foo);
     // multicore_launch_core1(foo);
 
@@ -235,13 +241,6 @@ int main(void)
 
     // N64_COLD_RESET = 1, n64 booted
 
-#ifdef PIO_MODE
-    PIO pio = pio0;
-    uint offset = pio_add_program(pio, &cart_program);
-    cart_pin_forever(pio, 0, offset);
-
-    // pio_sm_put_blocking(pio, 0, 0x00000000); // AD0 -> AD15 = IN
-#endif
 
     // printf("main 2!\r\n");
 

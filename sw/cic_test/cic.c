@@ -555,8 +555,6 @@ void cic_run(void)
     // printf("Write seed\n");
     WriteSeed();
 
-    return;
-
     // encode and send the checksum
     // printf("Write checksum\n");
     WriteChecksum();
