@@ -102,6 +102,9 @@ ENV/
 
 rom.h
 
+fp-lib-table
+fp-info-cache
+
 *-backups/
 
 build/

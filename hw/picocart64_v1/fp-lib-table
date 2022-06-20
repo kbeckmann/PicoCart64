@@ -1,5 +1,0 @@
-(fp_lib_table
-  (lib (name "Connector_USB_Extra")(type "KiCad")(uri "${KIPRJMOD}/../modules/Connector_USB_Extra.pretty")(options "")(descr ""))
-  (lib (name "RP2040_Stamp")(type "KiCad")(uri "${KIPRJMOD}/../modules/RP2040_Stamp.pretty")(options "")(descr ""))
-  (lib (name "picocart64")(type "KiCad")(uri "${KIPRJMOD}/../modules/picocart64.pretty")(options "")(descr ""))
-)
