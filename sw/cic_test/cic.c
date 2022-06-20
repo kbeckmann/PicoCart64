@@ -484,36 +484,6 @@ static void InitRam(unsigned char isPal)
     }
 }
 
-void cic_process(void)
-{
-    // printf("looping!\n");
-    // read mode (2 bit)
-    unsigned char cmd = 0;
-    cmd |= (ReadBit() << 1);
-    cmd |= ReadBit();
-    switch (cmd)
-    {
-    case 0:
-        // 00 (compare)
-        CompareMode(GET_REGION());
-        break;
-
-    case 2:
-        // 10 (6105)
-        Cic6105Mode();
-        break;
-
-    case 3:
-        // 11 (reset)
-        WriteBit(0);
-        break;
-
-    case 1:
-        // 01 (die)
-    default:
-        return;
-    }
-}
 
 void cic_run(void)
 {
@@ -530,6 +500,8 @@ void cic_run(void)
     gpio_init(N64_COLD_RESET);
 
     gpio_pull_up(N64_CIC_DIO);
+
+    printf("CIC Emulator core running!\r\n");
 
     // printf("Waiting for reset...\r\n");
 
@@ -565,4 +537,34 @@ void cic_run(void)
     // read the initial values from the PIF
     _CicMem[0x01] = ReadNibble();
     _CicMem[0x11] = ReadNibble();
+
+    while (1) {
+        // printf("looping!\n");
+        // read mode (2 bit)
+        unsigned char cmd = 0;
+        cmd |= (ReadBit() << 1);
+        cmd |= ReadBit();
+        switch (cmd)
+        {
+        case 0:
+            // 00 (compare)
+            CompareMode(GET_REGION());
+            break;
+
+        case 2:
+            // 10 (6105)
+            Cic6105Mode();
+            break;
+
+        case 3:
+            // 11 (reset)
+            WriteBit(0);
+            break;
+
+        case 1:
+            // 01 (die)
+        default:
+            return;
+        }
+    }
 }

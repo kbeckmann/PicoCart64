@@ -6,6 +6,8 @@
 
 .program cart
 
+; For debugging, `set pins, 0` up to `3` may be used
+
 cart_start:
 
     ; Change IO dir of all pins to INPUT
@@ -14,27 +16,20 @@ cart_start:
 
 .wrap_target
 
-    ; set pins, 0
     ; state => STATE_START
 
     ; wait for N64_ALEH
     wait 1 gpio 17
-    ; set pins, 1
 
     ; wait for N64_ALEL
     wait 1 gpio 16
-    ; set pins, 2
 
     ; state => STATE_WAIT_ADDR_H
 
     ; wait for ~N64_ALEH
     wait 0 gpio 17
     ; Sample AD0 -> AD15, put in ISR
-    ; 
     in pins, 16
-
-    ; set pins, 3
-
 
     ; state => STATE_WAIT_ADDR_L
 
@@ -45,40 +40,41 @@ cart_start:
     in pins, 16
 
     ; push 32 bits of high and low parts
-    ; TODO: Can use autopush?
-    ; set pins, 1
+    ; TODO: Can we use autopush?
     push
-    ; set pins, 2
 
 wait_for_not_read_or_aleh:
 
-    ; Read N64_ALEH
-    ; if N64_ALEH:
-    ;   jmp cart_start
-    ; else:
-    ;   if N64_READ:
-    ;     jmp wait_for_not_read_or_aleh
+    ; Pseudo-code of the loop below:
+    ; if (N64_ALEH)
+    ;   goto cart_start
+    ; else if (N64_READ):
+    ;   goto wait_for_not_read_or_aleh
 
     jmp pin cart_start
 
+    ; Read all pins into OSR
     mov osr, pins
-    ; Dump 16 bits of OSR contents
+    ; Dump 18 bits of OSR contents
     out null, 18
-    ; Read gpio 18
+    ; Effectively read gpio 18 into x, so we can branch on it
     out x, 1
+    ; if (x): goto wait_for_not_read_or_aleh;
     jmp x-- wait_for_not_read_or_aleh
 
     ; Send a "give me 16 bits!" command (null address)
-    ; isr should be 0 since we just pushed the address (or a null cmd) previously
+    ; ISR is 0 at this moment
     push
 
     ; Read data from c code into OSR
     pull
 
-    ; Write 32 bits from OSR to pins
-    out pins, 32
+    ; Write 16 bits from OSR to pins
+    out pins, 16
 
     ; Set pindirs to 0xFFFFFFFF
+    ; Note that only the pins set up in sm_config_set_out_pins() are affected,
+    ; i.e. GPIO0-GPIO15
     mov osr, ~null
     out pindirs, 32
 
@@ -87,9 +83,7 @@ wait_for_not_read_or_aleh:
 
     ; state => WAIT_READ_H
 
-
     jmp wait_for_not_read_or_aleh
-
 
 
 .wrap             ; Handle PI transactions forever!
