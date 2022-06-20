@@ -37,11 +37,43 @@ static inline uint32_t swap16(uint32_t value)
     return (value << 16) | (value >> 16);
 }
 
+/*
+
+Profiling results:
+
+Time between ~N64_READ and bit output on AD0
+
+With constant data fetched from C-code (no memory access)
+--------------------------------------
+133 MHz: 240 ns
+150 MHz: 330 ns
+200 MHz: 230 ns
+250 MHz: 190 ns
+
+
+With uncached data from external flash
+--------------------------------------
+133 MHz: 780 ns
+150 MHz: 640 ns
+200 MHz: 480 ns
+250 MHz: 390 ns
+
+
+
+*/
 
 int main(void)
 {
     // Overclock!
-    // set_sys_clock_khz(250000, true); // 171us
+    // Note that the Pico's external flash is rated to 133MHz,
+    // not sure if the flash speed is based on this clock.
+
+    // set_sys_clock_khz(PLL_SYS_KHZ, true);
+    // set_sys_clock_khz(150000, true); // Does not work
+    // set_sys_clock_khz(200000, true); // Does not work
+    // set_sys_clock_khz(250000, true); // Does not work
+    // set_sys_clock_khz(300000, true); // Doesn't even boot
+    // set_sys_clock_khz(400000, true); // Doesn't even boot
 
     stdio_init_all();
 
