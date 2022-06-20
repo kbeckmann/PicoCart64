@@ -46,7 +46,7 @@ Time between ~N64_READ and bit output on AD0
 With constant data fetched from C-code (no memory access)
 --------------------------------------
 133 MHz: 240 ns
-150 MHz: 330 ns
+150 MHz: 230 ns
 200 MHz: 230 ns
 250 MHz: 190 ns
 
