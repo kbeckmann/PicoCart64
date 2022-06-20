@@ -72,7 +72,7 @@ int main(void)
     //       otherwise multicore doesn't work properly.
     //       Alternatively, attach gdb to openocd, run `mon reset halt`, `c`.
     //       It seems this works around the issue as well.
-    multicore_launch_core1(cic_run);
+    multicore_launch_core1(cic_main);
 
     // Wait for reset to be released
     while (gpio_get(N64_COLD_RESET) == 0) {

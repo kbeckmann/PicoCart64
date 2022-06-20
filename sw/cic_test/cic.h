@@ -1,4 +1,3 @@
 #pragma once
 
-void cic_run(void);
-void cic_process(void);
+void cic_main(void);

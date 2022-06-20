@@ -37,9 +37,6 @@ Data Line, Bidir (DIO):  CIC Pin 15
 
 // #define DEBUG
 
-#define INFO(...)
-// #define INFO(...) printf("\e[92;1mCIC> \e[0m" __VA_ARGS__)
-
 #define REGION_NTSC (0)
 #define REGION_PAL  (1)
 
@@ -119,8 +116,15 @@ unsigned char _6105Mem[32];
 
 /* YOU HAVE TO IMPLEMENT THE LOW LEVEL GPIO FUNCTIONS ReadBit() and WriteBit() */
 
-static int running = 1;
-static int exit_by_uart = 0;
+static bool check_running(void)
+{
+    if (gpio_get(N64_COLD_RESET) == 0) {
+        // Reset the CIC
+        return false;
+    }
+
+    return true;
+}
 
 static unsigned char ReadBit(void)
 {
@@ -130,7 +134,7 @@ static unsigned char ReadBit(void)
     // wait for DCLK to go low
     do {
         vin = gpio_get(N64_CIC_DCLK);
-    } while (vin & 1);
+    } while ((vin & 1) && check_running());
 
     // Read the data bit
     res = gpio_get(N64_CIC_DIO);
@@ -138,9 +142,7 @@ static unsigned char ReadBit(void)
     // wait for DCLK to go high
     do {
         vin = gpio_get(N64_CIC_DCLK);
-    } while (((vin & 1) == 0));
-
-    // printf("Read %d\n", res ? 1 : 0);
+    } while (((vin & 1) == 0) && check_running());
 
     return res ? 1 : 0;
 }
@@ -149,12 +151,10 @@ static void WriteBit(unsigned char b)
 {
     unsigned char vin;
 
-    // printf("Writing %d\n", b ? 1 : 0);
-
     // wait for DCLK to go low
     do {
         vin = gpio_get(N64_CIC_DCLK);
-    } while ((vin & 1));
+    } while ((vin & 1) && check_running());
 
     if (b == 0)
     {
@@ -166,7 +166,7 @@ static void WriteBit(unsigned char b)
     // wait for DCLK to go high
     do {
         vin = gpio_get(N64_CIC_DCLK);
-    } while (((vin & 1) == 0));
+    } while (((vin & 1) == 0) && check_running());
 
     // Disable output
     gpio_set_dir(N64_CIC_DIO, GPIO_IN);
@@ -247,7 +247,7 @@ static void WriteChecksum(void)
     // int vin;
     // do {
     //     vin = gpio_get(N64_CIC_DCLK);
-    // } while ((vin & 1));
+    // } while ((vin & 1) && check_running());
 
     // "encrytion" key
     // initial value doesn't matter
@@ -485,15 +485,13 @@ static void InitRam(unsigned char isPal)
 }
 
 
-void cic_run(void)
+static void cic_run(void)
 {
     unsigned char isPal;
 
     // Reset the state
     memset(_CicMem, 0, sizeof(_CicMem));
     memset(_6105Mem, 0, sizeof(_6105Mem));
-    running = 1;
-    exit_by_uart = 0;
 
     gpio_init(N64_CIC_DCLK);
     gpio_init(N64_CIC_DIO);
@@ -503,14 +501,10 @@ void cic_run(void)
 
     printf("CIC Emulator core running!\r\n");
 
-    // printf("Waiting for reset...\r\n");
-
     // Wait for reset to be released
     while (gpio_get(N64_COLD_RESET) == 0) {
-
+        tight_loop_contents();
     }
-
-    // printf("N64 booting!\n");
 
     // read the region setting
     isPal = GET_REGION();
@@ -524,11 +518,9 @@ void cic_run(void)
     WriteNibble(hello);
 
     // encode and send the seed
-    // printf("Write seed\n");
     WriteSeed();
 
     // encode and send the checksum
-    // printf("Write checksum\n");
     WriteChecksum();
 
     // init the ram corresponding to the region
@@ -538,8 +530,8 @@ void cic_run(void)
     _CicMem[0x01] = ReadNibble();
     _CicMem[0x11] = ReadNibble();
 
-    while (1) {
-        // printf("looping!\n");
+    while(check_running())
+    {
         // read mode (2 bit)
         unsigned char cmd = 0;
         cmd |= (ReadBit() << 1);
@@ -548,7 +540,7 @@ void cic_run(void)
         {
         case 0:
             // 00 (compare)
-            CompareMode(GET_REGION());
+            CompareMode(isPal);
             break;
 
         case 2:
@@ -566,5 +558,12 @@ void cic_run(void)
         default:
             return;
         }
+    }
+}
+
+void cic_main(void)
+{
+    while (1) {
+        cic_run();
     }
 }
