@@ -99,7 +99,7 @@ int main(void)
         // We got a "Give me next 16 bits" command
         static uint32_t word;
         if (get_msb) {
-            if (addr == 0x10000000) {
+            if (last_addr == 0x10000000) {
                 // Configure bus to run slowly.
                 // This is better patched in the rom, so we won't need a branch here.
                 // But let's keep it here so it's easy to import roms easily.
