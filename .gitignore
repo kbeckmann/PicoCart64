@@ -108,3 +108,5 @@ fp-info-cache
 *-backups/
 
 build/
+
+\#auto_saved_files#

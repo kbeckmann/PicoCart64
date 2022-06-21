@@ -4,6 +4,13 @@
 
   (paper "A4")
 
+  (title_block
+    (title "PicoCart64")
+    (date "2022-06-22")
+    (rev "V1.0")
+    (company "Konrad Beckmann")
+  )
+
   (lib_symbols
     (symbol "Connector:Micro_SD_Card_Det" (pin_names (offset 1.016)) (in_bom yes) (on_board yes)
       (property "Reference" "J" (id 0) (at -16.51 17.78 0)
@@ -3154,7 +3161,7 @@
     (uuid a0fcb198-ccb6-40d8-be65-0bf4fbd463d8)
     (property "Reference" "U3" (id 0) (at 119.38 17.78 0))
     (property "Value" "RP2040_Stamp" (id 1) (at 119.38 20.32 0))
-    (property "Footprint" "RP2040_Stamp:RP2040_Stamp_SMD" (id 2) (at 119.38 105.41 0)
+    (property "Footprint" "RP2040_Stamp:RP2040_Stamp_FlexyPin" (id 2) (at 119.38 105.41 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Datasheet" "" (id 3) (at 86.36 22.86 0)
@@ -3610,7 +3617,7 @@
       (reference "SW1") (unit 1) (value "BootButton") (footprint "Button_Switch_SMD:SW_SPST_FSMSM")
     )
     (path "/a0fcb198-ccb6-40d8-be65-0bf4fbd463d8"
-      (reference "U3") (unit 1) (value "RP2040_Stamp") (footprint "RP2040_Stamp:RP2040_Stamp_SMD")
+      (reference "U3") (unit 1) (value "RP2040_Stamp") (footprint "RP2040_Stamp:RP2040_Stamp_FlexyPin")
     )
     (path "/69e1df44-123d-446b-8e62-8562dbf7e39b"
       (reference "U4") (unit 1) (value "N64-Cartridge") (footprint "picocart64:N64-Connector")
