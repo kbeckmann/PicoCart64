@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.12)
 
+# Set the external flash to 16 MB
+add_definitions(-DPICO_FLASH_SIZE_BYTES=16777216)
+
 # Pull in SDK (must be before project)
 include(pico_sdk_import.cmake)
 
