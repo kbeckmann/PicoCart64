@@ -1,12 +1,12 @@
 G04 #@! TF.GenerationSoftware,KiCad,Pcbnew,(6.0.6)*
-G04 #@! TF.CreationDate,2022-06-26T02:31:40+02:00*
+G04 #@! TF.CreationDate,2022-06-26T02:56:31+02:00*
 G04 #@! TF.ProjectId,picocart64_v1_lite,7069636f-6361-4727-9436-345f76315f6c,rev?*
 G04 #@! TF.SameCoordinates,Original*
 G04 #@! TF.FileFunction,Soldermask,Bot*
 G04 #@! TF.FilePolarity,Negative*
 %FSLAX46Y46*%
 G04 Gerber Fmt 4.6, Leading zero omitted, Abs format (unit mm)*
-G04 Created by KiCad (PCBNEW (6.0.6)) date 2022-06-26 02:31:40*
+G04 Created by KiCad (PCBNEW (6.0.6)) date 2022-06-26 02:56:31*
 %MOMM*%
 %LPD*%
 G01*
@@ -268,7 +268,7 @@ X148805000Y-103255000D03*
 X145415000Y-90170000D03*
 X169125000Y-88015000D03*
 X129200000Y-82350000D03*
-X163830000Y-102870000D03*
+X163830000Y-101985000D03*
 X120705560Y-97738088D03*
 X135890000Y-63295692D03*
 X194310000Y-102870000D03*
