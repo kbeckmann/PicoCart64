@@ -24,10 +24,11 @@ This takes you to the PCB configuration utility where you can upload the `.zip` 
 ## Sourcing the components
 For building the lite version, you need the following parts along with the PCBs. Here we're assuming you want to assemble 5 boards, as that is the number of PCBs you'll be getting from JLCPCB as a minimum.
 
-| Qty | Name                  | Source                                                                           | Notes                       |
-|-----|-----------------------|----------------------------------------------------------------------------------|-----------------------------|
-| 2   | Raspberry Pico 3-pack | [713-102110545](https://www.mouser.dk/ProductDetail/713-102110545)               |                             |
-| 5   | BSS84 MOSFET          | [750-BSS84-HF](https://www.mouser.dk/ProductDetail/750-BSS84-HF)                 |                             |
+| Qty | Name                  | Source                                                                           | Notes |
+|-----|-----------------------|----------------------------------------------------------------------------------|-------|
+| 2   | Raspberry Pico 3-pack | [713-102110545](https://www.mouser.dk/ProductDetail/713-102110545)               |       |
+| 5   | BSS84 MOSFET          | [750-BSS84-HF](https://www.mouser.dk/ProductDetail/750-BSS84-HF)                 |       |
+| 5   | 0603 100k resistor    | [71-CRCW0603100KJNEAC](https://www.mouser.dk/ProductDetail/71-CRCW0603100KJNEAC) |       |
 
 For the next-gen design, these are needed. This list is not exhaustive, and still a WIP.
 
@@ -35,7 +36,7 @@ For the next-gen design, these are needed. This list is not exhaustive, and stil
 |-----|-------------------|----------------------------------------------------------------------------------|----------------------------------|
 | 5   | BSS84 MOSFET      | [750-BSS84-HF](https://www.mouser.dk/ProductDetail/750-BSS84-HF)                 |                                  |
 | 5   | USB-C Receptacle  | [640-USB4105-GF-A](https://www.mouser.dk/ProductDetail/640-USB4105-GF-A)         |                                  |
-| 5   | 0601 1M resistor  | [71-CRCW02011M00FNED](https://www.mouser.dk/ProductDetail/71-CRCW02011M00FNED)   |                                  |
+| 5   | 0603 1M resistor  | [71-CRCW02011M00FNED](https://www.mouser.dk/ProductDetail/71-CRCW02011M00FNED)   |                                  |
 | 10  | 0603 5k1 resistor | [71-CRCW02015K10FKED](https://www.mouser.dk/ProductDetail/71-CRCW02015K10FKED)   |                                  |
 | 5   | Ferrite bead      | [810-MMZ0603Y241CTD25](https://www.mouser.dk/ProductDetail/810-MMZ0603Y241CTD25) | Does the ohm rating matter?      |
 | 5   | Push button       | [506-FSMSM](https://www.mouser.dk/ProductDetail/506-FSMSM)                       |                                  |
