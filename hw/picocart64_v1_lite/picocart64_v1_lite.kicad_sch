@@ -6,8 +6,8 @@
 
   (title_block
     (title "PicoCart64-lite")
-    (date "2022-06-26")
-    (rev "V1.1-lite")
+    (date "2022-06-29")
+    (rev "V1.2-lite")
     (company "Konrad Beckmann")
   )
 
