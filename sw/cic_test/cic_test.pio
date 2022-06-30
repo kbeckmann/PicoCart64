@@ -55,9 +55,9 @@ wait_for_not_read_or_aleh:
 
     ; Read all pins into OSR
     mov osr, pins
-    ; Dump 18 bits of OSR contents
-    out null, 18
-    ; Effectively read gpio 18 into x, so we can branch on it
+    ; Dump 19 bits of OSR contents
+    out null, 19
+    ; Effectively read gpio 19 into x, so we can branch on it
     out x, 1
     ; if (x): goto wait_for_not_read_or_aleh;
     jmp x-- wait_for_not_read_or_aleh
@@ -79,7 +79,7 @@ wait_for_not_read_or_aleh:
     out pindirs, 32
 
     ; wait for N64_READ
-    wait 1 gpio 18
+    wait 1 gpio 19
 
     ; state => WAIT_READ_H
 
