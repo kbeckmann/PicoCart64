@@ -14,7 +14,6 @@ cart_start:
     mov osr, null
     out pindirs, 32
 
-.wrap_target
 
     ; state => STATE_START
 
@@ -43,11 +42,14 @@ cart_start:
     ; TODO: Can we use autopush?
     push
 
+.wrap_target
 wait_for_not_read_or_aleh:
 
     ; Pseudo-code of the loop below:
     ; if (N64_ALEH)
     ;   goto cart_start
+    ; else if (~N64_WRITE):
+    ;   goto handle_write
     ; else if (N64_READ):
     ;   goto wait_for_not_read_or_aleh
 
@@ -55,10 +57,18 @@ wait_for_not_read_or_aleh:
 
     ; Read all pins into OSR
     mov osr, pins
-    ; Dump 19 bits of OSR contents
-    out null, 19
+    ; Dump 18 bits of OSR contents
+    out null, 18
+
+    ; Effectively read gpio 18 into y, so we can branch on it
+    out y, 1 ;; N64_WRITE
+
+    ; if (!y) goto handle_write
+    jmp !y handle_write
+
     ; Effectively read gpio 19 into x, so we can branch on it
-    out x, 1
+    out x, 1 ;; N64_READ
+
     ; if (x): goto wait_for_not_read_or_aleh;
     jmp x-- wait_for_not_read_or_aleh
 
@@ -85,6 +95,20 @@ wait_for_not_read_or_aleh:
 
     jmp wait_for_not_read_or_aleh
 
+
+handle_write:
+
+    ; Sample AD0 -> AD15, put in ISR
+    in pins, 16
+
+    ; encode 1 in lsb
+    mov x, ~null
+    in x, 16
+
+    ; wait for N64_WRITE
+    wait 1 gpio 18
+
+    push
 
 .wrap             ; Handle PI transactions forever!
 

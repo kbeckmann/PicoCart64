@@ -18,7 +18,11 @@
 
 // The rom to load in normal .z64, big endian, format
 #include "rom.h"
-const uint32_t *rom_file_32 = (uint32_t *) rom_file;
+const uint16_t *rom_file_16 = (uint16_t *) rom_file;
+
+uint32_t SRAM[32 * 1024 / 4];
+uint16_t *SRAM_16 = (uint16_t *) SRAM;
+
 
 #define ARRAY_SIZE(x) (sizeof(x)/sizeof(x[0]))
 
@@ -35,6 +39,12 @@ static inline uint32_t swap16(uint32_t value)
 {
     // 0x11223344 => 0x33441122
     return (value << 16) | (value >> 16);
+}
+
+static inline uint32_t swap8(uint16_t value)
+{
+    // 0x1122 => 0x2211
+    return (value << 8) | (value >> 8);
 }
 
 /*
@@ -75,7 +85,7 @@ int main(void)
     // set_sys_clock_khz(300000, true); // Doesn't even boot
     // set_sys_clock_khz(400000, true); // Doesn't even boot
 
-    stdio_init_all();
+    // stdio_init_all();
 
     for (int i = 0; i <= 27; i++) {
         gpio_init(i);
@@ -121,6 +131,14 @@ int main(void)
     while (1) {
         uint32_t addr = swap16(pio_sm_get_blocking(pio, 0));
 
+        if (addr & 0x00000001) {
+            // We got a WRITE
+            // 0bxxxxxxxx_xxxxxxxx_11111111_11111111
+            SRAM_16[(last_addr & 0xFFFFFF)>>1] = addr >> 16;
+            last_addr += 2;
+            continue;
+        }
+
         if (addr != 0) {
             // We got a start address
             last_addr = addr;
@@ -129,24 +147,32 @@ int main(void)
         }
 
         // We got a "Give me next 16 bits" command
-        static uint32_t word;
-        if (get_msb) {
-            if (last_addr == 0x10000000) {
-                // Configure bus to run slowly.
-                // This is better patched in the rom, so we won't need a branch here.
-                // But let's keep it here so it's easy to import roms easily.
-                // 0x8037FF40 in big-endian
-                word = 0x40FF3780;
-            } else {
-                word = rom_file_32[(last_addr & 0xFFFFFF) >> 2];
-            }
-            pio_sm_put_blocking(pio, 0, ((word << 8) & 0xFF00)  | ((word >> 8) & 0xFF));
-        } else {
-            pio_sm_put_blocking(pio, 0, ((word >> 8) & 0xFF00)  | (word >> 24));
-            last_addr += 4;
+        uint32_t word;
+        if (last_addr == 0x10000000) {
+            // Configure bus to run slowly.
+            // This is better patched in the rom, so we won't need a branch here.
+            // But let's keep it here so it's easy to import roms easily.
+            // 0x8037FF40 in big-endian
+            word = 0x8037;
+            pio_sm_put_blocking(pio, 0, word);
+        } else if (last_addr == 0x10000002) {
+            // Configure bus to run slowly.
+            // This is better patched in the rom, so we won't need a branch here.
+            // But let's keep it here so it's easy to import roms easily.
+            // 0x8037FF40 in big-endian
+            word = 0xFF40;
+            pio_sm_put_blocking(pio, 0, word);
+        } else if (last_addr >= 0x08000000 && last_addr <= 0x0FFFFFFF) {
+            // Domain 2, Address 2	Cartridge SRAM
+            word = SRAM_16[(last_addr & 0xFFFFFF) >> 1];
+            pio_sm_put_blocking(pio, 0, word);
+        } else if (last_addr >= 0x10000000 && last_addr <= 0x1FBFFFFF) {
+            // Domain 1, Address 2	Cartridge ROM
+            word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
+            pio_sm_put_blocking(pio, 0, swap8(word));
         }
 
-        get_msb = !get_msb;
+        last_addr += 2;
     }
 
     return 0;
