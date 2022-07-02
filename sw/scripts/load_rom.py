@@ -9,7 +9,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    rom_h = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'cic_test', 'rom.h')
+    rom_h = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'picocart64', 'rom.h')
 
     with open(args.rom, 'rb') as r:
         with open(rom_h, 'w') as f:

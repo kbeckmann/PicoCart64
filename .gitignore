@@ -96,7 +96,6 @@ ENV/
 *.csv
 *.vcd
 *.gtkw
-*.txt
 *.hex
 *.z64
 

@@ -32,7 +32,7 @@ Data Line, Bidir (DIO):  CIC Pin 15
 #include "hardware/gpio.h"
 
 #include "cic.h"
-#include "n64.h"
+#include "picocart64_pins.h"
 
 
 // #define DEBUG

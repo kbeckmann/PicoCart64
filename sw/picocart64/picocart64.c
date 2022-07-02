@@ -11,10 +11,10 @@
 #include "pico/stdio.h"
 #include "pico/multicore.h"
 
-#include "cic_test.pio.h"
+#include "n64_pi.pio.h"
 
 #include "cic.h"
-#include "n64.h"
+#include "picocart64_pins.h"
 
 // The rom to load in normal .z64, big endian, format
 #include "rom.h"
@@ -105,8 +105,8 @@ int main(void)
 
     // Init PIO before starting the second core
     PIO pio = pio0;
-    uint offset = pio_add_program(pio, &cart_program);
-    cart_program_init(pio, 0, offset);
+    uint offset = pio_add_program(pio, &n64_pi_program);
+    n64_pi_program_init(pio, 0, offset);
     pio_sm_set_enabled(pio, 0, true);
 
     // Launch the CIC emulator in the second core

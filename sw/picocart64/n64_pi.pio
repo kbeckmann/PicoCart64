@@ -4,11 +4,11 @@
 ; SPDX-License-Identifier: BSD-3-Clause
 ;
 
-.program cart
+.program n64_pi
 
 ; For debugging, `set pins, 0` up to `3` may be used
 
-cart_start:
+n64_pi_start:
 
     ; Change IO dir of all pins to INPUT
     mov osr, null
@@ -47,13 +47,13 @@ wait_for_not_read_or_aleh:
 
     ; Pseudo-code of the loop below:
     ; if (N64_ALEH)
-    ;   goto cart_start
+    ;   goto n64_pi_start
     ; else if (~N64_WRITE):
     ;   goto handle_write
     ; else if (N64_READ):
     ;   goto wait_for_not_read_or_aleh
 
-    jmp pin cart_start
+    jmp pin n64_pi_start
 
     ; Read all pins into OSR
     mov osr, pins
@@ -114,7 +114,7 @@ handle_write:
 
 
 % c-sdk {
-void cart_program_init(PIO pio, uint sm, uint offset) {
+void n64_pi_program_init(PIO pio, uint sm, uint offset) {
 
     // gpio0 -> 22 input
     for (int i = 0; i <= 22; i++) {
@@ -132,7 +132,7 @@ void cart_program_init(PIO pio, uint sm, uint offset) {
     // Set 26, 27 as outputs
     pio_sm_set_consecutive_pindirs(pio, sm, 26, 2, true);
 
-    pio_sm_config c = cart_program_get_default_config(offset);
+    pio_sm_config c = n64_pi_program_get_default_config(offset);
 
     // 26, 27 = set pins
     sm_config_set_set_pins(&c, 26, 2);
