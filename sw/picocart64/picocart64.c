@@ -20,7 +20,11 @@
 #include "rom.h"
 const uint16_t *rom_file_16 = (uint16_t *) rom_file;
 
-uint32_t SRAM[32 * 1024 / 4];
+#define SRAM_256KBIT_SIZE         0x00008000
+#define SRAM_768KBIT_SIZE         0x00018000
+#define SRAM_1MBIT_SIZE           0x00020000
+
+uint32_t SRAM[SRAM_1MBIT_SIZE / sizeof(uint32_t)];
 uint16_t *SRAM_16 = (uint16_t *) SRAM;
 
 
@@ -45,6 +49,21 @@ static inline uint32_t swap8(uint16_t value)
 {
     // 0x1122 => 0x2211
     return (value << 8) | (value >> 8);
+}
+
+static inline uint32_t resolve_sram_address(uint32_t address)
+{
+    uint32_t bank = (address >> 18) & 0x3;
+    uint32_t resolved_address;
+
+    if (bank) {
+        resolved_address = address & (SRAM_256KBIT_SIZE - 1);
+        resolved_address |= bank << 15;
+    } else {
+        resolved_address = address & (sizeof(SRAM) - 1);
+    }
+
+    return resolved_address;
 }
 
 /*
@@ -134,7 +153,9 @@ int main(void)
         if (addr & 0x00000001) {
             // We got a WRITE
             // 0bxxxxxxxx_xxxxxxxx_11111111_11111111
-            SRAM_16[(last_addr & 0xFFFFFF)>>1] = addr >> 16;
+            if (last_addr >= 0x08000000 && last_addr <= 0x0FFFFFFF) {
+                SRAM_16[resolve_sram_address(last_addr) >> 1] = addr >> 16;
+            }
             last_addr += 2;
             continue;
         }
@@ -163,11 +184,11 @@ int main(void)
             word = 0xFF40;
             pio_sm_put_blocking(pio, 0, word);
         } else if (last_addr >= 0x08000000 && last_addr <= 0x0FFFFFFF) {
-            // Domain 2, Address 2	Cartridge SRAM
-            word = SRAM_16[(last_addr & 0xFFFFFF) >> 1];
+            // Domain 2, Address 2 Cartridge SRAM
+            word = SRAM_16[resolve_sram_address(last_addr) >> 1];
             pio_sm_put_blocking(pio, 0, word);
         } else if (last_addr >= 0x10000000 && last_addr <= 0x1FBFFFFF) {
-            // Domain 1, Address 2	Cartridge ROM
+            // Domain 1, Address 2 Cartridge ROM
             word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
             pio_sm_put_blocking(pio, 0, swap8(word));
         }
