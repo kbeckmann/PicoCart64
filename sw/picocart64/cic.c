@@ -516,8 +516,9 @@ static void cic_run(void)
 
     // send out the corresponding id
     unsigned char hello = 0x1;
-    if (isPal)
+    if (isPal) {
         hello |= 0x4;
+    }
 
     // printf("W: %02X\n", hello);
     WriteNibble(hello);
@@ -535,8 +536,7 @@ static void cic_run(void)
     _CicMem[0x01] = ReadNibble();
     _CicMem[0x11] = ReadNibble();
 
-    while(check_running())
-    {
+    while (check_running()) {
         // read mode (2 bit)
         unsigned char cmd = 0;
         cmd |= (ReadBit() << 1);
@@ -566,27 +566,8 @@ static void cic_run(void)
     }
 }
 
-static void core1_sio_irq(void)
-{
-    // For now, just receive the value and don't do anything with it
-    uint32_t core1_rx_val = 0;
-
-    while (multicore_fifo_rvalid())
-        core1_rx_val = multicore_fifo_pop_blocking();
-
-    multicore_fifo_clear_irq();
-}
-
 void cic_main(void)
 {
-    // Set up IRQ to let core0 interrupt core1.
-    multicore_fifo_clear_irq();
-    irq_set_exclusive_handler(SIO_IRQ_PROC1, core1_sio_irq);
-    irq_set_enabled(SIO_IRQ_PROC1, true);
-
-    // Push a dummy hello message to the other core.
-    multicore_fifo_push_blocking(CORE1_FLAG_BOOT);
-
     // Load SRAM backup from external flash
     // TODO: How do we detect if it's uninitialized (config area in flash?),
     //       or maybe we don't have to care?
@@ -600,5 +581,8 @@ void cic_main(void)
 
         // Send message to Core0, which will save the SRAM contents to flash.
         multicore_fifo_push_blocking(CORE1_FLAG_N64_CR);
+
+        // Commit SRAM to flash
+        sram_save_to_flash();
     }
 }

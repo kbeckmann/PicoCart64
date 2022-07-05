@@ -28,6 +28,7 @@
 #define UART_ID     uart0
 #define BAUD_RATE   115200
 
+static bool core1_running;
 
 static void core0_sio_irq()
 {
@@ -36,12 +37,8 @@ static void core0_sio_irq()
     while (multicore_fifo_rvalid())
         core0_rx_val = multicore_fifo_pop_blocking();
 
-    if (core0_rx_val == CORE1_FLAG_N64_CR) {
-        // CORE1_FLAG_N64_CR from core1 means we should save sram.
-        // Do it from irq context for now (bad idea!).
-        // TODO: Maybe unblock the pio_sm_get_blocking call
-        //       by resetting the state machine?
-        sram_save_to_flash();
+    if (core0_rx_val == CORE1_FLAG_BOOT) {
+        core1_running = true;
     }
 
     multicore_fifo_clear_irq();
@@ -100,14 +97,21 @@ int main(void)
     irq_set_exclusive_handler(SIO_IRQ_PROC0, core0_sio_irq);
     irq_set_enabled(SIO_IRQ_PROC0, true);
 
-    // Launch the CIC emulator in the second core
+    // Launch the N64 PI implementation in the second core
     // Note! You have to power reset the pico after flashing it with a jlink,
     //       otherwise multicore doesn't work properly.
     //       Alternatively, attach gdb to openocd, run `mon reset halt`, `c`.
     //       It seems this works around the issue as well.
-    multicore_launch_core1(cic_main);
+    multicore_launch_core1(n64_pi_run);
 
-    n64_pi_run();
+    // Wait for core1 to finish booting
+    while (!core1_running) {
+        tight_loop_contents();
+    }
+
+    // Launch the CIC emulator on the primary core
+    // TODO: Integrate FreeRTOS or similar
+    cic_main();
 
     return 0;
 }
