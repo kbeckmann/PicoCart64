@@ -83,8 +83,7 @@ static void core0_sio_irq()
 
 static inline uint32_t n64_pi_get_value(PIO pio)
 {
-    // TODO: Change shift direction in PIO to skip the swap16
-    uint32_t value = swap16(pio_sm_get_blocking(pio, 0));
+    uint32_t value = pio_sm_get_blocking(pio, 0);
 
     // Disable to get some more performance. Enable for debugging.
     // Without ringbuf, ROM access takes 160-180ns. With, 240-260ns.

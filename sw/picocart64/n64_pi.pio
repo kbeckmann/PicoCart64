@@ -134,6 +134,12 @@ void n64_pi_program_init(PIO pio, uint sm, uint offset) {
 
     pio_sm_config c = n64_pi_program_get_default_config(offset);
 
+    // shift_right=false, autopush=false, push_threshold=32
+    sm_config_set_in_shift(&c, false, false, 32);
+
+    // shift_right=true, autopull=false, pull_threshold=32
+    sm_config_set_out_shift(&c, true, false, 32);
+
     // 26, 27 = set pins
     sm_config_set_set_pins(&c, 26, 2);
 
