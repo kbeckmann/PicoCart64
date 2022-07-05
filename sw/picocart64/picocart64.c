@@ -10,23 +10,18 @@
 #include "pico/stdlib.h"
 #include "pico/stdio.h"
 #include "pico/multicore.h"
+#include "hardware/irq.h"
 
 #include "n64_pi.pio.h"
 
 #include "cic.h"
+#include "picocart64.h"
 #include "picocart64_pins.h"
+#include "sram.h"
 
 // The rom to load in normal .z64, big endian, format
 #include "rom.h"
-const uint16_t *rom_file_16 = (uint16_t *) rom_file;
-
-#define SRAM_256KBIT_SIZE         0x00008000
-#define SRAM_768KBIT_SIZE         0x00018000
-#define SRAM_1MBIT_SIZE           0x00020000
-
-uint32_t SRAM[SRAM_1MBIT_SIZE / sizeof(uint32_t)];
-uint16_t *SRAM_16 = (uint16_t *) SRAM;
-
+static const uint16_t *rom_file_16 = (uint16_t *) rom_file;
 
 #define ARRAY_SIZE(x) (sizeof(x)/sizeof(x[0]))
 
@@ -60,11 +55,30 @@ static inline uint32_t resolve_sram_address(uint32_t address)
         resolved_address = address & (SRAM_256KBIT_SIZE - 1);
         resolved_address |= bank << 15;
     } else {
-        resolved_address = address & (sizeof(SRAM) - 1);
+        resolved_address = address & (sizeof(sram) - 1);
     }
 
     return resolved_address;
 }
+
+static void core0_sio_irq()
+{
+    uint32_t core0_rx_val = 0;
+
+    while (multicore_fifo_rvalid())
+        core0_rx_val = multicore_fifo_pop_blocking();
+
+    if (core0_rx_val == CORE1_FLAG_N64_CR) {
+        // CORE1_FLAG_N64_CR from core1 means we should save sram.
+        // Do it from irq context for now (bad idea!).
+        // TODO: Maybe unblock the pio_sm_get_blocking call
+        //       by resetting the state machine?
+        sram_save_to_flash();
+    }
+
+    multicore_fifo_clear_irq();
+}
+
 
 /*
 
@@ -128,6 +142,10 @@ int main(void)
     n64_pi_program_init(pio, 0, offset);
     pio_sm_set_enabled(pio, 0, true);
 
+    // Set up IRQ to let core1 interrupt core0
+    irq_set_exclusive_handler(SIO_IRQ_PROC0, core0_sio_irq);
+    irq_set_enabled(SIO_IRQ_PROC0, true);
+
     // Launch the CIC emulator in the second core
     // Note! You have to power reset the pico after flashing it with a jlink,
     //       otherwise multicore doesn't work properly.
@@ -154,7 +172,7 @@ int main(void)
             // We got a WRITE
             // 0bxxxxxxxx_xxxxxxxx_11111111_11111111
             if (last_addr >= 0x08000000 && last_addr <= 0x0FFFFFFF) {
-                SRAM_16[resolve_sram_address(last_addr) >> 1] = addr >> 16;
+                sram[resolve_sram_address(last_addr) >> 1] = addr >> 16;
             }
             last_addr += 2;
             continue;
@@ -185,7 +203,7 @@ int main(void)
             pio_sm_put_blocking(pio, 0, word);
         } else if (last_addr >= 0x08000000 && last_addr <= 0x0FFFFFFF) {
             // Domain 2, Address 2 Cartridge SRAM
-            word = SRAM_16[resolve_sram_address(last_addr) >> 1];
+            word = sram[resolve_sram_address(last_addr) >> 1];
             pio_sm_put_blocking(pio, 0, word);
         } else if (last_addr >= 0x10000000 && last_addr <= 0x1FBFFFFF) {
             // Domain 1, Address 2 Cartridge ROM

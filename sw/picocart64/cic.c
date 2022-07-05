@@ -29,9 +29,14 @@ Data Line, Bidir (DIO):  CIC Pin 15
 #include <stdio.h>
 #include <string.h>
 #include "pico/stdlib.h"
+#include "pico/multicore.h"
 #include "hardware/gpio.h"
+#include "hardware/irq.h"
 
+
+#include "picocart64.h"
 #include "cic.h"
+#include "sram.h"
 #include "picocart64_pins.h"
 
 
@@ -499,7 +504,7 @@ static void cic_run(void)
 
     gpio_pull_up(N64_CIC_DIO);
 
-    printf("CIC Emulator core running!\r\n");
+    // printf("CIC Emulator core running!\r\n");
 
     // Wait for reset to be released
     while (gpio_get(N64_COLD_RESET) == 0) {
@@ -561,9 +566,39 @@ static void cic_run(void)
     }
 }
 
+static void core1_sio_irq(void)
+{
+    // For now, just receive the value and don't do anything with it
+    uint32_t core1_rx_val = 0;
+
+    while (multicore_fifo_rvalid())
+        core1_rx_val = multicore_fifo_pop_blocking();
+
+    multicore_fifo_clear_irq();
+}
+
 void cic_main(void)
 {
+    // Set up IRQ to let core0 interrupt core1.
+    multicore_fifo_clear_irq();
+    irq_set_exclusive_handler(SIO_IRQ_PROC1, core1_sio_irq);
+    irq_set_enabled(SIO_IRQ_PROC1, true);
+
+    // Push a dummy hello message to the other core.
+    multicore_fifo_push_blocking(CORE1_FLAG_BOOT);
+
+    // Load SRAM backup from external flash
+    // TODO: How do we detect if it's uninitialized (config area in flash?),
+    //       or maybe we don't have to care?
+    sram_load_from_flash();
+
     while (1) {
         cic_run();
+
+        // cic_run returns when N64_CR goes low, i.e.
+        // user presses the reset button, or the N64 loses power.
+
+        // Send message to Core0, which will save the SRAM contents to flash.
+        multicore_fifo_push_blocking(CORE1_FLAG_N64_CR);
     }
 }

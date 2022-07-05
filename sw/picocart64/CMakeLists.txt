@@ -1,6 +1,7 @@
 add_executable(picocart64
     picocart64.c
     cic.c
+    sram.c
 )
 
 # pull in common dependencies
@@ -8,6 +9,7 @@ target_link_libraries(
     picocart64
     pico_multicore
     pico_stdlib
+    hardware_flash
     hardware_pio
 )
 
