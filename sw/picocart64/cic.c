@@ -1,14 +1,16 @@
+/**
+ * SPDX-License-Identifier: MIT License
+ *
+ * Copyright (c) 2019 Jan Goldacker
+ * Copyright (c) 2021-2022 Konrad Beckmann <konrad.beckmann@gmail.com>
+ */
+
 /*
 
-This file is part of ECPKart64.
-
-Copyright (c) 2019 Jan Goldacker
-Copyright (c) 2021-2022 Konrad Beckmann <konrad.beckmann@gmail.com>
+This file is part of PicoCart64.
 
 This is a port of:
 https://github.com/jago85/UltraCIC_C/blob/master/cic_c.c
-
-SPDX-License-Identifier: MIT License
 
 Generic CIC implementation for N64
 ----------------------------------------------------------
@@ -21,8 +23,6 @@ You just have to implement the low level gpio functions:
 Hardware connections
 Data Clock Input (DCLK): CIC Pin 14
 Data Line, Bidir (DIO):  CIC Pin 15
-
-
 
 */
 
