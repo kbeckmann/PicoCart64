@@ -575,9 +575,6 @@ void cic_main(void)
         // cic_run returns when N64_CR goes low, i.e.
         // user presses the reset button, or the N64 loses power.
 
-        // Send message to Core0, which will save the SRAM contents to flash.
-        multicore_fifo_push_blocking(CORE1_FLAG_N64_CR);
-
         // Commit SRAM to flash
         sram_save_to_flash();
     }
