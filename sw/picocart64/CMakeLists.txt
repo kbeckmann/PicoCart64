@@ -1,6 +1,7 @@
 add_executable(picocart64
-    picocart64.c
     cic.c
+    n64_pi.c
+    picocart64.c
     sram.c
 )
 
