@@ -21,7 +21,6 @@
 #include "picocart64.h"
 #include "ringbuf.h"
 #include "sram.h"
-#include "utils.h"
 
 // The rom to load in normal .z64, big endian, format
 #include "rom.h"

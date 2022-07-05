@@ -8,15 +8,12 @@
 #include <string.h>
 
 #include "pico/stdlib.h"
-#include "pico/stdio.h"
 #include "pico/multicore.h"
 #include "hardware/irq.h"
 
 #include "cic.h"
 #include "picocart64_pins.h"
 #include "picocart64.h"
-#include "ringbuf.h"
-#include "sram.h"
 #include "utils.h"
 #include "n64_pi.h"
 

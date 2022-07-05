@@ -29,12 +29,8 @@ Data Line, Bidir (DIO):  CIC Pin 15
 #include <stdio.h>
 #include <string.h>
 #include "pico/stdlib.h"
-#include "pico/multicore.h"
 #include "hardware/gpio.h"
-#include "hardware/irq.h"
 
-
-#include "picocart64.h"
 #include "cic.h"
 #include "sram.h"
 #include "picocart64_pins.h"
