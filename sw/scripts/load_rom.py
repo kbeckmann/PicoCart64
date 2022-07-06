@@ -32,7 +32,8 @@ def compress_rom(rom_data):
     print(f"Found {len(unique_chunks)} unique chunks")
     # print(chunk_mapping)
 
-    code = "const uint16_t __in_flash(\"rom_file\") rom_mapping[] = {\n"
+    # Note the lack of __in_flash() - we want the mapping to be copied to SRAM.
+    code = "const uint16_t rom_mapping[] = {\n"
     code += ", ".join([str(i) for i in chunk_mapping])
     code += "\n};"
     code += "const unsigned char __in_flash(\"rom_file\") rom_chunks[][" + str(chunk_size) + "] = {\n"
