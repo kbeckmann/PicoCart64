@@ -24,7 +24,12 @@
 
 // The rom to load in normal .z64, big endian, format
 #include "rom.h"
+
+#if COMPRESSED_ROM
+// do something
+#else
 static const uint16_t *rom_file_16 = (uint16_t *) rom_file;
+#endif
 
 RINGBUF_CREATE(ringbuf, 64);
 
@@ -135,7 +140,13 @@ void n64_pi_run(void)
             last_addr += 2;
 
             // Pre-fetch
+#if COMPRESSED_ROM
+            uint32_t chunk_index = rom_mapping[(last_addr & 0xFFFFFF) >> 12];
+            const uint16_t *chunk_16 = (const uint16_t *) rom_chunks[chunk_index];
+            next_word = chunk_16[(last_addr & 0xFFF) >> 1];
+#else
             next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
+#endif
 
             // ROM patching done
             addr = n64_pi_get_value(pio);
@@ -174,7 +185,13 @@ void n64_pi_run(void)
             // Domain 1, Address 2 Cartridge ROM
             do {
                 // Pre-fetch from the address
+#if COMPRESSED_ROM
+                uint32_t chunk_index = rom_mapping[(last_addr & 0xFFFFFF) >> 12];
+                const uint16_t *chunk_16 = (const uint16_t *) rom_chunks[chunk_index];
+                next_word = chunk_16[(last_addr & 0xFFF) >> 1];
+#else
                 next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
+#endif
 
                 // Read command/address
                 addr = n64_pi_get_value(pio);
