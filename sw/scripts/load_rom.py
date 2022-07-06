@@ -30,6 +30,12 @@ def compress_rom(rom_data):
             unique_chunks.append(chunk_data)
         chunk_mapping.append(unique_chunks.index(chunk_data))
     print(f"Found {len(unique_chunks)} unique chunks")
+    unique_chunks_size = len(unique_chunks) * chunk_size
+    chunk_mapping_size = len(chunk_mapping) * 2
+    print(f"Chunk data size: {unique_chunks_size / 1024:10.2f} kB")
+    print(f"Mapping size:    {chunk_mapping_size / 1024:10.2f} kB")
+    print(f"Total size:      {(unique_chunks_size + chunk_mapping_size) / 1024:10.2f} kB")
+
     # print(chunk_mapping)
 
     # Note the lack of __in_flash() - we want the mapping to be copied to SRAM.
