@@ -25,6 +25,9 @@
 #define UART_ID     uart0
 #define BAUD_RATE   115200
 
+#define ENABLE_N64_PI 1
+
+#if ENABLE_N64_PI
 static bool core1_running;
 
 static void core0_sio_irq()
@@ -40,7 +43,7 @@ static void core0_sio_irq()
 
     multicore_fifo_clear_irq();
 }
-
+#endif
 
 /*
 
@@ -69,8 +72,8 @@ int main(void)
     // but since it's used with a 2x clock divider,
     // 266 MHz is safe in this regard.
 
-    // set_sys_clock_khz(PLL_SYS_KHZ, true);
-    set_sys_clock_khz(266000, true); // Required for SRAM @ 200ns
+    set_sys_clock_khz(133000, true);
+    // set_sys_clock_khz(266000, true); // Required for SRAM @ 200ns
 
     // stdio_init_all();
 
@@ -80,15 +83,11 @@ int main(void)
         gpio_set_pulls(i, false, false);
     }
 
-    gpio_init(N64_CIC_DCLK);
-    gpio_init(N64_CIC_DIO);
-    gpio_init(N64_COLD_RESET);
-
-    gpio_pull_up(N64_CIC_DIO);
-
     // Init UART on pin 28/29
     stdio_uart_init_full(UART_ID, BAUD_RATE, UART_TX_PIN, UART_RX_PIN);
     printf("PicoCart64 Booting!\r\n");
+
+#if ENABLE_N64_PI
 
     // Set up IRQ to let core1 interrupt core0
     irq_set_exclusive_handler(SIO_IRQ_PROC0, core0_sio_irq);
@@ -105,6 +104,20 @@ int main(void)
     while (!core1_running) {
         tight_loop_contents();
     }
+
+#endif
+
+    // Ensure CIC pins are correctly configured after core1 has booted
+    gpio_init(N64_CIC_DCLK);
+    gpio_set_dir(N64_CIC_DCLK, GPIO_IN);
+
+    gpio_init(N64_CIC_DIO);
+    gpio_set_dir(N64_CIC_DIO, GPIO_IN);
+    gpio_pull_up(N64_CIC_DIO);
+
+    gpio_init(N64_COLD_RESET);
+
+
 
     // Launch the CIC emulator on the primary core
     // TODO: Integrate FreeRTOS or similar

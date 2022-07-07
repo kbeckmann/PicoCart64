@@ -82,14 +82,15 @@ void n64_pi_run(void)
     irq_set_exclusive_handler(SIO_IRQ_PROC1, core1_sio_irq);
     irq_set_enabled(SIO_IRQ_PROC1, true);
 
-    // Push a dummy hello message to the other core.
-    multicore_fifo_push_blocking(CORE1_FLAG_BOOT);
-
     // Init PIO
     PIO pio = pio0;
     uint offset = pio_add_program(pio, &n64_pi_program);
     n64_pi_program_init(pio, 0, offset);
     pio_sm_set_enabled(pio, 0, true);
+
+    // Push a dummy hello message to the other core.
+    // This should be done _after_ PIO is initialized.
+    multicore_fifo_push_blocking(CORE1_FLAG_BOOT);
 
     // Wait for reset to be released
     while (gpio_get(N64_COLD_RESET) == 0) {
@@ -128,11 +129,11 @@ void n64_pi_run(void)
             last_addr += 2;
 
             // Patch bus speed here if needed (e.g. if not overclocking)
-            // next_word = 0xFF40;
+            next_word = 0xFF40;
             // next_word = 0x2040;
 
             // Official SDK standard speed
-            next_word = 0x1240;
+            // next_word = 0x1240;
             addr = n64_pi_get_value(pio);
 
             // Assume addr == 0, i.e. push 16 bits of data

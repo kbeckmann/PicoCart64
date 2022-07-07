@@ -116,21 +116,13 @@ handle_write:
 % c-sdk {
 void n64_pi_program_init(PIO pio, uint sm, uint offset) {
 
-    // gpio0 -> 22 input
-    for (int i = 0; i <= 22; i++) {
+    // Init gpios [gpio0, gpio19] as inputs
+    for (int i = 0; i <= 19; i++) {
         pio_gpio_init(pio, i);
     }
 
-    // LA1, LA2
-    pio_gpio_init(pio, 26);
-    pio_gpio_init(pio, 27);
-
-    // AD0 -> AD15 input
-    // gpio 0 -> 22 are input for now
-    pio_sm_set_consecutive_pindirs(pio, sm, 0, 23, false);
-
-    // Set 26, 27 as outputs
-    pio_sm_set_consecutive_pindirs(pio, sm, 26, 2, true);
+    // Set [AD0, AD15] as input
+    pio_sm_set_consecutive_pindirs(pio, sm, 0, 19, false);
 
     pio_sm_config c = n64_pi_program_get_default_config(offset);
 
@@ -140,16 +132,13 @@ void n64_pi_program_init(PIO pio, uint sm, uint offset) {
     // shift_right=true, autopull=false, pull_threshold=32
     sm_config_set_out_shift(&c, true, false, 32);
 
-    // 26, 27 = set pins
-    sm_config_set_set_pins(&c, 26, 2);
-
-    // AD0 -> AD16 as in pins
+    // Set [AD0, AD15] as in pins
     sm_config_set_in_pins(&c, 0);
 
-    // AD0 -> AD16 as out pins
+    // Set [AD0, AD15] as out pins
     sm_config_set_out_pins(&c, 0, 16);
 
-    // JMP pin = ALEH
+    // Set ALEH as JMP pin
     sm_config_set_jmp_pin(&c, 17);
 
     pio_sm_init(pio, sm, offset, &c);

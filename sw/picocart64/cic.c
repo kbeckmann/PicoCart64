@@ -42,6 +42,7 @@ Data Line, Bidir (DIO):  CIC Pin 15
 #define REGION_PAL  (1)
 
 #define GET_REGION() (REGION_PAL)
+// #define GET_REGION() (REGION_NTSC)
 
 /* SEEDs */
 
@@ -135,7 +136,7 @@ static unsigned char ReadBit(void)
     // wait for DCLK to go low
     do {
         vin = gpio_get(N64_CIC_DCLK);
-    } while ((vin & 1) && check_running());
+    } while (vin && check_running());
 
     // Read the data bit
     res = gpio_get(N64_CIC_DIO);
@@ -143,7 +144,7 @@ static unsigned char ReadBit(void)
     // wait for DCLK to go high
     do {
         vin = gpio_get(N64_CIC_DCLK);
-    } while (((vin & 1) == 0) && check_running());
+    } while ((!vin) && check_running());
 
     return res ? 1 : 0;
 }
@@ -155,7 +156,7 @@ static void WriteBit(unsigned char b)
     // wait for DCLK to go low
     do {
         vin = gpio_get(N64_CIC_DCLK);
-    } while ((vin & 1) && check_running());
+    } while (vin && check_running());
 
     if (b == 0)
     {
@@ -167,7 +168,7 @@ static void WriteBit(unsigned char b)
     // wait for DCLK to go high
     do {
         vin = gpio_get(N64_CIC_DCLK);
-    } while (((vin & 1) == 0) && check_running());
+    } while ((!vin) && check_running());
 
     // Disable output
     gpio_set_dir(N64_CIC_DIO, GPIO_IN);
@@ -493,12 +494,6 @@ static void cic_run(void)
     // Reset the state
     memset(_CicMem, 0, sizeof(_CicMem));
     memset(_6105Mem, 0, sizeof(_6105Mem));
-
-    gpio_init(N64_CIC_DCLK);
-    gpio_init(N64_CIC_DIO);
-    gpio_init(N64_COLD_RESET);
-
-    gpio_pull_up(N64_CIC_DIO);
 
     // printf("CIC Emulator core running!\r\n");
 
