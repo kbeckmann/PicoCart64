@@ -141,9 +141,9 @@ void n64_pi_run(void)
 
             // Pre-fetch
 #if COMPRESSED_ROM
-            uint32_t chunk_index = rom_mapping[(last_addr & 0xFFFFFF) >> 12];
+            uint32_t chunk_index = rom_mapping[(last_addr & 0xFFFFFF) >> COMPRESSION_SHIFT_AMOUNT];
             const uint16_t *chunk_16 = (const uint16_t *) rom_chunks[chunk_index];
-            next_word = chunk_16[(last_addr & 0xFFF) >> 1];
+            next_word = chunk_16[(last_addr & COMPRESSION_MASK) >> 1];
 #else
             next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
 #endif
@@ -186,9 +186,9 @@ void n64_pi_run(void)
             do {
                 // Pre-fetch from the address
 #if COMPRESSED_ROM
-                uint32_t chunk_index = rom_mapping[(last_addr & 0xFFFFFF) >> 12];
+                uint32_t chunk_index = rom_mapping[(last_addr & 0xFFFFFF) >> COMPRESSION_SHIFT_AMOUNT];
                 const uint16_t *chunk_16 = (const uint16_t *) rom_chunks[chunk_index];
-                next_word = chunk_16[(last_addr & 0xFFF) >> 1];
+                next_word = chunk_16[(last_addr & COMPRESSION_MASK) >> 1];
 #else
                 next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
 #endif

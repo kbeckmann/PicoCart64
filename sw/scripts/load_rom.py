@@ -16,20 +16,27 @@ def uncompressed_rom(rom_data):
 
 
 def compress_rom(rom_data):
-    chunk_size = 4096
+    chunk_size_pot = 10
+    chunk_size = 1 << chunk_size_pot
 
-    assert(len(rom_data) % chunk_size == 0)
-
-    rom_data_ba = bytearray(rom_data)
+    rom_data_mv = memoryview(rom_data)
 
     unique_chunks = []
+    unique_chunks_map = {}
     chunk_mapping = []
-    for chunk in range(len(rom_data_ba) // chunk_size):
-        chunk_data = rom_data_ba[chunk*chunk_size:(chunk+1)*chunk_size]
-        if not chunk_data in unique_chunks:
+    chunk_idx = 0
+    for chunk in range(len(rom_data_mv) // chunk_size):
+        chunk_data = rom_data_mv[chunk*chunk_size:(chunk+1)*chunk_size]
+        if not chunk_data in unique_chunks_map:
             unique_chunks.append(chunk_data)
-        chunk_mapping.append(unique_chunks.index(chunk_data))
+            unique_chunks_map[chunk_data] = chunk_idx
+            chunk_mapping.append(chunk_idx)
+            chunk_idx += 1
+        else:
+            chunk_mapping.append(unique_chunks_map[chunk_data])
+
     print(f"Found {len(unique_chunks)} unique chunks")
+
     unique_chunks_size = len(unique_chunks) * chunk_size
     chunk_mapping_size = len(chunk_mapping) * 2
     print(f"Chunk data size: {unique_chunks_size / 1024:10.2f} kB")
@@ -46,9 +53,11 @@ def compress_rom(rom_data):
     for chunk in unique_chunks:
         code += "{"
         code += ','.join([hex(c) for c in chunk])
-        code += "},"
+        code += "},\n"
     code += "};\n"
-    code += "#define COMPRESSED_ROM 1"
+    code += "#define COMPRESSED_ROM 1\n"
+    code += f"#define COMPRESSION_SHIFT_AMOUNT {chunk_size_pot}\n"
+    code += f"#define COMPRESSION_MASK {chunk_size - 1}\n"
 
     return code
 
