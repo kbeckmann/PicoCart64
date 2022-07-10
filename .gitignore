@@ -108,3 +108,7 @@ fp-info-cache
 build/
 
 \#auto_saved_files#
+
+*.elf
+*.bin
+*.o
