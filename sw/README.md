@@ -8,7 +8,8 @@ git submodule update --init
 cd sw
 
 # Load a rom into sw/picocart64/rom.h
-./scripts/load_rom.py my_rom.z64
+# `--compress` will compress the rom with a simple compression scheme.
+./scripts/load_rom.py --compress my_rom.z64
 
 mkdir build
 cd build
