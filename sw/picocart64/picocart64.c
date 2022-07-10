@@ -129,8 +129,8 @@ int main(void)
     // but since it's used with a 2x clock divider,
     // 266 MHz is safe in this regard.
 
-    set_sys_clock_khz(133000, true);
-    // set_sys_clock_khz(266000, true); // Required for SRAM @ 200ns
+    // set_sys_clock_khz(133000, true);
+    set_sys_clock_khz(266000, true); // Required for SRAM @ 200ns
 
     // Init GPIOs before starting the second core and FreeRTOS
     for (int i = 0; i <= 27; i++) {
