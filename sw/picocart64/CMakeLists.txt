@@ -5,6 +5,14 @@ add_executable(picocart64
     sram.c
 )
 
+target_compile_definitions(picocart64 PRIVATE
+    PICO_STDOUT_MUTEX=0
+)
+
+target_include_directories(picocart64 PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}
+)
+
 # pull in common dependencies
 target_link_libraries(
     picocart64
@@ -12,6 +20,7 @@ target_link_libraries(
     pico_stdlib
     hardware_flash
     hardware_pio
+    FreeRTOS-Kernel-Static # FreeRTOS kernel, static allocations
 )
 
 # Build pio

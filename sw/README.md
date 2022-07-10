@@ -2,6 +2,9 @@ To build and flash with a j-link:
 
 ```bash
 
+# First of all, don't forget to update submodules
+git submodule update --init
+
 cd sw
 
 # Load a rom into sw/picocart64/rom.h

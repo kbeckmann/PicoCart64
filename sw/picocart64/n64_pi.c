@@ -63,34 +63,14 @@ static inline uint32_t n64_pi_get_value(PIO pio)
     return value;
 }
 
-static void core1_sio_irq(void)
-{
-    // For now, just receive the value and don't do anything with it
-    uint32_t core1_rx_val = 0;
-
-    while (multicore_fifo_rvalid())
-        core1_rx_val = multicore_fifo_pop_blocking();
-
-    multicore_fifo_clear_irq();
-}
-
 
 void n64_pi_run(void)
 {
-    // Set up IRQ to let core0 interrupt core1.
-    multicore_fifo_clear_irq();
-    irq_set_exclusive_handler(SIO_IRQ_PROC1, core1_sio_irq);
-    irq_set_enabled(SIO_IRQ_PROC1, true);
-
     // Init PIO
     PIO pio = pio0;
     uint offset = pio_add_program(pio, &n64_pi_program);
     n64_pi_program_init(pio, 0, offset);
     pio_sm_set_enabled(pio, 0, true);
-
-    // Push a dummy hello message to the other core.
-    // This should be done _after_ PIO is initialized.
-    multicore_fifo_push_blocking(CORE1_FLAG_BOOT);
 
     // Wait for reset to be released
     while (gpio_get(N64_COLD_RESET) == 0) {

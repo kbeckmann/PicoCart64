@@ -28,6 +28,10 @@ Data Line, Bidir (DIO):  CIC Pin 15
 
 #include <stdio.h>
 #include <string.h>
+
+#include "FreeRTOS.h"
+#include "task.h"
+
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 
@@ -136,6 +140,7 @@ static unsigned char ReadBit(void)
     // wait for DCLK to go low
     do {
         vin = gpio_get(N64_CIC_DCLK);
+        vPortYield();
     } while (vin && check_running());
 
     // Read the data bit
@@ -144,6 +149,7 @@ static unsigned char ReadBit(void)
     // wait for DCLK to go high
     do {
         vin = gpio_get(N64_CIC_DCLK);
+        vPortYield();
     } while ((!vin) && check_running());
 
     return res ? 1 : 0;
@@ -156,6 +162,7 @@ static void WriteBit(unsigned char b)
     // wait for DCLK to go low
     do {
         vin = gpio_get(N64_CIC_DCLK);
+        vPortYield();
     } while (vin && check_running());
 
     if (b == 0)
@@ -168,6 +175,7 @@ static void WriteBit(unsigned char b)
     // wait for DCLK to go high
     do {
         vin = gpio_get(N64_CIC_DCLK);
+        vPortYield();
     } while ((!vin) && check_running());
 
     // Disable output
@@ -499,7 +507,7 @@ static void cic_run(void)
 
     // Wait for reset to be released
     while (gpio_get(N64_COLD_RESET) == 0) {
-        tight_loop_contents();
+        vPortYield();
     }
 
     // read the region setting
@@ -528,6 +536,7 @@ static void cic_run(void)
     _CicMem[0x11] = ReadNibble();
 
     while (check_running()) {
+        vPortYield();
         // read mode (2 bit)
         unsigned char cmd = 0;
         cmd |= (ReadBit() << 1);
@@ -572,5 +581,7 @@ void cic_main(void)
 
         // Commit SRAM to flash
         sram_save_to_flash();
+
+        vPortYield();
     }
 }

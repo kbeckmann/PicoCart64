@@ -7,6 +7,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "FreeRTOS.h"
+#include "task.h"
+
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 #include "hardware/irq.h"
@@ -27,23 +30,16 @@
 
 #define ENABLE_N64_PI 1
 
-#if ENABLE_N64_PI
-static bool core1_running;
+// Priority 0 = lowest, 31 = highest
+#define CIC_TASK_PRIORITY     (tskIDLE_PRIORITY + 1UL)
+#define SECOND_TASK_PRIORITY  (tskIDLE_PRIORITY + 2UL)
 
-static void core0_sio_irq()
-{
-    uint32_t core0_rx_val = 0;
 
-    while (multicore_fifo_rvalid())
-        core0_rx_val = multicore_fifo_pop_blocking();
+static StaticTask_t cic_task;
+static StaticTask_t second_task;
+static StackType_t  cic_task_stack[4 * 1024 / sizeof(StackType_t)];
+static StackType_t  second_task_stack[4 * 1024 / sizeof(StackType_t)];
 
-    if (core0_rx_val == CORE1_FLAG_BOOT) {
-        core1_running = true;
-    }
-
-    multicore_fifo_clear_irq();
-}
-#endif
 
 /*
 
@@ -65,6 +61,67 @@ Time between ~N64_READ and bit output on AD0
 
 */
 
+
+// FreeRTOS boilerplate
+void vApplicationGetTimerTaskMemory(StaticTask_t **ppxTimerTaskTCBBuffer,
+                                    StackType_t **ppxTimerTaskStackBuffer,
+                                    uint32_t *pulTimerTaskStackSize)
+{
+    static StaticTask_t xTimerTaskTCB;
+    static StackType_t uxTimerTaskStack[ configTIMER_TASK_STACK_DEPTH ];
+
+    *ppxTimerTaskTCBBuffer = &xTimerTaskTCB;
+    *ppxTimerTaskStackBuffer = uxTimerTaskStack;
+    *pulTimerTaskStackSize = configTIMER_TASK_STACK_DEPTH;
+}
+
+void cic_task_entry(__unused void *params)
+{
+    printf("cic_task_entry\n");
+
+    cic_main();
+}
+
+void second_task_entry(__unused void *params)
+{
+    uint32_t count = 0;
+
+    printf("second_task_entry\n");
+
+    while (true) {
+        vTaskDelay(1000);
+        count++;
+
+        // Set to 1 to print stack watermarks.
+        // Printing is synchronous and interferes with the CIC emulation.
+#if 1
+        // printf("Second task heartbeat: %d\n", count);
+        // vPortYield();
+
+        if (count > 10) {
+            printf("watermark: %d\n", uxTaskGetStackHighWaterMark(NULL));
+            vPortYield();
+
+            printf("watermark second_task: %d\n", uxTaskGetStackHighWaterMark((TaskHandle_t) &second_task));
+            vPortYield();
+
+            printf("watermark cic_task: %d\n", uxTaskGetStackHighWaterMark((TaskHandle_t) &cic_task));
+            vPortYield();
+        }
+#endif
+
+    }
+}
+
+void vLaunch(void)
+{
+    xTaskCreateStatic(cic_task_entry,    "CICThread",    configMINIMAL_STACK_SIZE, NULL, CIC_TASK_PRIORITY,    cic_task_stack,    &cic_task);
+    xTaskCreateStatic(second_task_entry, "SecondThread", configMINIMAL_STACK_SIZE, NULL, SECOND_TASK_PRIORITY, second_task_stack, &second_task);
+
+    /* Start the tasks and timer running. */
+    vTaskStartScheduler();
+}
+
 int main(void)
 {
     // Overclock!
@@ -75,53 +132,31 @@ int main(void)
     set_sys_clock_khz(133000, true);
     // set_sys_clock_khz(266000, true); // Required for SRAM @ 200ns
 
-    // stdio_init_all();
-
+    // Init GPIOs before starting the second core and FreeRTOS
     for (int i = 0; i <= 27; i++) {
         gpio_init(i);
         gpio_set_dir(i, GPIO_IN);
         gpio_set_pulls(i, false, false);
     }
 
+    // Enable pull up on N64_CIC_DIO since there is no external one.
+    gpio_pull_up(N64_CIC_DIO);
+
     // Init UART on pin 28/29
     stdio_uart_init_full(UART_ID, BAUD_RATE, UART_TX_PIN, UART_RX_PIN);
-    printf("PicoCart64 Booting!\r\n");
+    printf("PicoCart64 Boot\r\n");
 
 #if ENABLE_N64_PI
-
-    // Set up IRQ to let core1 interrupt core0
-    irq_set_exclusive_handler(SIO_IRQ_PROC0, core0_sio_irq);
-    irq_set_enabled(SIO_IRQ_PROC0, true);
-
     // Launch the N64 PI implementation in the second core
     // Note! You have to power reset the pico after flashing it with a jlink,
     //       otherwise multicore doesn't work properly.
     //       Alternatively, attach gdb to openocd, run `mon reset halt`, `c`.
     //       It seems this works around the issue as well.
     multicore_launch_core1(n64_pi_run);
-
-    // Wait for core1 to finish booting
-    while (!core1_running) {
-        tight_loop_contents();
-    }
-
 #endif
 
-    // Ensure CIC pins are correctly configured after core1 has booted
-    gpio_init(N64_CIC_DCLK);
-    gpio_set_dir(N64_CIC_DCLK, GPIO_IN);
-
-    gpio_init(N64_CIC_DIO);
-    gpio_set_dir(N64_CIC_DIO, GPIO_IN);
-    gpio_pull_up(N64_CIC_DIO);
-
-    gpio_init(N64_COLD_RESET);
-
-
-
-    // Launch the CIC emulator on the primary core
-    // TODO: Integrate FreeRTOS or similar
-    cic_main();
+    // Start FreeRTOS on Core0
+    vLaunch();
 
     return 0;
 }
