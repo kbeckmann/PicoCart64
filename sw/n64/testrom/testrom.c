@@ -41,6 +41,21 @@ static volatile PI_regs_t * const PI_regs = (PI_regs_t *) 0xA4600000;
 #define CART_DOM1_ADDR3_START     0x1FD00000
 #define CART_DOM1_ADDR3_END       0x7FFFFFFF
 
+// PicoCart64 Address Space
+#define PC64_BASE_ADDRESS_START   0xB0000000
+#define PC64_BASE_ADDRESS_END     (PC64_BASE_ADDRESS_START + 0xFFF)
+
+#define PC64_CIBASE_ADDRESS_START 0xB8000000
+#define PC64_CIBASE_ADDRESS_END   0xB8000FFF
+
+#define PC64_REGISTER_MAGIC       0x00000000
+
+// Write length to print from TX buffer
+#define PC64_REGISTER_UART      0x00000004
+
+#define PC64_MAGIC              0xDEAD6400
+
+
 // SRAM constants
 #define SRAM_256KBIT_SIZE         0x00008000
 #define SRAM_768KBIT_SIZE         0x00018000
@@ -92,6 +107,20 @@ static void verify_memory_range(uint32_t base, uint32_t offset, uint32_t len)
         assert(end   <= CART_DOM1_ADDR3_END);
         break;
 
+    case PC64_BASE_ADDRESS_START:
+        assert(start >= PC64_BASE_ADDRESS_START);
+        assert(start <= PC64_BASE_ADDRESS_END);
+        assert(end   >= PC64_BASE_ADDRESS_START);
+        assert(end   <= PC64_BASE_ADDRESS_END);
+        break;
+
+    case PC64_CIBASE_ADDRESS_START:
+        assert(start >= PC64_CIBASE_ADDRESS_START);
+        assert(start <= PC64_CIBASE_ADDRESS_END);
+        assert(end   >= PC64_CIBASE_ADDRESS_START);
+        assert(end   <= PC64_CIBASE_ADDRESS_END);
+        break;
+
     default:
         assert(!"Unsupported base");
     }
@@ -138,6 +167,14 @@ static void pi_write_raw(const void * src, uint32_t base, uint32_t offset, uint3
     dma_wait();
 }
 
+static void pi_write_u32(const uint32_t value, uint32_t base, uint32_t offset)
+{
+    uint32_t buf[] = {value};
+
+    data_cache_hit_writeback_invalidate(buf, sizeof(buf));
+    pi_write_raw(buf, base, offset, sizeof(buf));
+}
+
 
 static unsigned int seed;
 
@@ -156,6 +193,7 @@ static void rand32_reset(void)
 
 static uint8_t __attribute__ ((aligned(16))) facit_buf[SRAM_1MBIT_SIZE];
 static uint8_t __attribute__ ((aligned(16))) read_buf[SRAM_1MBIT_SIZE];
+static char    __attribute__ ((aligned(16))) write_buf[0x1000];
 
 int main(void)
 {
@@ -197,14 +235,31 @@ int main(void)
             }
         }
     } else {
-        printf("[OK]   SRAM was backed up properly.\n");
+        printf("[ OK ] SRAM was backed up properly.\n");
     }
+
+    // Verify PicoCart64 Magic
+    data_cache_hit_writeback_invalidate(read_buf, sizeof(read_buf));
+    pi_read_raw(read_buf, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_MAGIC, sizeof(uint32_t));
+    if (read_buf32[0] == PC64_MAGIC) {
+        printf("[ OK ] MAGIC = 0x%08lX.\n", read_buf32[0]);
+    } else {
+        printf("[FAIL] MAGIC = 0x%08lX.\n", read_buf32[0]);
+    }
+
+    // Print Hello world from the N64
+    strcpy(write_buf, "Hello from the N64!\r\n");
+    data_cache_hit_writeback_invalidate(write_buf, sizeof(write_buf));
+    pi_write_raw(write_buf, PC64_BASE_ADDRESS_START, 0, (strlen(write_buf) + 3) & (-4));
+
+    pi_write_u32(strlen(write_buf), PC64_CIBASE_ADDRESS_START, PC64_REGISTER_UART);
+    printf("[ -- ] Wrote hello over UART.\n");
 
     // Write 1Mbit of SRAM
     data_cache_hit_writeback_invalidate(facit_buf, sizeof(facit_buf));
     pi_write_raw(facit_buf, CART_DOM2_ADDR2_START, 0, sizeof(facit_buf));
 
-    printf("[OK]   Wrote test pattern to SRAM.\n");
+    printf("[ -- ] Wrote test pattern to SRAM.\n");
 
     console_render();
 }

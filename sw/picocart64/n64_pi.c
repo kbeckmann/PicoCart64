@@ -21,6 +21,7 @@
 #include "picocart64.h"
 #include "ringbuf.h"
 #include "sram.h"
+#include "stdio_async_uart.h"
 
 // The rom to load in normal .z64, big endian, format
 #include "rom.h"
@@ -32,6 +33,23 @@ static const uint16_t *rom_file_16 = (uint16_t *) rom_file;
 #endif
 
 RINGBUF_CREATE(ringbuf, 64, uint32_t);
+
+
+// UART TX buffer
+static uint16_t pc64_uart_tx_buf[1024];
+#define PC64_BASE_ADDRESS_START 0xB0000000
+#define PC64_BASE_ADDRESS_END   (PC64_BASE_ADDRESS_START + sizeof(pc64_uart_tx_buf) - 1)
+
+#define PC64_CIBASE_ADDRESS_START 0xB8000000
+#define PC64_CIBASE_ADDRESS_END   0xB8000FFF
+
+#define PC64_REGISTER_MAGIC       0x00000000
+
+// Write length to print from TX buffer
+#define PC64_REGISTER_UART_TX     0x00000004
+
+#define PC64_MAGIC                0xDEAD6400
+
 
 
 static inline uint32_t resolve_sram_address(uint32_t address)
@@ -58,6 +76,8 @@ static inline uint32_t n64_pi_get_value(PIO pio)
     // Without ringbuf, ROM access takes 160-180ns. With, 240-260ns.
 #if 0
     ringbuf_add(ringbuf, value);
+#elif 0
+    uart_print_hex_u32(value);
 #endif
 
     return value;
@@ -230,6 +250,76 @@ handle_d1a2_read:
                     // WRITE
                     // Ignore
                     last_addr += 2;
+                } else {
+                    // New address
+                    break;
+                }
+            } while(1);
+        } else if (last_addr >= PC64_BASE_ADDRESS_START && last_addr <= PC64_BASE_ADDRESS_END) {
+            // PicoCart64 BASE address space
+            do {
+                // Pre-fetch from the address
+                next_word = pc64_uart_tx_buf[(last_addr & (sizeof(pc64_uart_tx_buf) - 1)) >> 1];
+
+                // Read command/address
+                addr = n64_pi_get_value(pio);
+
+                if (addr & 0x00000001) {
+                    // We got a WRITE
+                    // 0bxxxxxxxx_xxxxxxxx_11111111_11111111
+                    pc64_uart_tx_buf[(last_addr & (sizeof(pc64_uart_tx_buf) - 1)) >> 1] = swap8(addr >> 16);
+                    last_addr += 2;
+                } else if (addr == 0) {
+                    // READ
+                    pio_sm_put(pio, 0, next_word);
+                    last_addr += 2;
+                    next_word = pc64_uart_tx_buf[(last_addr & (sizeof(pc64_uart_tx_buf) - 1)) >> 1];
+                } else {
+                    // New address
+                    break;
+                }
+            } while(1);
+        } else if (last_addr >= PC64_CIBASE_ADDRESS_START && last_addr <= PC64_CIBASE_ADDRESS_END) {
+            // PicoCart64 CIBASE address space
+            do {
+                // Read command/address
+                addr = n64_pi_get_value(pio);
+
+                if (addr == 0) {
+                    // READ
+                    switch (last_addr - PC64_CIBASE_ADDRESS_START) {
+                    case PC64_REGISTER_MAGIC:
+                        next_word = PC64_MAGIC;
+                        break;
+                    default:
+                        next_word = 0;
+                    }
+
+                    // Write as a 32-bit word
+                    pio_sm_put(pio, 0, next_word >> 16);
+                    last_addr += 2;
+
+                    // Dummy consume the READ signal
+                    addr = n64_pi_get_value(pio);
+                    assert(addr == 0);
+
+                    pio_sm_put(pio, 0, next_word & 0xFFFF);
+                    last_addr += 2;
+                } else if (addr & 0x00000001) {
+                    // WRITE
+
+                    // Read two 16-bit half-words and merge them to a 32-bit value
+                    uint32_t write_word = addr & 0xFFFF0000;
+                    write_word |= n64_pi_get_value(pio) >> 16;
+
+                    switch (last_addr - PC64_CIBASE_ADDRESS_START) {
+                    case PC64_REGISTER_UART_TX:
+                        stdio_uart_out_chars((const char *) pc64_uart_tx_buf, write_word & (sizeof(pc64_uart_tx_buf) - 1));
+                        break;
+                    default:
+                    }
+
+                    last_addr += 4;
                 } else {
                     // New address
                     break;
