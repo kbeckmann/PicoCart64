@@ -8,6 +8,9 @@ git submodule update --init
 # If you have more than 2MB flash, you need to change the SDK file src/rp2_common/pico_standard_link/memmap_copy_to_ram.ld (for now!):
 # Change to: `FLASH(rx) : ORIGIN = 0x10000000, LENGTH = 16384k`
 
+# If your have an NTSC console, you need to change to NTSC mode:
+# In the file sw/picocart64/cic.c, uncomment: #define GET_REGION() (REGION_NTSC)
+
 
 cd sw
 
