@@ -5,6 +5,10 @@ To build and flash with a j-link:
 # First of all, don't forget to update submodules
 git submodule update --init
 
+# If you have more than 2MB flash, you need to change the SDK file src/rp2_common/pico_standard_link/memmap_copy_to_ram.ld (for now!):
+# Change to: `FLASH(rx) : ORIGIN = 0x10000000, LENGTH = 16384k`
+
+
 cd sw
 
 # Load a rom into sw/picocart64/rom.h
