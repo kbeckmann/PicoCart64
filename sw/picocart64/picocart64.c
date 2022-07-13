@@ -33,8 +33,9 @@
 #define ENABLE_N64_PI 1
 
 // Priority 0 = lowest, 31 = highest
+// Use same priority to force round-robin scheduling
 #define CIC_TASK_PRIORITY     (tskIDLE_PRIORITY + 1UL)
-#define SECOND_TASK_PRIORITY  (tskIDLE_PRIORITY + 2UL)
+#define SECOND_TASK_PRIORITY  (tskIDLE_PRIORITY + 1UL)
 
 
 static StaticTask_t cic_task;
