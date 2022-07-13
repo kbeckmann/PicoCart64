@@ -11,7 +11,7 @@ N64TOOL = $(ROOTDIR)/bin/n64tool
 CHKSUM64 = $(ROOTDIR)/bin/chksum64
 
 ASFLAGS = -mtune=vr4300 -march=vr4300
-CFLAGS = -std=gnu99 -march=vr4300 -mtune=vr4300 -Wall -Werror -I$(ROOTDIR)/mips64-elf/include
+CFLAGS = -std=gnu99 -march=vr4300 -mtune=vr4300 -Wall -I$(ROOTDIR)/mips64-elf/include
 LDFLAGS = -L$(ROOTDIR)/mips64-elf/lib -ldragon -lc -lm -ldragonsys -Tn64.ld --gc-sections
 N64TOOLFLAGS = -l 1M -h $(ROOTDIR)/mips64-elf/lib/header -t "PicoCart64 Test ROM"
 
