@@ -31,7 +31,7 @@
 static const uint16_t *rom_file_16 = (uint16_t *) rom_file;
 #endif
 
-RINGBUF_CREATE(ringbuf, 64);
+RINGBUF_CREATE(ringbuf, 64, uint32_t);
 
 
 static inline uint32_t resolve_sram_address(uint32_t address)

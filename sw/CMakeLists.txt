@@ -26,6 +26,9 @@ pico_sdk_init()
 # Include FreeRTOS integration
 add_subdirectory(lib/freertos-kernel/portable/ThirdParty/GCC/RP2040 FreeRTOS-Kernel)
 
+# Add shared code
+add_subdirectory(stdio_async_uart)
+
 # Add picocart64 (uses FreeRTOS)
 add_subdirectory(picocart64)
 

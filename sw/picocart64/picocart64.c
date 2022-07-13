@@ -14,6 +14,8 @@
 #include "pico/multicore.h"
 #include "hardware/irq.h"
 
+#include "stdio_async_uart.h"
+
 #include "cic.h"
 #include "picocart64_pins.h"
 #include "picocart64.h"
@@ -143,7 +145,7 @@ int main(void)
     gpio_pull_up(N64_CIC_DIO);
 
     // Init UART on pin 28/29
-    stdio_uart_init_full(UART_ID, BAUD_RATE, UART_TX_PIN, UART_RX_PIN);
+    stdio_async_uart_init_full(UART_ID, BAUD_RATE, UART_TX_PIN, UART_RX_PIN);
     printf("PicoCart64 Boot\r\n");
 
 #if ENABLE_N64_PI
