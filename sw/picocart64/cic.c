@@ -198,6 +198,7 @@ static void WriteRamNibbles(unsigned char index)
     {
         WriteNibble(_CicMem[index]);
         index++;
+        vPortYield();
     } while ((index & 0x0f) != 0);
 }
 
@@ -306,6 +307,7 @@ static void EncodeRound(unsigned char index)
         a = (a + _CicMem[index]) & 0x0f;
         _CicMem[index] = a;
         index++;
+        vPortYield();
     } while ((index & 0x0f) != 0);
 }
 
@@ -368,6 +370,8 @@ static void CicRound(unsigned char * m)
         } while (b != 0);
         a = x + 0xf;
         x = a & 0xf;
+
+        vPortYield();
     } while (x != 15);
 }
 
@@ -582,6 +586,7 @@ void cic_main(void)
         // Commit SRAM to flash
         sram_save_to_flash();
 
+        printf("CIC task restarting\n");
         vPortYield();
     }
 }
