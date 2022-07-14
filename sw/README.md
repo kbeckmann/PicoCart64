@@ -20,7 +20,11 @@ cd sw
 
 mkdir build
 cd build
-cmake ..
+
+# Configure cmake. To use NTSC, set -DREGION=NTSC
+cmake -DREGION=PAL ..
+
+# Build
 make
 
 # You can now flash it by holding down the BOOT button and resetting the device, then mounting the usb mass storage device, then copy the file picocart64/picocart64.uf2 to the mounted path and run `sync`.

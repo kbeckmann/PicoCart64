@@ -5,8 +5,25 @@ add_executable(picocart64
     sram.c
 )
 
+if(NOT DEFINED REGION)
+    message(FATAL_ERROR "Please set the variable REGION to either NTSC or PAL")
+endif()
+
+if(REGION STREQUAL "NTSC")
+    set(CONFIG_REGION_NTSC 1)
+    set(CONFIG_REGION_PAL 0)
+elseif(REGION STREQUAL "PAL")
+    set(CONFIG_REGION_NTSC 0)
+    set(CONFIG_REGION_PAL 1)
+else()
+    message(FATAL_ERROR "Please set the variable REGION to either NTSC or PAL")
+endif()
+
+
 target_compile_definitions(picocart64 PRIVATE
     PICO_STDOUT_MUTEX=0
+    CONFIG_REGION_NTSC=${CONFIG_REGION_NTSC}
+    CONFIG_REGION_PAL=${CONFIG_REGION_PAL}
 )
 
 target_include_directories(picocart64 PRIVATE
