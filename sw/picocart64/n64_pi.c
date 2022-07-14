@@ -317,6 +317,7 @@ handle_d1a2_read:
                         stdio_uart_out_chars((const char *) pc64_uart_tx_buf, write_word & (sizeof(pc64_uart_tx_buf) - 1));
                         break;
                     default:
+                        break;
                     }
 
                     last_addr += 4;
