@@ -30,6 +30,11 @@ $(PROG_NAME).bin: $(PROG_NAME).elf
 $(PROG_NAME).elf: $(PROG_NAME).o
 	$(LD) -o $@ $^ $(LDFLAGS)
 
+$(PROG_NAME).c:
+	echo -n "#define GIT_REV 0x" > git_info.h
+	git rev-parse --short=8 HEAD >> git_info.h
+.PHONY: $(PROG_NAME).c
+
 .PHONY: clean
 clean:
 	rm -f *.v64 *.z64 *.bin *.elf *.o

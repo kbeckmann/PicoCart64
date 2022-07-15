@@ -112,3 +112,5 @@ build/
 *.elf
 *.bin
 *.o
+
+git_info.h

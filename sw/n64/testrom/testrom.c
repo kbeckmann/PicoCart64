@@ -11,6 +11,8 @@
 #include <stdint.h>
 #include <libdragon.h>
 
+#include "git_info.h"
+
 typedef struct PI_regs_s {
     volatile void * ram_address;
     uint32_t pi_address;
@@ -195,6 +197,20 @@ static uint8_t __attribute__ ((aligned(16))) facit_buf[SRAM_1MBIT_SIZE];
 static uint8_t __attribute__ ((aligned(16))) read_buf[SRAM_1MBIT_SIZE];
 static char    __attribute__ ((aligned(16))) write_buf[0x1000];
 
+
+static void pc64_uart_write(const uint8_t *buf, uint32_t len)
+{
+    // 16-bit aligned
+    assert((((uint32_t) buf) & 0x1) == 0);
+
+    uint32_t len_aligned32 = (len + 3) & (-4);
+
+    data_cache_hit_writeback_invalidate((uint8_t *) buf, len_aligned32);
+    pi_write_raw(write_buf, PC64_BASE_ADDRESS_START, 0, len_aligned32);
+
+    pi_write_u32(len, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_UART);
+}
+
 int main(void)
 {
     uint32_t *facit_buf32 = (uint32_t *) facit_buf;
@@ -210,7 +226,7 @@ int main(void)
     console_init();
     // debug_init_isviewer();
 
-    printf("PicoCart64 Test ROM\n\n");
+    printf("PicoCart64 Test ROM (git rev %08lX)\n\n", GIT_REV);
 
     // Initialize a random sequence
     rand32_reset();
@@ -247,12 +263,9 @@ int main(void)
         printf("[FAIL] MAGIC = 0x%08lX.\n", read_buf32[0]);
     }
 
-    // Print Hello world from the N64
+    // Print Hello from the N64
     strcpy(write_buf, "Hello from the N64!\r\n");
-    data_cache_hit_writeback_invalidate(write_buf, sizeof(write_buf));
-    pi_write_raw(write_buf, PC64_BASE_ADDRESS_START, 0, (strlen(write_buf) + 3) & (-4));
-
-    pi_write_u32(strlen(write_buf), PC64_CIBASE_ADDRESS_START, PC64_REGISTER_UART);
+    pc64_uart_write((const uint8_t *) write_buf, strlen(write_buf));
     printf("[ -- ] Wrote hello over UART.\n");
 
     // Write 1Mbit of SRAM
@@ -260,6 +273,22 @@ int main(void)
     pi_write_raw(facit_buf, CART_DOM2_ADDR2_START, 0, sizeof(facit_buf));
 
     printf("[ -- ] Wrote test pattern to SRAM.\n");
+
+    // Read 1Mbit of 64DD IPL ROM
+    data_cache_hit_writeback_invalidate(read_buf, sizeof(read_buf));
+    pi_read_raw(read_buf, CART_DOM1_ADDR1_START, 0, sizeof(read_buf));
+    printf("[ -- ] Read from the N64DD address space.\n");
+
+    // Verify the PicoCart64 Magic *again*
+    // This is done to ensure that the PicoCart64 is still alive and well,
+    // and hasn't crashed or locked itself up.
+    data_cache_hit_writeback_invalidate(read_buf, sizeof(read_buf));
+    pi_read_raw(read_buf, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_MAGIC, sizeof(uint32_t));
+    if (read_buf32[0] == PC64_MAGIC) {
+        printf("[ OK ] (second time) MAGIC = 0x%08lX.\n", read_buf32[0]);
+    } else {
+        printf("[FAIL] (second time) MAGIC = 0x%08lX.\n", read_buf32[0]);
+    }
 
     console_render();
 }
