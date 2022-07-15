@@ -35,7 +35,7 @@ add_custom_target(update_git_info DEPENDS ${GIT_INFO_H})
 add_custom_command(OUTPUT ${GIT_INFO_H}
         COMMENT "Generating ${GIT_INFO_H}"
         COMMAND ${CMAKE_COMMAND} -E echo_append " #define GIT_REV 0x" > ${GIT_INFO_H}
-        COMMAND git rev-parse --short=8 HEAD >> ${GIT_INFO_H}
+        COMMAND git -C ${CMAKE_CURRENT_LIST_DIR} rev-parse --short=8 HEAD >> ${GIT_INFO_H}
 )
 
 

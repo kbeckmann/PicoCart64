@@ -48,7 +48,10 @@ jobs:
         --mount type=bind,source=$(pwd),target=/ci \
         --workdir=/ci \
         ghcr.io/dragonminded/libdragon:latest \
-        bash -c "(cd libdragon && ./build.sh) && make -C ./picocart64/sw/n64/testrom"
+        bash -c "\
+          git config --global --add safe.directory /ci/picocart64          && \
+          (cd libdragon && ./build.sh)                                     && \
+          make -C ./picocart64/sw/n64/testrom"
         mkdir artifacts
         cp ./picocart64/sw/n64/testrom/testrom.z64 ./artifacts/
 
@@ -61,7 +64,16 @@ jobs:
         --mount type=bind,source=$(pwd),target=/ci \
         --workdir=/ci \
         ghcr.io/kbeckmann/pico-sdk-builder:latest \
-        bash -c "mkdir build && cd build && cmake -DREGION=PAL ../picocart64/sw && make && cp picocart64/picocart64.uf2 /ci/artifacts/picocart64-pal.uf2 && cmake -DREGION=NTSC ../picocart64/sw && make && cp picocart64/picocart64.uf2 /ci/artifacts/picocart64-ntsc.uf2"
+        bash -c "\
+          git config --global --add safe.directory /ci/picocart64          && \
+          mkdir picocart64/sw/build                                        && \
+          cd picocart64/sw/build                                           && \
+          cmake -DREGION=PAL ..                                            && \
+          make                                                             && \
+          cp picocart64/picocart64.uf2 /ci/artifacts/picocart64-pal.uf2    && \
+          cmake -DREGION=NTSC ..                                           && \
+          make                                                             && \
+          cp picocart64/picocart64.uf2 /ci/artifacts/picocart64-ntsc.uf2"
 
     - name: Upload PicoCart64 binaries with a bundled test rom to artifacts
       uses: actions/upload-artifact@v2
