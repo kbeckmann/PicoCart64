@@ -45,13 +45,12 @@ Data Line, Bidir (DIO):  CIC Pin 15
 #define REGION_NTSC (0)
 #define REGION_PAL  (1)
 
-// Run cmake with -DREGION=NTSC to set NTSC mode, alternatively -DREGION=PAL
 #if CONFIG_REGION_NTSC == 1
 #define GET_REGION() (REGION_NTSC)
 #elif CONFIG_REGION_PAL == 1
 #define GET_REGION() (REGION_PAL)
 #else
-#error One of CONFIG_REGION_NTSC and CONFIG_REGION_PAL must be set to 1
+#error Please pass -DREGION=PAL or NTSC to your cmake command line.
 #endif
 
 /* SEEDs */
