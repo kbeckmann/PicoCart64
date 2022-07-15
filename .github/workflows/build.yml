@@ -3,6 +3,8 @@ on:
   push:
     branches:
       - main
+      - develop
+      - ci
   pull_request:
     branches:
       - main
@@ -18,37 +20,52 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+
     - name: Clean workspace
       run: |
         echo "Cleaning up previous run"
         rm -rf "${{ github.workspace }}"
         mkdir -p "${{ github.workspace }}"
+
     - name: Checkout PicoCart64
       uses: actions/checkout@v2
       with:
         path: picocart64
-    - name: Checkout pico-sdk/develop
+
+    - name: Checkout PicoCart64 submodules
+      working-directory: ${{github.workspace}}/picocart64
+      run: git submodule update --init
+
+    - name: Checkout DragonMinded/libdragon
       uses: actions/checkout@v2
       with:
-        repository: raspberrypi/pico-sdk
-        ref: develop
-        path: pico-sdk
-    - name: Checkout pico-sdk submodules
-      working-directory: ${{github.workspace}}/pico-sdk
-      run: git submodule update --init
-    - name: Install build dependencies
-      run: sudo apt-get install -y gcc-arm-none-eabi
-    - name: Fetch test ROM
-      run: wget -q https://github.com/PeterLemon/N64/raw/master/HelloWorld/32BPP/HelloWorldCPU320x240/HelloWorldCPU32BPP320X240.N64 -O test.z64
+        repository: DragonMinded/libdragon
+        path: libdragon
+
+    - name: Build testrom using the libdragon docker image
+      run: |
+        docker run \
+        --mount type=bind,source=$(pwd),target=/ci \
+        --workdir=/ci \
+        ghcr.io/dragonminded/libdragon:latest \
+        bash -c "(cd libdragon && ./build.sh) && make -C ./picocart64/sw/n64/testrom"
+        mkdir artifacts
+        cp ./picocart64/sw/n64/testrom/testrom.z64 ./artifacts/
+
     - name: Prepare test ROM for build
+      run: python3 picocart64/sw/scripts/load_rom.py --compress picocart64/sw/n64/testrom/testrom.z64
+
+    - name: Build PicoCart64 using the pico-sdk-builder docker image
       run: |
-        xxd -i test.z64 > picocart64/sw/cic_test/rom.h
-        sed -i 's/unsigned char test_z64/const unsigned char __in_flash("rom_file") rom_file/' picocart64/sw/cic_test/rom.h
-    - name: Build PicoCart64
-      run: |
-        export PICO_SDK_PATH=${{ github.workspace }}/pico-sdk
-        mkdir picocart64/sw/build
-        cd picocart64/sw/build
-        cmake -DPICO_COPY_TO_RAM=1 ..
-        make
-    
+        docker run \
+        --mount type=bind,source=$(pwd),target=/ci \
+        --workdir=/ci \
+        ghcr.io/kbeckmann/pico-sdk-builder:latest \
+        bash -c "mkdir build && cd build && cmake -DREGION=PAL ../picocart64/sw && make && cp picocart64/picocart64.uf2 /ci/artifacts/picocart64-pal.uf2 && cmake -DREGION=NTSC ../picocart64/sw && make && cp picocart64/picocart64.uf2 /ci/artifacts/picocart64-ntsc.uf2"
+
+    - name: Upload PicoCart64 binaries with a bundled test rom to artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: picocart64
+        path: |
+          ${{ github.workspace }}/artifacts/*
