@@ -21,6 +21,7 @@
 #include "picocart64.h"
 #include "utils.h"
 #include "n64_pi.h"
+#include "git_info.h"
 
 #define PICO_LA1    (26)
 #define PICO_LA2    (27)
@@ -147,7 +148,7 @@ int main(void)
 
     // Init UART on pin 28/29
     stdio_async_uart_init_full(UART_ID, BAUD_RATE, UART_TX_PIN, UART_RX_PIN);
-    printf("PicoCart64 Boot\r\n");
+    printf("PicoCart64 Boot (git rev %08x)\r\n", GIT_REV);
 
 #if ENABLE_N64_PI
     // Launch the N64 PI implementation in the second core

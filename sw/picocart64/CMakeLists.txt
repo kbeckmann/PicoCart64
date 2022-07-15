@@ -26,9 +26,25 @@ target_compile_definitions(picocart64 PRIVATE
     CONFIG_REGION_PAL=${CONFIG_REGION_PAL}
 )
 
+
+# Generate git_info.h
+set(GIT_INFO_H ${CMAKE_CURRENT_BINARY_DIR}/git_info.h)
+
+add_custom_target(update_git_info DEPENDS ${GIT_INFO_H})
+
+add_custom_command(OUTPUT ${GIT_INFO_H}
+        COMMENT "Generating ${GIT_INFO_H}"
+        COMMAND ${CMAKE_COMMAND} -E echo_append " #define GIT_REV 0x" > ${GIT_INFO_H}
+        COMMAND git rev-parse --short=8 HEAD >> ${GIT_INFO_H}
+)
+
+
 target_include_directories(picocart64 PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}
+    ${CMAKE_CURRENT_BINARY_DIR}
 )
+
+add_dependencies(picocart64 update_git_info)
 
 # pull in common dependencies
 target_link_libraries(
