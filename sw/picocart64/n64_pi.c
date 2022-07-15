@@ -211,7 +211,9 @@ handle_d1a2_read:
                     break;
                 }
             } while(1);
-        } else if (last_addr >= 0x05000000 && last_addr <= 0x05FFFFFF) {
+        }
+#if 0
+        else if (last_addr >= 0x05000000 && last_addr <= 0x05FFFFFF) {
             // Domain 2, Address 1 N64DD control registers
             do {
                 // We don't support this yet, but we have to consume another value
@@ -234,7 +236,7 @@ handle_d1a2_read:
                 }
             } while(1);
         } else if (last_addr >= 0x06000000 && last_addr <= 0x07FFFFFF) {
-            // Domain 2, Address 1 N64DD control registers
+            // Domain 1, Address 1 N64DD IPL ROM (if present)
             do {
                 // We don't support this yet, but we have to consume another value
                 next_word = 0;
@@ -255,7 +257,9 @@ handle_d1a2_read:
                     break;
                 }
             } while(1);
-        } else if (last_addr >= PC64_BASE_ADDRESS_START && last_addr <= PC64_BASE_ADDRESS_END) {
+        }
+#endif
+        else if (last_addr >= PC64_BASE_ADDRESS_START && last_addr <= PC64_BASE_ADDRESS_END) {
             // PicoCart64 BASE address space
             do {
                 // Pre-fetch from the address
@@ -327,26 +331,12 @@ handle_d1a2_read:
                 }
             } while(1);
         } else {
-            do {
-                // We don't support this memory area yet, but we have to consume another value
-                next_word = 0;
+            // Don't handle this request - jump back to the beginning.
+            // This way, there won't be a bus conflict in case e.g. a physical N64DD is connected.
+            pio_sm_exec(pio, 0, pio_encode_jmp(0));
 
-                // Read command/address
-                addr = n64_pi_get_value(pio);
-
-                if (addr == 0) {
-                    // READ
-                    pio_sm_put(pio, 0, swap8(next_word));
-                    last_addr += 2;
-                } else if (addr & 0x00000001) {
-                    // WRITE
-                    // Ignore
-                    last_addr += 2;
-                } else {
-                    // New address
-                    break;
-                }
-            } while(1);
+            // Wait for the next address and handle it in the loop like everything else.
+            addr = n64_pi_get_value(pio);
         }
     }
 }
