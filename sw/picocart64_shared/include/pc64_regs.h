@@ -35,5 +35,3 @@
 
 // [WRITE]: Set the random seed to a 32-bit value
 #define PC64_REGISTER_RAND_SEED    0x00000008
-
-
