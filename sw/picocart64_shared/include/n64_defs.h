@@ -18,7 +18,7 @@
 #define CART_DOM2_ADDR2_START     0x08000000
 #define CART_DOM2_ADDR2_END       0x0FFFFFFF
 
-// Define the highest supported banked SRAM addressees
+// Define the highest supported banked SRAM addresses
 #define CART_SRAM_START           CART_DOM2_ADDR2_START
 #define CART_SRAM_END             (CART_DOM2_ADDR2_START + 0x100000 - 1)
 
