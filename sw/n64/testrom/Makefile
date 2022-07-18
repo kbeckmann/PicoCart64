@@ -15,6 +15,9 @@ CFLAGS = -std=gnu99 -march=vr4300 -mtune=vr4300 -Wall -I$(ROOTDIR)/mips64-elf/in
 LDFLAGS = -L$(ROOTDIR)/mips64-elf/lib -ldragon -lc -lm -ldragonsys -Tn64.ld --gc-sections
 N64TOOLFLAGS = -l 1M -h $(ROOTDIR)/mips64-elf/lib/header -t "PicoCart64 Test ROM"
 
+FILES = $(wildcard *.c)
+OBJS = $(FILES:.c=.o)
+
 ifeq ($(N64_BYTE_SWAP),true)
 $(PROG_NAME).v64: $(PROG_NAME).z64
 	dd conv=swab if=$^ of=$@
@@ -27,8 +30,8 @@ $(PROG_NAME).z64: $(PROG_NAME).bin
 $(PROG_NAME).bin: $(PROG_NAME).elf
 	$(OBJCOPY) $< $@ -O binary
 
-$(PROG_NAME).elf: $(PROG_NAME).o
-	$(LD) -o $@ $^ $(LDFLAGS)
+$(PROG_NAME).elf : $(OBJS)
+	$(LD) -o $(PROG_NAME).elf $(OBJS) $(LDFLAGS)
 
 $(PROG_NAME).c:
 	echo -n "#define GIT_REV 0x" > git_info.h
