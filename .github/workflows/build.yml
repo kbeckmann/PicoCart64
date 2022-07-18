@@ -53,10 +53,10 @@ jobs:
           (cd libdragon && ./build.sh)                                     && \
           make -C ./picocart64/sw/n64/testrom"
         mkdir artifacts
-        cp ./picocart64/sw/n64/testrom/testrom.z64 ./artifacts/
+        cp ./picocart64/sw/n64/testrom/build/testrom.z64 ./artifacts/
 
     - name: Prepare test ROM for build
-      run: python3 picocart64/sw/scripts/load_rom.py --compress picocart64/sw/n64/testrom/testrom.z64
+      run: python3 picocart64/sw/scripts/load_rom.py --compress picocart64/sw/n64/testrom/build/testrom.z64
 
     - name: Build PicoCart64 using the pico-sdk-builder docker image
       run: |
