@@ -6,9 +6,10 @@
 
 .program n64_pi
 
-; For debugging, `set pins, 0` up to `3` may be used
-
 n64_pi_start:
+
+    ; Clear ISR (needed when jumping here manually from C-code quickly)
+    mov isr, null
 
     ; Change IO dir of all pins to INPUT
     mov osr, null
@@ -41,6 +42,8 @@ n64_pi_start:
     ; push 32 bits of high and low parts
     ; TODO: Can we use autopush?
     push
+
+    ; TODO: Pull to check if address should be handled or not
 
 .wrap_target
 wait_for_not_read_or_aleh:

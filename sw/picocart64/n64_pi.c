@@ -17,6 +17,9 @@
 #include "n64_pi.pio.h"
 
 #include "cic.h"
+#include "n64_defs.h"
+#include "pc64_regs.h"
+#include "pc64_rand.h"
 #include "picocart64_pins.h"
 #include "picocart64.h"
 #include "ringbuf.h"
@@ -36,19 +39,7 @@ RINGBUF_CREATE(ringbuf, 64, uint32_t);
 
 
 // UART TX buffer
-static uint16_t pc64_uart_tx_buf[1024];
-#define PC64_BASE_ADDRESS_START 0xB0000000
-#define PC64_BASE_ADDRESS_END   (PC64_BASE_ADDRESS_START + sizeof(pc64_uart_tx_buf) - 1)
-
-#define PC64_CIBASE_ADDRESS_START 0xB8000000
-#define PC64_CIBASE_ADDRESS_END   0xB8000FFF
-
-#define PC64_REGISTER_MAGIC       0x00000000
-
-// Write length to print from TX buffer
-#define PC64_REGISTER_UART_TX     0x00000004
-
-#define PC64_MAGIC                0xDEAD6400
+static uint16_t pc64_uart_tx_buf[PC64_BASE_ADDRESS_LENGTH];
 
 
 
@@ -158,7 +149,7 @@ void n64_pi_run(void)
             } else {
                 continue;
             }
-        } else if (last_addr >= 0x08000000 && last_addr <= 0x0FFFFFFF) {
+        } else if (last_addr >= CART_SRAM_START && last_addr <= CART_SRAM_END) {
             // Domain 2, Address 2 Cartridge SRAM
             do {
                 // Pre-fetch from the address
@@ -283,6 +274,25 @@ handle_d1a2_read:
                     break;
                 }
             } while(1);
+        } else if (last_addr >= PC64_RAND_ADDRESS_START && last_addr <= PC64_RAND_ADDRESS_END) {
+            // PicoCart64 RAND address space
+            do {
+                // Read command/address
+                addr = n64_pi_get_value(pio);
+
+                if (addr & 0x00000001) {
+                    // We got a WRITE
+                    last_addr += 2;
+                } else if (addr == 0) {
+                    // READ
+                    next_word = pc64_rand16();
+                    pio_sm_put(pio, 0, next_word);
+                    last_addr += 2;
+                } else {
+                    // New address
+                    break;
+                }
+            } while(1);
         } else if (last_addr >= PC64_CIBASE_ADDRESS_START && last_addr <= PC64_CIBASE_ADDRESS_END) {
             // PicoCart64 CIBASE address space
             do {
@@ -320,6 +330,9 @@ handle_d1a2_read:
                     case PC64_REGISTER_UART_TX:
                         stdio_uart_out_chars((const char *) pc64_uart_tx_buf, write_word & (sizeof(pc64_uart_tx_buf) - 1));
                         break;
+                    case PC64_REGISTER_RAND_SEED:
+                        pc64_rand_seed(write_word);
+                        break;
                     default:
                         break;
                     }
@@ -333,9 +346,14 @@ handle_d1a2_read:
         } else {
             // Don't handle this request - jump back to the beginning.
             // This way, there won't be a bus conflict in case e.g. a physical N64DD is connected.
+
+            // Read to empty fifo
+            addr = n64_pi_get_value(pio);
+
+            // Jump to start of the PIO program.
             pio_sm_exec(pio, 0, pio_encode_jmp(0));
 
-            // Wait for the next address and handle it in the loop like everything else.
+            // Read and handle the following requests normally
             addr = n64_pi_get_value(pio);
         }
     }

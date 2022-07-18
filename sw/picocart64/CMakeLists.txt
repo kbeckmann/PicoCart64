@@ -3,6 +3,7 @@ add_executable(picocart64
     n64_pi.c
     picocart64.c
     sram.c
+    utils.c
 )
 
 if(NOT DEFINED REGION)
@@ -49,6 +50,7 @@ add_dependencies(picocart64 update_git_info)
 # pull in common dependencies
 target_link_libraries(
     picocart64
+    picocart64_shared
     pico_multicore
     pico_stdlib
     stdio_async_uart

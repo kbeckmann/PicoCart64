@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include <stdint.h>
+
 #define ARRAY_SIZE(x) (sizeof(x)/sizeof(x[0]))
 
 static inline uint32_t swap16(uint32_t value)
