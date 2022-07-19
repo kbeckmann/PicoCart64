@@ -1,3 +1,9 @@
+/**
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Copyright (c) 2022 Kaili Hill
+ */
+
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
@@ -31,7 +37,7 @@ color_t MENU_BAR_COLOR = { .r = 0x82, .g = 0x00, .b = 0x2E, .a = 0x00 }; // 0x82
 color_t SELECTION_COLOR = { .r = 0x00, .g = 0x67, .b = 0xC7, .a = 0x00 }; // 0x0067C7, Bright Blue
 
 /* Assume default font size*/
-int calculate_num_rows_per_page() {
+static int calculate_num_rows_per_page(void) {
     // ---top of screen---
     // menu bar
     // padding + more files above indicator space
@@ -52,7 +58,7 @@ int calculate_num_rows_per_page() {
 /*
  * Render a list of strings and show a caret on the currently selected row
  */
-void render_list(display_context_t display, char *list[], int currently_selected, int first_visible, int max_on_screen) {
+static void render_list(display_context_t display, char *list[], int currently_selected, int first_visible, int max_on_screen) {
 
     /* If we aren't starting at the first row, draw an indicator to show more files above*/
     if (first_visible > 0) {
@@ -92,19 +98,19 @@ void render_list(display_context_t display, char *list[], int currently_selected
     }
 }
 
-void draw_header_bar(display_context_t display, int fileCount) {
+static void draw_header_bar(display_context_t display, int fileCount) {
     int x = 0, y = 0, width = SCREEN_WIDTH, height = MENU_BAR_HEIGHT;
     graphics_draw_box(display, x, y, width, height, graphics_convert_color(MENU_BAR_COLOR));
     
-    char menuHeaderBuffer[50];
-    sprintf(menuHeaderBuffer, "PicoCart64 OS b2022.07.17\t\t\t\t%d Files\0", fileCount);
+    char menuHeaderBuffer[100];
+    sprintf(menuHeaderBuffer, "PicoCart64 OS (git rev %08x)\t\t\t\t%d Files", GIT_REV, fileCount);
     graphics_draw_text(display, MARGIN_PADDING, y+4, menuHeaderBuffer);
 }
 
 /*
  * Init display and controller input then render a list of strings, showing currently selected
  */
-void show_list() {
+static void show_list(void) {
     // For now, hard code some strings in so we can have something to test with
     char *entries[21] = {
         "Goldeneye 007 (USA).n64", 
@@ -119,7 +125,7 @@ void show_list() {
         "007 Tomorrow Never Dies (USA).n64",
         "Donkey Kong 64 (USA).n64",
         "testrom.n64",
-        /*"お母さん３(JPN).n64",*/ // I don't think it likes this entry too much
+        /*"お母さん３(JPN).n64",*/ // I don't think it likes this entry too much, will need a font that supports UTF8
         "Harvest Moon 64 (JPN).n64",
         "Crusin' USA (USA).n64",
         "Metriod 64 (USA).n64",
@@ -178,7 +184,7 @@ void show_list() {
     }
 }
 
-void start_shell() {
+void start_shell(void) {
     /* Init the screen and controller */
     display_init(RESOLUTION_512x240, DEPTH_16_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE);
     controller_init();
