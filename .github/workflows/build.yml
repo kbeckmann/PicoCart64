@@ -44,7 +44,6 @@ jobs:
     - name: Check for modified files (indent changed) verbose
       run: |
         echo ${{ github.ref }}
-        echo ${{ github.commit }}
         git -C picocart64 status;
         git -C picocart64 branch;
         git -C picocart64 remote -v;
@@ -61,7 +60,7 @@ jobs:
         git config --global user.email 'kbeckmann@users.noreply.github.com'
         git -C picocart64 remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
         git -C picocart64 commit -am "Automated changes"
-        git -C picocart64 push
+        git -C picocart64 push origin ${{ github.ref }}
 
     - name: Checkout DragonMinded/libdragon
       uses: actions/checkout@v2
