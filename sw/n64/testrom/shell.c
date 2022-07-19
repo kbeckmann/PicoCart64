@@ -176,7 +176,7 @@ static void show_list(void) {
 
         /* A little debug text at the bottom of the screen */
         char debugTextBuffer[100];
-        sprintf(debugTextBuffer, "currently_selected=%d, first_visible=%d, max_per_page=%d\0", currently_selected, first_visible, max_on_screen);
+        snprintf(debugTextBuffer, 100, "currently_selected=%d, first_visible=%d, max_per_page=%d", currently_selected, first_visible, max_on_screen);
         graphics_draw_text(display, 5, 230, debugTextBuffer);
 
         /* Force the backbuffer flip */
