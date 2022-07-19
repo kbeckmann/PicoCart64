@@ -39,11 +39,13 @@ jobs:
       run: git submodule update --init
 
     - name: Check for bad indentation
+      if: github.event.pull_request.head.repo.full_name == github.repository
       run: |
         sudo apt-get install -y indent git
         ./picocart64/sw/scripts/indent.sh --cleanup
 
     - name: Check for modified files (indent changed) verbose
+      if: github.event.pull_request.head.repo.full_name == github.repository
       run: |
         echo ${{ github.ref }}
         echo ${{ github.ref_name }}
@@ -55,6 +57,7 @@ jobs:
         git -C picocart64 diff-index HEAD --;
 
     - name: Check for modified files (indent changed)
+      if: github.event.pull_request.head.repo.full_name == github.repository
       id: git-check
       run: echo ::set-output name=modified::$(if git -C picocart64 diff-index --quiet HEAD --; then echo "false"; else echo "true"; fi)
 
