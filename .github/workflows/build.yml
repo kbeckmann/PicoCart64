@@ -43,6 +43,8 @@ jobs:
 
     - name: Check for modified files (indent changed) verbose
       run: |
+        echo ${{ github.ref }}
+        echo ${{ github.commit }}
         git -C picocart64 status;
         git -C picocart64 branch;
         git -C picocart64 remote -v;
