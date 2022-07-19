@@ -20,8 +20,6 @@ jobs:
     - name: Checkout PicoCart64
       uses: actions/checkout@v2
       with:
-        repository: ${{ github.event.pull_request.head.repo.full_name }}
-        ref: ${{ github.head_ref }}
         path: picocart64
 
     - name: Check for bad indentation
@@ -48,6 +46,6 @@ jobs:
       run: |
         git config --global user.name 'GitHub CI'
         git config --global user.email 'kbeckmann@users.noreply.github.com'
-        git -C picocart64 remote add pr_origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.event.pull_request.head.repo.full_name }}
+        git -C picocart64 remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
         git -C picocart64 commit -am "Automated changes"
-        git -C picocart64 push pr_origin HEAD:${{ github.head_ref }}
+        git -C picocart64 push
