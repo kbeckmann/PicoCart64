@@ -30,6 +30,7 @@ jobs:
     - name: Checkout PicoCart64
       uses: actions/checkout@v2
       with:
+        ref: ${{ github.head_ref }}
         path: picocart64
 
     - name: Checkout PicoCart64 submodules
@@ -43,6 +44,9 @@ jobs:
 
     - name: Check for modified files (indent changed) verbose
       run: |
+        echo ${{ github.ref }}
+        echo ${{ github.ref_name }}
+        echo ${{ github.head_ref }}
         git -C picocart64 status;
         git -C picocart64 branch;
         git -C picocart64 remote -v;
