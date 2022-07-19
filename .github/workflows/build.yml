@@ -63,7 +63,7 @@ jobs:
         git config --global user.email 'kbeckmann@users.noreply.github.com'
         git -C picocart64 remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
         git -C picocart64 commit -am "Automated changes"
-        git -C picocart64 push origin pull/${{ github.ref_name }}
+        git -C picocart64 push
 
     - name: Checkout DragonMinded/libdragon
       uses: actions/checkout@v2
