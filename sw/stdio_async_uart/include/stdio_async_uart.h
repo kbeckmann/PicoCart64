@@ -36,29 +36,26 @@ extern "C" {
  * \param tx_pin the UART pin to use for stdout (or -1 for no stdout)
  * \param rx_pin the UART pin to use for stdin (or -1 for no stdin)
  */
-void stdio_async_uart_init_full(uart_inst_t *uart, uint baud_rate, int tx_pin, int rx_pin);
+	void stdio_async_uart_init_full(uart_inst_t * uart, uint baud_rate, int tx_pin, int rx_pin);
 
 // Directly write to the ringbuffer, should be super fast
-void stdio_uart_out_chars(const char *buf, int length);
+	void stdio_uart_out_chars(const char *buf, int length);
 
 // Quickly print a 32-bit unsigned value as hex
-static inline void uart_print_hex_u32(uint32_t word)
-{
-    uint8_t buf[10];
+	static inline void uart_print_hex_u32(uint32_t word) {
+		uint8_t buf[10];
 
-    for (int i = 0; i < 8; i++) {
-        const uint8_t nibble = word >> 28;
+		for (int i = 0; i < 8; i++) {
+			const uint8_t nibble = word >> 28;
 
-        buf[i] = (nibble > 9) ? 0x37 + nibble : 0x30 + nibble;
+			 buf[i] = (nibble > 9) ? 0x37 + nibble : 0x30 + nibble;
 
-        word <<= 4;
-    }
+			 word <<= 4;
+		} buf[8] = '\r';
+		buf[9] = '\n';
 
-    buf[8] = '\r';
-    buf[9] = '\n';
-
-    stdio_uart_out_chars(buf, sizeof(buf));
-}
+		stdio_uart_out_chars(buf, sizeof(buf));
+	}
 
 #ifdef __cplusplus
 }
