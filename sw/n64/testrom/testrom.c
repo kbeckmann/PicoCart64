@@ -231,7 +231,10 @@ static void configure_sram(void)
 #endif
 }
 
-static void foo(void) { printf("Hello!\n");}
+static void foo(void)
+{
+	printf("Hello!\n");
+}
 
 int main(void)
 {
@@ -247,8 +250,8 @@ int main(void)
 
 	printf("PicoCart64 Test ROM (git rev %08X)\n\n", GIT_REV);
 
-			// test test
-		foo();
+	// test test
+	foo();
 
 	///////////////////////////////////////////////////////////////////////////
 
