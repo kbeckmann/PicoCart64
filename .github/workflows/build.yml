@@ -30,6 +30,7 @@ jobs:
     - name: Checkout PicoCart64
       uses: actions/checkout@v2
       with:
+        ref: ${{ github.head_ref }}
         path: picocart64
 
     - name: Checkout PicoCart64 submodules
