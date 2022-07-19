@@ -231,6 +231,8 @@ static void configure_sram(void)
 #endif
 }
 
+static void foo(void) { printf("Hello!\n");}
+
 int main(void)
 {
 	uint32_t *facit_buf32 = (uint32_t *) facit_buf;
@@ -244,6 +246,9 @@ int main(void)
 	// debug_init_isviewer();
 
 	printf("PicoCart64 Test ROM (git rev %08X)\n\n", GIT_REV);
+
+			// test test
+		foo();
 
 	///////////////////////////////////////////////////////////////////////////
 
