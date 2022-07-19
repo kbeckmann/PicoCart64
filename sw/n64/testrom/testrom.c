@@ -12,6 +12,7 @@
 #include <libdragon.h>
 
 #include "git_info.h"
+#include "shell.h"
 
 // picocart64_shared
 #include "pc64_regs.h"
@@ -370,4 +371,18 @@ int main(void)
 	}
 
 	console_render();
+    
+    /* Start the shell if the user presses start */
+    printf("\n\nPress START to continue to the shell...\n");
+    controller_init();
+    while (true) {
+        controller_scan();
+        struct controller_data keys = get_keys_pressed();
+        if (keys.c[0].start) {
+            printf("Start pressed.\n");
+            break;
+        }
+    }
+    
+    start_shell();
 }
