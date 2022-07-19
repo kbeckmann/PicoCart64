@@ -237,7 +237,7 @@ int main(void)
 	uint32_t *read_buf32 = (uint32_t *) read_buf;
 	uint16_t *read_buf16 = (uint16_t *) read_buf;
 
-	configure_sram();
+		configure_sram();
 
 	display_init(RESOLUTION_320x240, DEPTH_32_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
 	console_init();
