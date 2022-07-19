@@ -44,32 +44,6 @@ jobs:
         sudo apt-get install -y indent git
         ./picocart64/sw/scripts/indent.sh --cleanup
 
-    - name: Check for modified files (indent changed) verbose
-      if: github.event.pull_request.head.repo.full_name == github.repository
-      run: |
-        echo ${{ github.ref }}
-        echo ${{ github.ref_name }}
-        echo ${{ github.head_ref }}
-        echo ${{ github.event.pull_request.head.repo.full_name }}
-        git -C picocart64 status;
-        git -C picocart64 branch;
-        git -C picocart64 remote -v;
-        git -C picocart64 diff-index HEAD --;
-
-    - name: Check for modified files (indent changed)
-      if: github.event.pull_request.head.repo.full_name == github.repository
-      id: git-check
-      run: echo ::set-output name=modified::$(if git -C picocart64 diff-index --quiet HEAD --; then echo "false"; else echo "true"; fi)
-
-    - name: Push changes
-      if: steps.git-check.outputs.modified == 'true'
-      run: |
-        git config --global user.name 'GitHub CI'
-        git config --global user.email 'kbeckmann@users.noreply.github.com'
-        git -C picocart64 remote add pr_origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.event.pull_request.head.repo.full_name }}
-        git -C picocart64 commit -am "Automated changes"
-        git -C picocart64 push pr_origin HEAD:${{ github.head_ref }}
-
     - name: Checkout DragonMinded/libdragon
       uses: actions/checkout@v2
       with:
