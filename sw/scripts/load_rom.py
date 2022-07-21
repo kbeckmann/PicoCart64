@@ -7,7 +7,7 @@ import os
 
 
 def uncompressed_rom(rom_data):
-    code = 'const unsigned char __in_flash("rom_file") rom_file[] = {\n'
+    code = 'const unsigned char __attribute__((section(".n64_rom"))) rom_file[] = {\n'
     code += ','.join([hex(c) for c in rom_data])
     code += '\n};\n'
     return code
@@ -46,10 +46,11 @@ def compress_rom(rom_data):
     # print(chunk_mapping)
 
     # Note the lack of __in_flash() - we want the mapping to be copied to SRAM.
-    code = "const uint16_t rom_mapping[] = {\n"
+    code = "const uint16_t __attribute__((section(\".n64_rom.mapping\"))) flash_rom_mapping[] = {\n"
     code += ", ".join([str(i) for i in chunk_mapping])
-    code += "\n};"
-    code += "const unsigned char __in_flash(\"rom_file\") rom_chunks[][" + str(chunk_size) + "] = {\n"
+    code += "\n};\n"
+    code += "uint16_t rom_mapping[16384];\n"
+    code += "const unsigned char __attribute__((section(\".n64_rom\"))) rom_chunks[][" + str(chunk_size) + "] = {\n"
     for chunk in unique_chunks:
         code += "{"
         code += ','.join([hex(c) for c in chunk])

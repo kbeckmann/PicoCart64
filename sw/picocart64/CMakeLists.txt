@@ -68,6 +68,9 @@ pico_enable_stdio_usb(picocart64 0)
 # disable uart output
 pico_enable_stdio_uart(picocart64 0)
 
+# use custom linker script
+pico_set_linker_script(picocart64 ${CMAKE_CURRENT_LIST_DIR}/memmap_custom.ld)
+
 # create map/bin/hex/uf2 file etc.
 pico_add_extra_outputs(picocart64)
 

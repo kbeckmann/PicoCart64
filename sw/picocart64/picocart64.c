@@ -121,6 +121,10 @@ void vLaunch(void)
 	vTaskStartScheduler();
 }
 
+extern uint16_t flash_rom_mapping[];
+extern uint16_t rom_mapping[];
+extern char picocart_header[];
+
 int main(void)
 {
 	// Overclock!
@@ -136,6 +140,15 @@ int main(void)
 		gpio_init(i);
 		gpio_set_dir(i, GPIO_IN);
 		gpio_set_pulls(i, false, false);
+	}
+
+	if(memcmp(picocart_header, "picocartcompress", 16) == 0) {
+		// Copy rom compressed map from flash into RAM
+		memcpy(rom_mapping, flash_rom_mapping, 16384*2);
+	} else {
+		for(int i = 0; i < 16384; i++) {
+			rom_mapping[i] = i;
+		}
 	}
 
 	// Enable pull up on N64_CIC_DIO since there is no external one.
