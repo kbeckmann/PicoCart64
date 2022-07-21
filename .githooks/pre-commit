@@ -6,8 +6,6 @@ if [[ "$STAGED_FILES" = "" ]]; then
   exit 0
 fi
 
-PASS=true
-
 ./sw/scripts/indent.sh --cleanup
 
 INDENTED_FILES=$(git diff --name-only --diff-filter=ACM -- $STAGED_FILES)
