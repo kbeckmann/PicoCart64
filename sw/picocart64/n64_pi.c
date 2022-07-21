@@ -351,7 +351,7 @@ void n64_pi_run(void)
 			addr = n64_pi_get_value(pio);
 
 			// Jump to start of the PIO program.
-			pio_sm_exec(pio, 0, pio_encode_jmp(0));
+			pio_sm_exec(pio, 0, pio_encode_jmp(offset + 0));
 
 			// Read and handle the following requests normally
 			addr = n64_pi_get_value(pio);
