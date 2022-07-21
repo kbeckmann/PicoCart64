@@ -93,7 +93,8 @@ void n64_pi_run(void)
 	while (1) {
 		// addr must not be a WRITE or READ request here,
 		// it should contain a 16-bit aligned address.
-		assert((addr != 0) && ((addr & 1) == 0));
+		// Assert drains performance, uncomment when debugging.
+		// ASSERT((addr != 0) && ((addr & 1) == 0));
 
 		// We got a start address
 		last_addr = addr;
@@ -308,9 +309,12 @@ void n64_pi_run(void)
 					pio_sm_put(pio, 0, next_word >> 16);
 					last_addr += 2;
 
-					// Dummy consume the READ signal
+					// Get the next command/address
 					addr = n64_pi_get_value(pio);
-					assert(addr == 0);
+					if (addr != 0) {
+						// Handle 16-bit reads even if we shouldn't get them here.
+						continue;
+					}
 
 					pio_sm_put(pio, 0, next_word & 0xFFFF);
 					last_addr += 2;
