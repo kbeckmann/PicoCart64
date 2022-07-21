@@ -21,11 +21,13 @@
     __stack (== StackTop)
 */
 
+__N64_ROM_LENGTH__ = DEFINED(__N64_ROM_LENGTH__) ? __N64_ROM_LENGTH__ : 1856k;
+
 MEMORY
 {
     FLASH(rx) : ORIGIN = 0x10000000, LENGTH = 64k
     N64_SRAM(rx) : ORIGIN = 0x10010000, LENGTH = 128k
-    N64_ROM(rx) : ORIGIN = 0x10030000, LENGTH = 1856k
+    N64_ROM(rx) : ORIGIN = 0x10030000, LENGTH = __N64_ROM_LENGTH__
     RAM(rwx) : ORIGIN =  0x20000000, LENGTH = 256k
     SCRATCH_X(rwx) : ORIGIN = 0x20040000, LENGTH = 4k
     SCRATCH_Y(rwx) : ORIGIN = 0x20041000, LENGTH = 4k
@@ -259,9 +261,9 @@ SECTIONS
 
     .n64_rom : {
         *(.n64_rom.header)
-        . = ALIGN(16);
+        . = 16;
         *(.n64_rom.mapping)
-        . = ALIGN(32768);
+        . = 32768;
         *(.n64_rom)
     } > N64_ROM
 }

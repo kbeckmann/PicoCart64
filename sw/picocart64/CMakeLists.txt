@@ -20,13 +20,28 @@ else()
     message(FATAL_ERROR "Please set the variable REGION to either NTSC or PAL")
 endif()
 
+if(NOT DEFINED FLASH_SIZE_MB)
+    set(FLASH_SIZE_MB 2)
+endif()
+
+if(FLASH_SIZE_MB STREQUAL "2")
+    set(N64_ROM_SIZE "1856k")
+elseif(FLASH_SIZE_MB STREQUAL "4")
+    set(N64_ROM_SIZE "3904k")
+elesif(FLASH_SIZE_MB STREQUAL "8")
+    set(N64_ROM_SIZE "8000k")
+elseif(FLASH_SIZE_MB STREQUAL "16")
+    set(N64_ROM_SIZE "16192k")
+endif()
+
+target_link_options(picocart64 PRIVATE
+    "-Wl,--defsym=__N64_ROM_LENGTH__=${N64_ROM_SIZE}")
 
 target_compile_definitions(picocart64 PRIVATE
     PICO_STDOUT_MUTEX=0
     CONFIG_REGION_NTSC=${CONFIG_REGION_NTSC}
     CONFIG_REGION_PAL=${CONFIG_REGION_PAL}
 )
-
 
 # Generate git_info.h
 set(GIT_INFO_H ${CMAKE_CURRENT_BINARY_DIR}/git_info.h)
