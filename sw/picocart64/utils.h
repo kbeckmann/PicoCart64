@@ -21,3 +21,15 @@ static inline uint32_t swap8(uint16_t value)
 	// 0x1122 => 0x2211
 	return (value << 8) | (value >> 8);
 }
+
+void assert_handler(char *file, int line, char *statement);
+
+#define ASSERT(_stmt) do                                                      \
+{                                                                             \
+    if (!(_stmt)) {                                                           \
+        assert_handler(__FILE__, __LINE__, #_stmt);                           \
+    }                                                                         \
+} while (0)
+
+#define LIKELY(x)    __builtin_expect ((x), 1)
+#define UNLIKELY(x)  __builtin_expect ((x), 0)
