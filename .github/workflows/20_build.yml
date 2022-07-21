@@ -42,7 +42,7 @@ jobs:
       if: github.event.pull_request.head.repo.full_name == github.repository
       run: |
         sudo apt-get install -y indent git
-        ./picocart64/sw/scripts/indent.sh --cleanup
+        ./picocart64/sw/scripts/indent.sh -c
 
     - name: Checkout DragonMinded/libdragon
       uses: actions/checkout@v2

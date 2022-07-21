@@ -4,4 +4,4 @@ To install the git hooks, please run `git config core.hooksPath .githooks` from 
 
 ### `pre-commit`
 
-Executes `./sw/scripts/indent.sh --cleanup` before a commit is made. If indentation was fixed, this will be changed in your working copy, i.e. you have to manually review and stage the changes before committing again.
+Executes `./sw/scripts/indent.sh -c` before a commit is made. If indentation was fixed, this will be changed in your working copy, i.e. you have to manually review and stage the changes before committing again.
