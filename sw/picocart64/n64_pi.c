@@ -342,6 +342,11 @@ void n64_pi_run(void)
 			// Don't handle this request - jump back to the beginning.
 			// This way, there won't be a bus conflict in case e.g. a physical N64DD is connected.
 
+			// Enable to log addresses to UART
+#if 0
+			uart_print_hex_u32(last_addr);
+#endif
+
 			// Read to empty fifo
 			addr = n64_pi_get_value(pio);
 
