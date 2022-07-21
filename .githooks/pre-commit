@@ -1,0 +1,21 @@
+#!/bin/sh
+
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep ".c$")
+
+if [[ "$STAGED_FILES" = "" ]]; then
+  exit 0
+fi
+
+PASS=true
+
+./sw/scripts/indent.sh --cleanup
+
+INDENTED_FILES=$(git diff --name-only --diff-filter=ACM -- $STAGED_FILES)
+if [[ "$INDENTED_FILES" != "" ]]; then
+  echo "Some files have been indented for you."
+  echo "Please review the following files and stage them manually:"
+  echo ""
+  echo $INDENTED_FILES
+  echo ""
+  exit 1
+fi
