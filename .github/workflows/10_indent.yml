@@ -43,6 +43,7 @@ jobs:
       run: echo ::set-output name=modified::$(if git -C picocart64 diff-index --quiet HEAD --; then echo "false"; else echo "true"; fi)
 
     - name: Push changes
+      if: steps.git-check.outputs.modified == 'true'
       run: |
         git config --global user.name 'GitHub CI'
         git config --global user.email 'kbeckmann@users.noreply.github.com'
