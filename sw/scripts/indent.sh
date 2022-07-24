@@ -26,6 +26,7 @@ done
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
 C_DIRECTORIES="
+    dualpico
     n64
     picocart64
     picocart64_shared
@@ -34,7 +35,7 @@ C_DIRECTORIES="
 
 for x in $C_DIRECTORIES; do
     C_SOURCES=$(find "$SCRIPTPATH/../$x" -type f -name '*.c')
-    H_SOURCES=$(find "$SCRIPTPATH/../$x" -type f -name '*.h' | grep -v '/rom.h')
+    H_SOURCES=$(find "$SCRIPTPATH/../$x" -type f -name '*.h' ! -name 'rom.h')
 
     SIMPLE_BACKUP_SUFFIX="~picocart64~" indent $C_SOURCES $H_SOURCES -nbad -bap -bbo -hnl -br -brs -c33 -cd33 -ncdb -ce -ci4 -cli0 -d0 -di1 -nfc1 -i8 -ip0 -l180 -lp -npcs -nprs -npsl -sai -saf -saw -ncs -nsc -sob -nfca -cp33  -ss -ts8 -il1
 
