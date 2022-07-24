@@ -50,19 +50,19 @@ int main(void)
 	// Set all QSPI IOs high impedance (disable OE)
 	for (int i = 0; i < 6; i++) {
 		ioqspi_hw->io[i].ctrl = (ioqspi_hw->io[i].ctrl & (~IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_BITS) |
-								(IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_VALUE_DISABLE << IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_LSB)	);
+					 (IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_VALUE_DISABLE << IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_LSB));
 	}
 
 	if (mcu_id == 1) {
 		// I am MCU1, let MCU2 boot
 		gpio_set_dir(2, GPIO_OUT);
-		gpio_put(2, 1); // Set GPIO2 / MCU2.RUN to HIGH
+		gpio_put(2, 1);	// Set GPIO2 / MCU2.RUN to HIGH
 	}
 
 	while (true) {
 		count++;
 		printf("Hello, world! I am MCU %d -- %d\n", mcu_id, count);
-		gpio_put(25, count & 1); // Toggle LED slowly
+		gpio_put(25, count & 1);	// Toggle LED slowly
 		sleep_ms(1000);
 	}
 	return 0;
