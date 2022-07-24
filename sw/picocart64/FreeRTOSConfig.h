@@ -102,7 +102,7 @@
 #define configMAX_API_CALL_INTERRUPT_PRIORITY   [dependent on processor and application]
 */
 
-#if FREE_RTOS_KERNEL_SMP	// set by the RP2040 SMP port of FreeRTOS
+#if FREE_RTOS_KERNEL_SMP		// set by the RP2040 SMP port of FreeRTOS
 
 #error SMP should be disabled
 
@@ -137,4 +137,4 @@ to exclude the API function. */
 
 /* A header file that defines trace macro can be included here. */
 
-#endif				/* FREERTOS_CONFIG_H */
+#endif							/* FREERTOS_CONFIG_H */

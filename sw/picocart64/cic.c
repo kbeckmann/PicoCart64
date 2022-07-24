@@ -102,7 +102,7 @@ const unsigned char _CicSeed = CIC6102_SEED;
 
 const unsigned char _CicChecksum[] = {
 	CIC6102_CHECKSUM
-	    // CIC6105_CHECKSUM
+		// CIC6105_CHECKSUM
 };
 
 /* NTSC initial RAM */
