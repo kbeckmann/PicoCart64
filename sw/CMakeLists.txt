@@ -30,8 +30,9 @@ add_subdirectory(lib/freertos-kernel/portable/ThirdParty/GCC/RP2040 FreeRTOS-Ker
 add_subdirectory(stdio_async_uart)
 add_subdirectory(picocart64_shared)
 
-# Add picocart64 (uses FreeRTOS)
+# Add applications
 add_subdirectory(picocart64)
+add_subdirectory(dualpico)
 
 add_compile_options(-Wall
         -Wno-format          # int != int32_t as far as the compiler is concerned because gcc has int32_t as long int
