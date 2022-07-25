@@ -11,6 +11,7 @@ target_include_directories(dualpico PRIVATE
 target_link_libraries(
     dualpico
     pico_stdlib
+    picocart64_shared
 )
 
 # usb
