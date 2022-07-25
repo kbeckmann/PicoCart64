@@ -29,31 +29,88 @@
  *
  */
 
-// Set up the SSI controller for standard SPI mode,i.e. for every byte sent we get one back
-static void flash_init_spi(bool is_slave)
+// Define interface width: single/dual/quad IO
+#define FRAME_FORMAT SSI_CTRLR0_SPI_FRF_VALUE_QUAD
+
+// For W25Q080 this is the "Read data fast quad IO" instruction:
+#define CMD_READ 0xeb
+
+// "Mode bits" are 8 special bits sent immediately after
+// the address bits in a "Read Data Fast Quad I/O" command sequence. 
+// On W25Q080, the four LSBs are don't care, and if MSBs == 0xa, the
+// next read does not require the 0xeb instruction prefix.
+#define MODE_CONTINUOUS_READ 0xa0
+
+// The number of address + mode bits, divided by 4 (always 4, not function of
+// interface width).
+#define ADDR_L 8
+
+// How many clocks of Hi-Z following the mode bits. For W25Q080, 4 dummy cycles
+// are required.
+#define WAIT_CYCLES 4
+
+// These are supported by almost any SPI flash
+#define FLASHCMD_PAGE_PROGRAM     0x02
+#define FLASHCMD_READ_DATA        0x03
+#define FLASHCMD_READ_STATUS      0x05
+#define FLASHCMD_WRITE_ENABLE     0x06
+#define FLASHCMD_SECTOR_ERASE     0x20
+#define FLASHCMD_READ_SFDP        0x5a
+#define FLASHCMD_READ_JEDEC_ID    0x9f
+
+static void flash_init_spi(void)
 {
 	// Disable SSI for further config
 	ssi_hw->ssienr = 0;
 	// Clear sticky errors (clear-on-read)
 	(void)ssi_hw->sr;
 	(void)ssi_hw->icr;
-	// Hopefully-conservative baud rate for boot and programming
+
 	// ssi_hw->baudr = 6;
 	// ssi_hw->baudr = 20;
 	ssi_hw->baudr = 0x100;
-	uint32_t bits = (1 << SSI_CTRLR0_SSTE_LSB) | (SSI_CTRLR0_SPI_FRF_VALUE_STD << SSI_CTRLR0_SPI_FRF_LSB) |	// Standard 1-bit SPI serial frames
-		(7 << SSI_CTRLR0_DFS_32_LSB) |	// 8 clocks per data frame
-		(SSI_CTRLR0_TMOD_VALUE_TX_AND_RX << SSI_CTRLR0_TMOD_LSB);	// TX and RX FIFOs are both used for every byte
 
-	if (is_slave) {
-		bits |= (1 << SSI_CTRLR0_SLV_OE_LSB);	// Slave output enable
-	}
+	ssi_hw->ctrlr0 = (SSI_CTRLR0_SPI_FRF_VALUE_STD << SSI_CTRLR0_SPI_FRF_LSB) |	// Standard 1-bit SPI serial frames
+		(31 << SSI_CTRLR0_DFS_32_LSB) |	// 32 clocks per data frame
+		(SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB);	// Send instr + addr, receive data
 
-	ssi_hw->ctrlr0 = bits;
-	// Slave _NOT_ selected when transfers in progress
-	// ssi_hw->ser = is_slave ? 0 : 1;
-	ssi_hw->ser = 1;
-	// Re-enable
+	ssi_hw->spi_ctrlr0 = ((FLASHCMD_READ_DATA << SSI_SPI_CTRLR0_XIP_CMD_LSB) |	// Standard 03h read
+						  (2u << SSI_SPI_CTRLR0_INST_L_LSB) |	// 8-bit instruction prefix
+						  (6u << SSI_SPI_CTRLR0_ADDR_L_LSB) |	// 24-bit addressing for 03h commands
+						  (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C1A << SSI_SPI_CTRLR0_TRANS_TYPE_LSB)	// Command and address both in serial format
+		);
+
+	ssi_hw->ssienr = 1;
+}
+
+// Set up the SSI controller for standard SPI mode,i.e. for every byte sent we get one back
+static void flash_init_qspi(void)
+{
+	// Disable SSI for further config
+	ssi_hw->ssienr = 0;
+	// Clear sticky errors (clear-on-read)
+	(void)ssi_hw->sr;
+	(void)ssi_hw->icr;
+
+	ssi_hw->baudr = 2;
+	// ssi_hw->baudr = 6;
+	// ssi_hw->baudr = 20;
+	// ssi_hw->baudr = 0x100;
+
+	ssi_hw->ctrlr0 = ((FRAME_FORMAT << SSI_CTRLR0_SPI_FRF_LSB) |	/* Quad I/O mode */
+					  (31 << SSI_CTRLR0_DFS_32_LSB) |	/* 32 data bits */
+					  (SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB)	/* Send INST/ADDR, Receive Data */
+		);
+
+	ssi_hw->ctrlr1 = 0;			// NDF=0 (single 32b read)
+
+	ssi_hw->spi_ctrlr0 = ((MODE_CONTINUOUS_READ << SSI_SPI_CTRLR0_XIP_CMD_LSB) |	/* Mode bits to keep flash in continuous read mode */
+						  (ADDR_L << SSI_SPI_CTRLR0_ADDR_L_LSB) |	/* Total number of address + mode bits */
+						  (WAIT_CYCLES << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |	/* Hi-Z dummy clocks following address + mode */
+						  (SSI_SPI_CTRLR0_INST_L_VALUE_NONE << SSI_SPI_CTRLR0_INST_L_LSB) |	/* Do not send a command, instead send XIP_CMD as mode bits after address */
+						  (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_2C2A << SSI_SPI_CTRLR0_TRANS_TYPE_LSB)	/* Send Address in Quad I/O mode (and Command but that is zero bits long) */
+		);
+
 	ssi_hw->ssienr = 1;
 }
 
@@ -138,11 +195,19 @@ void __noinline flash_flush_cache()
 #define LED_PIN        (25)
 
 #define QSPI_SCLK_PIN  (0)
-#define QSPI_CSn_PIN   (1)
+#define QSPI_SS_PIN    (1)
 #define QSPI_SD0_PIN   (2)
 #define QSPI_SD1_PIN   (3)
 #define QSPI_SD2_PIN   (4)
 #define QSPI_SD3_PIN   (5)
+
+#define QSPI_GPIO_XIP_NORMAL ( \
+		(IO_QSPI_GPIO_QSPI_SCLK_CTRL_IRQOVER_VALUE_NORMAL   << IO_QSPI_GPIO_QSPI_SCLK_CTRL_IRQOVER_LSB) | \
+		(IO_QSPI_GPIO_QSPI_SCLK_CTRL_INOVER_VALUE_NORMAL    << IO_QSPI_GPIO_QSPI_SCLK_CTRL_INOVER_LSB)  | \
+		(IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_VALUE_NORMAL    << IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_LSB)  | \
+		(IO_QSPI_GPIO_QSPI_SCLK_CTRL_OUTOVER_VALUE_NORMAL   << IO_QSPI_GPIO_QSPI_SCLK_CTRL_OUTOVER_LSB) | \
+		(IO_QSPI_GPIO_QSPI_SCLK_CTRL_FUNCSEL_VALUE_XIP_SCLK << IO_QSPI_GPIO_QSPI_SCLK_CTRL_FUNCSEL_LSB)   \
+)
 
 #define QSPI_GPIO_INPUT ( \
 		(IO_QSPI_GPIO_QSPI_SCLK_CTRL_IRQOVER_VALUE_NORMAL   << IO_QSPI_GPIO_QSPI_SCLK_CTRL_IRQOVER_LSB) | \
@@ -170,9 +235,58 @@ void __noinline flash_flush_cache()
 
 #define QSPI_GPIO_INPUT_GET(_pin) (ioqspi_hw->io[(_pin)].status & IO_QSPI_GPIO_QSPI_SCLK_STATUS_INFROMPAD_BITS)
 
+static inline void flash_put_cmd_addr(uint8_t cmd, uint32_t addr)
+{
+	addr |= cmd << 24;
+	for (int i = 0; i < 4; ++i) {
+		ssi_hw->dr0 = addr >> 24;
+		addr <<= 8;
+	}
+}
+
+const uint32_t __in_flash("foo") foo[] = {
+
+	0x11111111,
+	0x22222222,
+	0x33333333,
+	0x44444444,
+	0x55555555,
+	0x66666666,
+	0x77777777,
+	0x88888888,
+	0x99999999,
+	0xaaaaaaaa,
+	0xbbbbbbbb,
+	0xcccccccc,
+	0xdddddddd,
+	0xeeeeeeee,
+	0xffffffff,
+
+/*
+	0x11223344,
+	0x55667788,
+	0xaabbccdd,
+	0x11223344,
+	0x55667788,
+	0xaabbccdd,
+	0x11223344,
+	0x55667788,
+	0xaabbccdd,
+	0x11223344,
+	0x55667788,
+	0xaabbccdd,
+	0x11223344,
+	0x55667788,
+	0xaabbccdd,
+	0x12345678,
+*/
+};
+
 int main(void)
 {
 	int count = 0;
+
+	set_sys_clock_khz(266000, true);	// Required for SRAM @ 200ns
 
 	// On MCU1, GPIO 2 is pulled low externally and connected to MCU2.RUN.
 	// On MCU2, GPIO 2 is pulled high externally.
@@ -195,12 +309,12 @@ int main(void)
 	ioqspi_hw->io[QSPI_SCLK_PIN].ctrl = (ioqspi_hw->io[QSPI_SCLK_PIN].ctrl & (~IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_BITS) |
 										 (IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_VALUE_DISABLE << IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_LSB));
 
-	ioqspi_hw->io[QSPI_CSn_PIN].ctrl = (ioqspi_hw->io[QSPI_CSn_PIN].ctrl & (~IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_BITS) |
-										(IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_VALUE_DISABLE << IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_LSB));
+	ioqspi_hw->io[QSPI_SS_PIN].ctrl = (ioqspi_hw->io[QSPI_SS_PIN].ctrl & (~IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_BITS) |
+									   (IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_VALUE_DISABLE << IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_LSB));
 
 	// Turn off the XIP cache
-	// xip_ctrl_hw->ctrl = 1 << XIP_CTRL_POWER_DOWN_LSB;
-	// xip_ctrl_hw->flush = 1;
+	xip_ctrl_hw->ctrl = (xip_ctrl_hw->ctrl & (~XIP_CTRL_EN_BITS));
+	xip_ctrl_hw->flush = 1;
 
 	if (mcu_id == 1) {
 		// I am MCU1
@@ -217,49 +331,41 @@ int main(void)
 		// TODO: Wait for MCU2 to tell MCU1 "I have booted"
 		sleep_ms(1000);
 
-		flash_init_spi(false);
+		ioqspi_hw->io[QSPI_SCLK_PIN].ctrl = QSPI_GPIO_XIP_NORMAL;
 
-		// flash_enter_cmd_xip();
+		// flash_init_spi(false);
+		flash_init_qspi();
 
-		// ioqspi_hw->io[QSPI_SCLK_PIN].ctrl = (ioqspi_hw->io[QSPI_SCLK_PIN].ctrl & (~IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_BITS) |
-		//                          (IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_VALUE_NORMAL << IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_LSB));
+		io_rw_32 *ss_ctrl = &ioqspi_hw->io[QSPI_SS_PIN].ctrl;
 
-		// Send data to MCU2 by accessing random flash addresses
+#define CUSTOM_CSN_PIN_MASK (1 << CUSTOM_CSN_PIN)
+
 		while (true) {
 			count++;
 			gpio_put(LED_PIN, count & 1);	// Toggle LED slowly
 
-			while (ssi_hw->rxflr != 0) {
-				// Empty the RX fifo (shouldn't be needed)
-				uint32_t value = ssi_hw->dr0;
-				printf("** Threw away an RX entry: %08lX\n", value);
-			}
+			// Test the speed of requesting data with a manual CS toggling.
+			// Time should be measured between CS=0 until CS=1
 
-			ioqspi_hw->io[QSPI_SCLK_PIN].ctrl = (ioqspi_hw->io[QSPI_SCLK_PIN].ctrl & (~IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_BITS) |
-												 (IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_VALUE_NORMAL << IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_LSB));
+			const uint32_t *ptr1 = &foo[(2 * count) % 16];
+			const uint32_t *ptr2 = &foo[(2 * count + 1) % 16];
 
-			// CustomCSn = 0
-			gpio_put(CUSTOM_CSN_PIN, 0);
+			// CSn = 0
+			gpio_clr_mask(CUSTOM_CSN_PIN_MASK);
+			*ss_ctrl = QSPI_GPIO_OUTPUT_LOW;
 
-			ssi_hw->dr0 = count;
-			for (int i = 0; i < 16; i++) {
-				ssi_hw->dr0 = 0;
-			}
+			uint32_t word1 = *ptr1;
 
-			while (ssi_hw->rxflr < 16) {
-				// Wait until we have two entries in the rx fifo
-			}
+			// TODO: Fix so we can read continously?
+			uint32_t word2 = *ptr2;
 
-			// CustomCSn = 1
-			gpio_put(CUSTOM_CSN_PIN, 1);
+			// TODO: Implement manual 16 bit read and see if it's faster
 
-			uint32_t value0 = ssi_hw->dr0;
-			uint32_t value1 = ssi_hw->dr0;
+			// CSn = 1
+			*ss_ctrl = QSPI_GPIO_OUTPUT_HIGH;
+			gpio_set_mask(CUSTOM_CSN_PIN_MASK);
 
-			ioqspi_hw->io[QSPI_SCLK_PIN].ctrl = (ioqspi_hw->io[QSPI_SCLK_PIN].ctrl & (~IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_BITS) |
-												 (IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_VALUE_DISABLE << IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_LSB));
-
-			printf("Read from SSI: %08lX %08lX\n", value0, value1);
+			printf("Read from mem mapped flash: %08lX %08lX\n", word1, word2);
 			printf("MCU1 rxflr: %d, txflr: %d, xip_ctrl_hw->stat: %d\n", ssi_hw->rxflr, ssi_hw->txflr, xip_ctrl_hw->stat);
 			printf("MCU1 txftlr: %d, rxftlr: %d, baudr: %d\n", ssi_hw->txftlr, ssi_hw->rxftlr, ssi_hw->baudr);
 
@@ -272,69 +378,19 @@ int main(void)
 		gpio_init(CUSTOM_CSN_PIN);
 		gpio_set_dir(CUSTOM_CSN_PIN, GPIO_IN);
 
-		// Disable SSI and enable SIO (GPIO mode) for the QSPI pins
-		// ssi_hw->ssienr = 0;
-
 		for (int i = 0; i < 6; i++) {
 			ioqspi_hw->io[i].ctrl = QSPI_GPIO_INPUT;
 		}
 
-		// Configure SSI to become a slave somehow
 		while (true) {
 			count++;
-			gpio_put(LED_PIN, count & 1);	// Toggle LED slowly
-			// ssi_hw->dr0 = count;
+			gpio_put(LED_PIN, count & 1);
+			printf("MCU2 -- %d\n", count);
 
-			printf("MCU2\n");
-
-			while (gpio_get(CUSTOM_CSN_PIN)) {
-				// Wait for CSn = 0
-			}
-			// printf("CSn=0\n");
-
-			// Bit-bang receive SPI
-			uint32_t stat0 = ioqspi_hw->io[QSPI_SCLK_PIN].status;
-			while (!gpio_get(CUSTOM_CSN_PIN)) {
-				// Wait for CSn = 1
-				uint32_t stat1 = ioqspi_hw->io[QSPI_SCLK_PIN].status;
-				if (stat0 != stat1) {
-					printf("%08lX %08lX\n", stat0, stat1);
-					stat0 = stat1;
-				}
-				// // wait for posedge SCK
-				// while (!QSPI_GPIO_INPUT_GET(QSPI_SCLK_PIN)) {}
-				// printf("SCK=1, MOSI=%d\n", !!QSPI_GPIO_INPUT_GET(QSPI_SD0_PIN));
-
-				// // wait for negedge SCK
-				// while (QSPI_GPIO_INPUT_GET(QSPI_SCLK_PIN)) {}
-				// printf("SCK=0, MOSI=%d\n", !!QSPI_GPIO_INPUT_GET(QSPI_SD0_PIN));
-
-			}
-
-			while (!gpio_get(CUSTOM_CSN_PIN)) {
-				// Wait for CSn = 1
-			}
-			printf("CSn=1\n");
-
-			for (int i = 0; i < 100; i++) {
-				ioqspi_hw->io[QSPI_SD1_PIN].ctrl = QSPI_GPIO_OUTPUT_HIGH;
-				// sleep_ms(1);
-				ioqspi_hw->io[QSPI_SD1_PIN].ctrl = QSPI_GPIO_OUTPUT_LOW;
-				// sleep_ms(1);
-			}
-			ioqspi_hw->io[QSPI_SD1_PIN].ctrl = QSPI_GPIO_INPUT;
-
-			printf("MCU2 rxflr: %d, txflr: %d, xip_ctrl_hw->stat: %d\n", ssi_hw->rxflr, ssi_hw->txflr, xip_ctrl_hw->stat);
-
+			sleep_ms(1000);
 		}
 
 	}
 
-	while (true) {
-		count++;
-		printf("Hello, world! I am MCU %d -- %d\n", mcu_id, count);
-		gpio_put(LED_PIN, count & 1);	// Toggle LED slowly
-		sleep_ms(1000);
-	}
 	return 0;
 }
