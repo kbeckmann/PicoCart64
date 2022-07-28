@@ -27,12 +27,15 @@
 #include "stdio_async_uart.h"
 
 // The rom to load in normal .z64, big endian, format
+#include "rom_vars.h"
 #include "rom.h"
+
+uint16_t rom_mapping[MAPPING_TABLE_LEN];
 
 #if COMPRESSED_ROM
 // do something
 #else
-static const uint16_t *rom_file_16 = (uint16_t *) rom_file;
+static const uint16_t *rom_file_16 = (uint16_t *) rom_chunks;
 #endif
 
 RINGBUF_CREATE(ringbuf, 64, uint32_t);

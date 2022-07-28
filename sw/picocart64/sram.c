@@ -15,7 +15,7 @@
 uint16_t sram[SRAM_1MBIT_SIZE / sizeof(uint16_t)];
 
 // sram_backup will be aligned to 4096 to match the flash sector erase size
-uint16_t __aligned(4096) __in_flash("sram_backup") sram_backup[SRAM_1MBIT_SIZE / sizeof(uint16_t)];
+uint16_t __aligned(4096) __attribute__((section(".n64_sram"))) sram_backup[SRAM_1MBIT_SIZE / sizeof(uint16_t)];
 
 void sram_load_from_flash(void)
 {

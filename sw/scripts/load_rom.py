@@ -5,20 +5,25 @@
 import argparse
 import os
 
+chunk_size_pot = 10
+chunk_size = 1 << chunk_size_pot
 
 def uncompressed_rom(rom_data):
-    code = 'const unsigned char __in_flash("rom_file") rom_file[] = {\n'
-    code += ','.join([hex(c) for c in rom_data])
+    rom_data_mv = memoryview(rom_data)
+
+    code = 'const char __attribute__((section(".n64_rom.header"))) picocart_header[16] = "picocart        ";\n'
+    code += 'const uint16_t __attribute__((section(".n64_rom.mapping"))) flash_rom_mapping[] = {};\n'
+    code += 'const unsigned char __attribute__((section(".n64_rom"))) rom_chunks[]['+str(chunk_size)+'] = {\n'
+    for chunk in range(len(rom_data)//chunk_size):
+        chunk_data = rom_data_mv[chunk*chunk_size:(chunk+1)*chunk_size]
+        code += "{"
+        code += ','.join([hex(c) for c in chunk_data])
+        code += "},\n"
     code += '\n};\n'
     return code
 
 
-
-
 def compress_rom(rom_data):
-    chunk_size_pot = 10
-    chunk_size = 1 << chunk_size_pot
-
     rom_data_mv = memoryview(rom_data)
 
     unique_chunks = []
@@ -45,11 +50,13 @@ def compress_rom(rom_data):
 
     # print(chunk_mapping)
 
-    # Note the lack of __in_flash() - we want the mapping to be copied to SRAM.
-    code = "const uint16_t rom_mapping[] = {\n"
+    code = 'const char __attribute__((section(".n64_rom.header"))) picocart_header[16] = "picocartcompress";\n'
+
+    # We copy the mapping to SRAM manually.
+    code += "const uint16_t __attribute__((section(\".n64_rom.mapping\"))) flash_rom_mapping[] = {\n"
     code += ", ".join([str(i) for i in chunk_mapping])
-    code += "\n};"
-    code += "const unsigned char __in_flash(\"rom_file\") rom_chunks[][" + str(chunk_size) + "] = {\n"
+    code += "\n};\n"
+    code += "const unsigned char __attribute__((section(\".n64_rom\"))) rom_chunks[][" + str(chunk_size) + "] = {\n"
     for chunk in unique_chunks:
         code += "{"
         code += ','.join([hex(c) for c in chunk])

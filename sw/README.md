@@ -18,6 +18,8 @@ mkdir build
 cd build
 
 # Configure cmake. To use NTSC, set -DREGION=NTSC
+# If you have more than 2MB flash, you need to change the flash size by adding -DFLASH_SIZE_MB={one of 2,4,8,16} here.
+
 cmake -DREGION=PAL ..
 
 # Build
