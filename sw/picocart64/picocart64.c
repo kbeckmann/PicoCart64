@@ -141,11 +141,11 @@ int main(void)
 	}
 
 	// Set up ROM mapping table
-	if(memcmp(picocart_header, "picocartcompress", 16) == 0) {
+	if (memcmp(picocart_header, "picocartcompress", 16) == 0) {
 		// Copy rom compressed map from flash into RAM
-		memcpy(rom_mapping, flash_rom_mapping, MAPPING_TABLE_LEN*2);
+		memcpy(rom_mapping, flash_rom_mapping, MAPPING_TABLE_LEN * sizeof(uint16_t));
 	} else {
-		for(int i = 0; i < MAPPING_TABLE_LEN; i++) {
+		for (int i = 0; i < MAPPING_TABLE_LEN; i++) {
 			rom_mapping[i] = i;
 		}
 	}

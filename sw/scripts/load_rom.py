@@ -15,7 +15,6 @@ def uncompressed_rom(rom_data):
     code += 'const uint16_t __attribute__((section(".n64_rom.mapping"))) flash_rom_mapping[] = {};\n'
     code += 'const unsigned char __attribute__((section(".n64_rom"))) rom_chunks[]['+str(chunk_size)+'] = {\n'
     for chunk in range(len(rom_data)//chunk_size):
-        print(chunk)
         chunk_data = rom_data_mv[chunk*chunk_size:(chunk+1)*chunk_size]
         code += "{"
         code += ','.join([hex(c) for c in chunk_data])

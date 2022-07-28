@@ -24,7 +24,7 @@ if(NOT DEFINED FLASH_SIZE_MB)
     set(FLASH_SIZE_MB 2)
 endif()
 
-# subtract the 64kb used for firmware + 128kb used for sram backup
+# Subtract the 64kB used for firmware + 128kB used for SRAM backup
 if(FLASH_SIZE_MB STREQUAL "2")
     set(N64_ROM_SIZE "1856k")
 elseif(FLASH_SIZE_MB STREQUAL "4")
