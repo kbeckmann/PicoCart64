@@ -1,1 +1,92 @@
-placeholder
+<!DOCTYPE html>
+<html translate="no">
+
+<head>
+    <title>PicoCart64 UF2 ROM Builder</title>
+    <meta http-equiv="content-Type" content="text/html; charset=UTF-8" />
+    <meta name="description"
+        content="Tool that compiles ROM files into UF2 files for PicoCart64." />
+    <meta name="keywords"
+        content="picocart64,picocart,rom,z64,uf2" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" />
+    <link rel="manifest" href="./manifest.json" />
+    <link rel="shortcut icon" href="./style/app_icon_16.png" type="image/png" sizes="16x16" />
+    <link rel="shortcut icon" href="./style/app_icon_192.png" type="image/png" sizes="192x192" />
+
+    <!-- iOS icons -->
+    <link rel="apple-touch-icon" sizes="57x57" href="./style/app_icon_114.png" />
+    <link rel="apple-touch-icon" sizes="114x114" href="./style/app_icon_114.png" />
+    <link rel="apple-touch-icon" sizes="72x72" href="./style/app_icon_144.png" />
+    <link rel="apple-touch-icon" sizes="144x144" href="./style/app_icon_144.png" />
+    <link rel="apple-touch-icon" href="./style/app_icon_192.png" />
+
+    <!-- cache -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+
+    <!-- social network metatags -->
+    <meta name="twitter:site" content="@kbeckmann">
+    <meta name="twitter:creator" content="@kbeckmann">
+    <meta name="twitter:domain" content="picoc.art">
+    <meta property="og:title" content="PicoCart64 UF2 ROM Builder">
+    <meta name="twitter:title" content="PicoCart64 UF2 ROM Builder">
+    <meta name="twitter:description"
+        content="Tool that compiles ROM files into UF2 files for PicoCart64.">
+    <meta property="og:image" content="https://picoc.art/PicoCart64/style/thumbnail.jpg">
+    <meta name="twitter:image" content="https://picoc.art/PicoCart64/style/thumbnail.jpg">
+    <meta name="twitter:card" content="photo">
+
+    <link type="text/css" rel="stylesheet" href="./style/PicoCart64.css" media="all" />
+    <script type="text/javascript" src="./js/PicoCart64.js"></script>
+    <script type="text/javascript" src="./js/MarcFile.js"></script>
+    <script type="text/javascript" src="./js/crc.js"></script>
+    <script type="text/javascript" src="./js/uf2.js"></script>
+</head>
+
+<body>
+    <div id="column">
+        <!-- HEADER -->
+        <header><img src="./style/logo.png" />
+            <h1>PicoCart64 UF2 ROM Builder</h1>
+        </header>
+
+        <!-- APP -->
+        <div id="wrapper">
+            <div id="tab0" class="tab">
+                <div class="row m-b">
+                    <div class="leftcol text-right"><label for="input-file-rom" data-localize="rom_file">ROM
+                            file:</label></div>
+                    <div class="rightcol">
+                        <input type="file" id="input-file-rom" class="enabled" />
+                    </div>
+                </div>
+                <div class="row m-b" id="rom-info">
+                    <div class="leftcol text-right"></div>
+                    <div class="rightcol"><span id="infotext"></span></div>
+                    <div class="leftcol text-right">CRC32:</div>
+                    <div class="rightcol"><span id="crc32"></span></div>
+                    <div class="leftcol text-right">MD5:</div>
+                    <div class="rightcol"><span id="md5"></span></div>
+                    <div class="leftcol text-right">SHA-1:</div>
+                    <div class="rightcol"><span id="sha1"></span></div>
+                </div>
+
+                <div class="buttons">
+                    <span id="message-build" class="message"></span>
+                    <button id="button-build" data-localize="build_uf2" class="disabled" disabled>Build UF2</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- FOOTER -->
+        <footer>
+            PicoCart64 UF2 ROM Builder <small>v1.0.0</small> by <a href="/">Konrad Beckmann</a>, based on <a href="https://github.com/marcrobledo/RomPatcher.js/">RomPatcher.js</a>.
+            <br />
+            <img src="style/icon_github.svg" class="icon github" /> <a
+                href="https://github.com/kbeckmann/PicoCart64/" target="_blank">See on GitHub</a>
+        </footer>
+    </div>
+</body>
+
+</html>
