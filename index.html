@@ -61,15 +61,23 @@
                         <input type="file" id="input-file-rom" class="enabled" />
                     </div>
                 </div>
+
                 <div class="row m-b" id="rom-info">
-                    <div class="leftcol text-right"></div>
-                    <div class="rightcol"><span id="infotext"></span></div>
                     <div class="leftcol text-right">CRC32:</div>
                     <div class="rightcol"><span id="crc32"></span></div>
                     <div class="leftcol text-right">MD5:</div>
                     <div class="rightcol"><span id="md5"></span></div>
                     <div class="leftcol text-right">SHA-1:</div>
                     <div class="rightcol"><span id="sha1"></span></div>
+                    <div class="leftcol text-right"><span id="infotext-left">&nbsp;</span></div>
+                    <div class="rightcol"><span id="infotext-right">&nbsp;</span></div>
+                </div>
+
+                <div class="row m-b" id="row-compress">
+                    <div class="leftcol text-right"></div>
+                    <div class="rightcol">
+                        <input type="checkbox" id="checkbox-compress" checked /> <label for="checkbox-compress" data-localize="compress">Compress</label>
+                    </div>
                 </div>
 
                 <div class="buttons">

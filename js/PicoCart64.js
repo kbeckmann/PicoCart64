@@ -20,7 +20,8 @@ addEvent(window, 'load', function () {
     });
 
     addEvent(el('button-build'), 'click', function () {
-        buildUF2(romFile);
+        el('infotext-right').innerHTML = "Working...";
+        generateAndSaveUF2(romFile, el('checkbox-compress').checked);
     });
 
 });
@@ -38,9 +39,9 @@ function setBuildEnabled(status) {
 
 function parseROM() {
     if (!romFile.readString(4).startsWith(Z64_MAGIC)) {
-        el('infotext').innerHTML = "Might not be a z64 file!";
+        el('infotext-right').innerHTML = "Might not be a z64 file!";
     } else {
-        el('infotext').innerHTML = "";
+        el('infotext-right').innerHTML = "";
     }
 
     updateChecksums(romFile, 0);
@@ -76,11 +77,12 @@ function stringToUint8Array(str) {
     return new Uint8Array(str.split('').map(function(char) {return char.charCodeAt(0);}));
 }
 
-function buildUF2(rom) {
+
+function compileUF2(headerAndMappingU8, payload) {
     let offset = 0;
 
-    // Estimate the output size
-    var blocks = Math.floor(((rom.fileSize + 255) / 256) + 0x8000 / 256);
+    // Calculate the output size
+    var blocks = Math.floor(((payload.fileSize + 255) / 256) + 0x8000 / 256);
     var outSize = blocks * 512;
     var dataOut = new Uint8Array(outSize);
 
@@ -93,21 +95,7 @@ function buildUF2(rom) {
         boardFamily: familyMap['Raspberry Pi RP2040'],
     };
 
-    // Encode header
-    var headerAndMapping = new ArrayBuffer(0x8000);
-    var headerAndMappingU8 = new Uint8Array(headerAndMapping, 0);
-
-    var header = new Uint8Array(headerAndMapping, 0, 16);
-    header.set(stringToUint8Array("picocartcompress"));
-
-    var mapping = new Uint16Array(headerAndMapping, 16, Math.floor((0x8000 - 16) / 2));
-
-    for (i = 0; i < mapping.length; i++) {
-        mapping[i] = i;
-    }
-
-    console.log(headerAndMapping);
-
+    // Write header
     for (i = 0; i < headerAndMappingU8.length / 256; i++) {
         block.payload = headerAndMappingU8.slice(i * 256, (i + 1) * 256);
         encodeBlock(block, dataOut, offset);
@@ -116,25 +104,127 @@ function buildUF2(rom) {
         offset += 512;
     }
 
-    romFile.seek(0);
-    while (!rom.isEOF()) {
-        block.payload = rom.readBytes(256);
+    // Write payload
+    payload.seek(0);
+    while (!payload.isEOF()) {
+        block.payload = payload.readBytes(256);
         encodeBlock(block, dataOut, offset);
         block.blockNumber++;
         block.flashAddress += 256;
         offset += 512;
     }
 
-    // Convert dataOut to a blob and save it with saveAs
+    return dataOut;
+}
+
+// Compares two Uint8Array
+function Uint8ArrayCompare(buf1, buf2) {
+    if (buf1.byteLength != buf2.byteLength) {
+        return false;
+    }
+
+    for (var i = 0; i < buf1.byteLength; i++) {
+        if (buf1[i] != buf2[i]) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+// Returns the index of the Uint8Array needle in the array of Uint8Arrays haystack
+function indexOfUint8Array(needle, haystack) {
+    for (var i = 0; i < haystack.length; i++) {
+        if (Uint8ArrayCompare(haystack[i], needle)) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+function generateAndSaveUF2(rom, compress) {
+    var uf2data;
     var blob;
+
+    if (compress) {
+        var headerAndMapping = new ArrayBuffer(0x8000);
+        var headerAndMappingU8 = new Uint8Array(headerAndMapping, 0);
+        headerAndMappingU8.set(stringToUint8Array("picocartcompress"));
+
+        var mappingU16 = new Uint16Array(headerAndMapping, 16, Math.floor((0x8000 - 16) / 2));
+
+        chunk_size_pot = 10
+        chunk_size = 1 << chunk_size_pot
+
+        // compressedROM
+
+        // Split rom into chunk_size chunks
+        unique_chunks = []
+        chunk_mapping = []
+        chunk_idx = 0
+        num_chunks = Math.floor(rom.fileSize / chunk_size)
+        rom.seek(0)
+        for (var i = 0; i < num_chunks; i++) {
+            chunk_data = rom.slice(i * chunk_size, chunk_size)._u8array;
+
+            // Check if chunk_data is in unique_chunks
+            var index = indexOfUint8Array(chunk_data, unique_chunks);
+            if (index == -1) {
+                // Found a unique chunk
+                unique_chunks.push(chunk_data)
+                index = chunk_idx
+                chunk_idx += 1
+            }
+
+            chunk_mapping.push(index)
+            // console.log(`${i} -> ${index}`)
+        }
+
+        // Flatten chunk_mapping into a Uint8Array
+        for (var i = 0; i < chunk_mapping.length; i++) {
+            mappingU16[i] = chunk_mapping[i];
+        }
+
+        // Flatten unique_chunks into a Uint8Array
+        var compressedROM = new Uint8Array(chunk_size * unique_chunks.length);
+        for (var i = 0; i < unique_chunks.length; i++) {
+            compressedROM.set(unique_chunks[i], chunk_size * i);
+        }
+
+        romSize = rom.fileSize;
+        newSize = headerAndMapping.byteLength + compressedROM.byteLength;
+        ratio = newSize / romSize;
+        lastAddr = 0x10030000 + newSize;
+        flashEnd = 0x10000000 + 16*1024*1024;
+        console.log(`Full ROM size:   ${romSize} bytes`)
+        console.log(`Header + Chunks: ${newSize} bytes`)
+        console.log(`Ratio:           ${ratio * 100} %`)
+        console.log(`Address of last byte: 0x${lastAddr.toString(16)} / 0x${flashEnd.toString(16)}`)
+
+        el('infotext-left').innerHTML = "Required flash:";
+        el('infotext-right').innerHTML = `${((30000 + newSize) / 1024/1024).toFixed(2)} MB`;
+        if (lastAddr > flashEnd) {
+            alert("Flash overflow, the compressed ROM will not fit.")
+        }
+
+        uf2data = compileUF2(headerAndMappingU8, new MarcFile(compressedROM));
+    } else {
+        var headerAndMapping = new ArrayBuffer(0x8000);
+        var headerAndMappingU8 = new Uint8Array(headerAndMapping, 0);
+        headerAndMappingU8.set(stringToUint8Array("picocart        "));
+        uf2data = compileUF2(headerAndMappingU8, rom);
+    }
+
+    // Convert dataOut to a blob and save it with saveAs
     try {
-        blob = new Blob([dataOut], { type: "uf2" });
+        blob = new Blob([uf2data], { type: "uf2" });
     } catch (e) {
         //old browser, use BlobBuilder
         window.BlobBuilder = window.BlobBuilder || window.WebKitBlobBuilder || window.MozBlobBuilder || window.MSBlobBuilder;
         if (e.name === 'InvalidStateError' && window.BlobBuilder) {
             var bb = new BlobBuilder();
-            bb.append(dataOut.buffer);
+            bb.append(uf2data.buffer);
             blob = bb.getBlob("uf2");
         } else {
             throw new Error('Incompatible Browser');
