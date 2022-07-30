@@ -25,6 +25,7 @@
 #include "ringbuf.h"
 #include "sram.h"
 #include "stdio_async_uart.h"
+#include "qspi_helper.h"
 
 // The rom to load in normal .z64, big endian, format
 #include "rom_vars.h"
@@ -93,6 +94,9 @@ void n64_pi_run(void)
 	// Read addr manually before the loop
 	addr = n64_pi_get_value(pio);
 
+	ioqspi_hw->io[QSPI_SS_PIN].ctrl = (ioqspi_hw->io[QSPI_SS_PIN].ctrl & (~IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_BITS) |
+									   (IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_VALUE_DISABLE << IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_LSB));
+
 	while (1) {
 		// addr must not be a WRITE or READ request here,
 		// it should contain a 16-bit aligned address.
@@ -134,9 +138,10 @@ void n64_pi_run(void)
 #if COMPRESSED_ROM
 			uint32_t chunk_index = rom_mapping[(last_addr & 0xFFFFFF) >> COMPRESSION_SHIFT_AMOUNT];
 			const uint16_t *chunk_16 = (const uint16_t *)rom_chunks[chunk_index];
-			next_word = chunk_16[(last_addr & COMPRESSION_MASK) >> 1];
+			// next_word = chunk_16[(last_addr & COMPRESSION_MASK) >> 1];
+			next_word = qspi_read_u16(&chunk_16[(last_addr & COMPRESSION_MASK) >> 1], QSPI_SS_GPIO_PIN_MASK);
 #else
-			next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
+			next_word = qspi_read_u16(&rom_file_16[(last_addr & 0xFFFFFF) >> 1], QSPI_SS_GPIO_PIN_MASK);
 #endif
 
 			// ROM patching done
@@ -179,9 +184,10 @@ void n64_pi_run(void)
 #if COMPRESSED_ROM
 				uint32_t chunk_index = rom_mapping[(last_addr & 0xFFFFFF) >> COMPRESSION_SHIFT_AMOUNT];
 				const uint16_t *chunk_16 = (const uint16_t *)rom_chunks[chunk_index];
-				next_word = chunk_16[(last_addr & COMPRESSION_MASK) >> 1];
+				// next_word = chunk_16[(last_addr & COMPRESSION_MASK) >> 1];
+				next_word = qspi_read_u16(&chunk_16[(last_addr & COMPRESSION_MASK) >> 1], QSPI_SS_GPIO_PIN_MASK);
 #else
-				next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
+				next_word = qspi_read_u16(&rom_file_16[(last_addr & 0xFFFFFF) >> 1], QSPI_SS_GPIO_PIN_MASK);
 #endif
 
 				// Read command/address
