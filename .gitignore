@@ -116,3 +116,5 @@ build/
 *.o
 
 git_info.h
+
+*.bak
