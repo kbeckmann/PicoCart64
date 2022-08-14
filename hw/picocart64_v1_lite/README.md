@@ -2,7 +2,10 @@
 
 ## Errata
 
-### v1.2
+### v1.3
+- None so far
+
+#### v1.2
 - None so far
 
 ### v1.1
@@ -13,6 +16,9 @@
 
 
 ## Changelog
+
+### v1.3
+- Added JP1, a solder bridge to make it possible to use the WeAct RP2040 third party Pico board
 
 ### v1.2
 - Improved routing a lot, removed many vias
