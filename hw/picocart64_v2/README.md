@@ -5,10 +5,11 @@
 ## Errata
 
 ### v2.0
-- TBD
+- Less than ideal VBus' routing on Inner Layer 1. The power routing should work and passes DRC, but could be better.
 
 
 ## Changelog
 
-### v2.0
+### v2.1-unreleased
+- Improved power routing for VBus'
 
