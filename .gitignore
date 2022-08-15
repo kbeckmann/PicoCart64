@@ -94,7 +94,6 @@ ENV/
 *.swp
 
 
-*.csv
 *.vcd
 *.gtkw
 *.hex
