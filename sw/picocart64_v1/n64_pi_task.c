@@ -14,17 +14,15 @@
 #include "pico/multicore.h"
 #include "hardware/irq.h"
 
-#include "n64_pi.pio.h"
-
-#include "cic.h"
 #include "n64_defs.h"
-#include "pc64_regs.h"
+#include "n64_pi.h"
 #include "pc64_rand.h"
+#include "pc64_regs.h"
 #include "picocart64_pins.h"
-#include "picocart64.h"
 #include "ringbuf.h"
 #include "sram.h"
 #include "stdio_async_uart.h"
+#include "utils.h"
 
 // The rom to load in normal .z64, big endian, format
 #include "rom_vars.h"

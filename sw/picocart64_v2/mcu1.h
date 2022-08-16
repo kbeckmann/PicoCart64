@@ -5,3 +5,5 @@
  */
 
 #pragma once
+
+void mcu1_main(void);

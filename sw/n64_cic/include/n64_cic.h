@@ -7,4 +7,4 @@
 
 #pragma once
 
-void cic_main(void);
+void n64_cic_run(void);

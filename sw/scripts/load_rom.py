@@ -84,7 +84,6 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    rom_h = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'picocart64', 'rom.h')
 
     with open(args.rom, 'rb') as r:
         rom_data = r.read()
@@ -92,6 +91,8 @@ if __name__ == '__main__':
             code = compress_rom(rom_data)
         else:
             code = uncompressed_rom(rom_data)
+
+        rom_h = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'generated', 'rom.h')
         with open(rom_h, 'w') as f:
             f.write(code)
         print(f'Wrote rom contents to {rom_h}')

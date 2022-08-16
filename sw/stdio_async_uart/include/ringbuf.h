@@ -9,8 +9,9 @@
 #include <stdint.h>
 #include <string.h>
 
-// ARRAY_SIZE
-#include "utils.h"
+#ifndef ARRAY_SIZE
+#define ARRAY_SIZE(x) (sizeof(x)/sizeof(x[0]))
+#endif
 
 #define RINGBUF_CREATE(_name, _size, _type)                                   \
     struct {                                                                  \

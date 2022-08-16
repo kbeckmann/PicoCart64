@@ -27,11 +27,14 @@ pico_sdk_init()
 add_subdirectory(lib/freertos-kernel/portable/ThirdParty/GCC/RP2040 FreeRTOS-Kernel)
 
 # Add shared code
+add_subdirectory(n64_cic)
+add_subdirectory(n64_pi)
 add_subdirectory(stdio_async_uart)
 add_subdirectory(picocart64_shared)
 
 # Add applications
-add_subdirectory(picocart64)
+add_subdirectory(picocart64_v1)
+add_subdirectory(picocart64_v2)
 add_subdirectory(dualpico)
 
 add_compile_options(-Wall
