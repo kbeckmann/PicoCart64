@@ -17,6 +17,7 @@
 "^JST_GH_SM","180"
 "^JST_PH_S","180"
 "^LED_WS2812B","180"
+"^LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm","90"
 "^LQFP-","270"
 "^Molex_PicoBlade_53261","180"
 "^PUIAudio_SMT_0825_S_4_R*","270"
