@@ -495,6 +495,12 @@
     (path "/a45f4a80-c0aa-44a7-9a38-7c9b17fbae2c/b8dd71b4-0990-4529-aebd-daabc07c518f"
       (reference "#PWR0115") (unit 1) (value "GND") (footprint "")
     )
+    (path "/a45f4a80-c0aa-44a7-9a38-7c9b17fbae2c/8b9a5752-da80-4ecb-bdb7-f08ab8aae21b"
+      (reference "#PWR0116") (unit 1) (value "+3V3") (footprint "")
+    )
+    (path "/a45f4a80-c0aa-44a7-9a38-7c9b17fbae2c/b3b91ea7-d903-4e0c-90cc-c651fe318e4f"
+      (reference "#PWR0117") (unit 1) (value "GND") (footprint "")
+    )
     (path "/18bc2029-d732-4df0-8cd4-b3abe43b5862/6df8030b-0ec0-4998-8504-16a82a237558"
       (reference "C1") (unit 1) (value "100n") (footprint "Capacitor_SMD:C_0402_1005Metric")
     )
@@ -611,6 +617,9 @@
     )
     (path "/a45f4a80-c0aa-44a7-9a38-7c9b17fbae2c/9c9ee2e7-e45e-4e2f-95bf-478bdc5dd0f7"
       (reference "D1") (unit 1) (value "WS2812B-2020") (footprint "LED_SMD_Extra:WS2812B-2020")
+    )
+    (path "/a45f4a80-c0aa-44a7-9a38-7c9b17fbae2c/f5949529-fe5d-4160-b27e-30af5ffe248f"
+      (reference "D2") (unit 1) (value "WS2812B") (footprint "LED_SMD:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm")
     )
     (path "/a45f4a80-c0aa-44a7-9a38-7c9b17fbae2c/b38c3ed0-187f-49e5-a4cc-c0c11e76e032"
       (reference "FB1") (unit 1) (value "Ferrite") (footprint "Inductor_SMD:L_0603_1608Metric")
