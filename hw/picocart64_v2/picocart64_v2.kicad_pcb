@@ -1472,7 +1472,7 @@
     (property "Sheetfile" "board.kicad_sch")
     (property "Sheetname" "Mainboard")
     (path "/a45f4a80-c0aa-44a7-9a38-7c9b17fbae2c/9c9ee2e7-e45e-4e2f-95bf-478bdc5dd0f7")
-    (attr smd)
+    (attr smd exclude_from_pos_files)
     (fp_text reference "D1" (at -2.1844 -0.254) (layer "F.SilkS") hide
       (effects (font (size 1 1) (thickness 0.15)))
       (tstamp a44fb860-706e-44ef-8bcf-ea70147a2bae)
