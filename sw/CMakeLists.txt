@@ -27,7 +27,7 @@ if (PICO_SDK_VERSION_STRING VERSION_LESS "1.3.0")
 endif()
 
 # Copy program to ram during boot
-# set(PICO_COPY_TO_RAM 1)
+set(PICO_COPY_TO_RAM 1)
 
 # Initialize the SDK
 pico_sdk_init()

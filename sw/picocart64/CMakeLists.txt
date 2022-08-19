@@ -9,6 +9,7 @@ add_executable(picocart64
     n64_pi.c
     picocart64.c
     utils.c
+    sram.c
 
     ${PICO_LWIP_CONTRIB_PATH}/apps/ping/ping.c
 

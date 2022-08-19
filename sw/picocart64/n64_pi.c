@@ -24,11 +24,10 @@
 #include "picocart64.h"
 #include "ringbuf.h"
 #include "stdio_async_uart.h"
+#include "sram.h"
 
 // The rom to load in normal .z64, big endian, format
 #include "rom.h"
-
-uint16_t sram[320 * 240];
 
 #if COMPRESSED_ROM
 // do something
@@ -61,7 +60,8 @@ static inline uint32_t n64_pi_get_value(PIO pio)
 	return value;
 }
 
-void __no_inline_not_in_flash_func(n64_pi_run) (void) {
+void n64_pi_run(void)
+{
 	// Init PIO
 	PIO pio = pio0;
 	uint offset = pio_add_program(pio, &n64_pi_program);
@@ -89,7 +89,7 @@ void __no_inline_not_in_flash_func(n64_pi_run) (void) {
 		// We got a start address
 		last_addr = addr;
 
-		uart_print_hex_u32(last_addr);
+		// uart_print_hex_u32(last_addr);
 
 		// Handle access based on memory region
 		// Note that the if-cases are ordered in priority from
@@ -319,7 +319,7 @@ void __no_inline_not_in_flash_func(n64_pi_run) (void) {
 
 					switch (last_addr - PC64_CIBASE_ADDRESS_START) {
 					case PC64_REGISTER_UART_TX:
-						stdio_uart_out_chars((const char *)pc64_uart_tx_buf, write_word & (sizeof(pc64_uart_tx_buf) - 1));
+						// stdio_uart_out_chars((const char *)pc64_uart_tx_buf, write_word & (sizeof(pc64_uart_tx_buf) - 1));
 						break;
 					case PC64_REGISTER_RAND_SEED:
 						pc64_rand_seed(write_word);

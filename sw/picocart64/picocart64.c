@@ -178,7 +178,7 @@ int main(void)
 	gpio_pull_up(N64_CIC_DIO);
 
 	// Init UART on pin 28/29
-	stdio_async_uart_init_full(UART_ID, BAUD_RATE, UART_TX_PIN, UART_RX_PIN);
+	// stdio_async_uart_init_full(UART_ID, BAUD_RATE, UART_TX_PIN, UART_RX_PIN);
 	printf("PicoCart64 Boot (git rev %08x)\r\n", GIT_REV);
 
 #if ENABLE_N64_PI

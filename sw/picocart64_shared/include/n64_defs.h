@@ -6,6 +6,9 @@
 
 #pragma once
 
+// #include "sram.h"
+#define SRAM_SIZE_BYTES (64 * 1024)
+
 // N64DD control registers
 #define CART_DOM2_ADDR1_START     0x05000000
 #define CART_DOM2_ADDR1_END       0x05FFFFFF
@@ -21,6 +24,7 @@
 // Define the highest supported banked SRAM addresses
 #define CART_SRAM_START           CART_DOM2_ADDR2_START
 #define CART_SRAM_END             (CART_DOM2_ADDR2_START + 0x100000 - 1)
+// #define CART_SRAM_END             (CART_DOM2_ADDR2_START + SRAM_SIZE_BYTES - 1)
 
 // Cartridge ROM
 #define CART_DOM1_ADDR2_START     0x10000000
