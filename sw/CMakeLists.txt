@@ -6,6 +6,15 @@ add_definitions(-DPICO_FLASH_SIZE_BYTES=16777216)
 # Build as release but with debug symbols
 set(CMAKE_BUILD_TYPE RelWithDebInfo)
 
+####################### PICO W STUFF ##############
+# Force PicoW stuff
+set(PICO_BOARD "pico_w")
+
+
+
+###################################################
+
+
 # Pull in SDK (must be before project)
 include(pico_sdk_import.cmake)
 
@@ -18,7 +27,7 @@ if (PICO_SDK_VERSION_STRING VERSION_LESS "1.3.0")
 endif()
 
 # Copy program to ram during boot
-set(PICO_COPY_TO_RAM 1)
+# set(PICO_COPY_TO_RAM 1)
 
 # Initialize the SDK
 pico_sdk_init()

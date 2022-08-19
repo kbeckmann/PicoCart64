@@ -36,7 +36,6 @@ Data Line, Bidir (DIO):  CIC Pin 15
 #include "hardware/gpio.h"
 
 #include "cic.h"
-#include "sram.h"
 #include "picocart64_pins.h"
 
 // #define DEBUG
@@ -548,19 +547,8 @@ static void cic_run(void)
 
 void cic_main(void)
 {
-	// Load SRAM backup from external flash
-	// TODO: How do we detect if it's uninitialized (config area in flash?),
-	//       or maybe we don't have to care?
-	sram_load_from_flash();
-
 	while (1) {
 		cic_run();
-
-		// cic_run returns when N64_CR goes low, i.e.
-		// user presses the reset button, or the N64 loses power.
-
-		// Commit SRAM to flash
-		sram_save_to_flash();
 
 		printf("CIC task restarting\n");
 		vPortYield();

@@ -1,9 +1,17 @@
+if (TARGET pico_cyw43_arch)
+    message("YES this is right")
+else()
+    message(FATAL_ERROR "NO this is wrong")
+endif()
+
 add_executable(picocart64
     cic.c
     n64_pi.c
     picocart64.c
-    sram.c
     utils.c
+
+    ${PICO_LWIP_CONTRIB_PATH}/apps/ping/ping.c
+
 )
 
 if(NOT DEFINED REGION)
@@ -42,6 +50,11 @@ target_compile_definitions(picocart64 PRIVATE
     PICO_STDOUT_MUTEX=0
     CONFIG_REGION_NTSC=${CONFIG_REGION_NTSC}
     CONFIG_REGION_PAL=${CONFIG_REGION_PAL}
+
+    # Wifi
+    WIFI_SSID=\"${WIFI_SSID}\"
+    WIFI_PASSWORD=\"${WIFI_PASSWORD}\"
+
 )
 
 # Generate git_info.h
@@ -59,6 +72,7 @@ add_custom_command(OUTPUT ${GIT_INFO_H}
 target_include_directories(picocart64 PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}
+    ${PICO_LWIP_CONTRIB_PATH}/apps/ping
 )
 
 add_dependencies(picocart64 update_git_info)
@@ -72,6 +86,10 @@ target_link_libraries(
     stdio_async_uart
     hardware_flash
     hardware_pio
+
+    # PicoW WiFi
+    pico_cyw43_arch_lwip_threadsafe_background
+
     FreeRTOS-Kernel-Static # FreeRTOS kernel, static allocations
 )
 
@@ -85,7 +103,7 @@ pico_enable_stdio_usb(picocart64 0)
 pico_enable_stdio_uart(picocart64 0)
 
 # use custom linker script
-pico_set_linker_script(picocart64 ${CMAKE_CURRENT_LIST_DIR}/memmap_custom.ld)
+# pico_set_linker_script(picocart64 ${CMAKE_CURRENT_LIST_DIR}/memmap_custom.ld)
 
 # create map/bin/hex/uf2 file etc.
 pico_add_extra_outputs(picocart64)

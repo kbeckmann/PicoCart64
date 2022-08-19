@@ -40,8 +40,8 @@
 
 static StaticTask_t cic_task;
 static StaticTask_t second_task;
-static StackType_t cic_task_stack[4 * 1024 / sizeof(StackType_t)];
-static StackType_t second_task_stack[4 * 1024 / sizeof(StackType_t)];
+static StackType_t cic_task_stack[configMINIMAL_STACK_SIZE];
+static StackType_t second_task_stack[configMINIMAL_STACK_SIZE];
 
 /*
 
@@ -81,6 +81,41 @@ void cic_task_entry(__unused void *params)
 	cic_main();
 }
 
+#include "pico/cyw43_arch.h"
+
+#include "lwip/ip4_addr.h"
+
+#include "ping.h"
+
+#define PING_ADDR "192.168.5.18"
+
+void ping_task(__unused void *params)
+{
+	if (cyw43_arch_init()) {
+		printf("failed to initialise\n");
+		return;
+	}
+	cyw43_arch_enable_sta_mode();
+	printf("Connecting to WiFi...\n");
+	if (cyw43_arch_wifi_connect_timeout_ms(WIFI_SSID, WIFI_PASSWORD, CYW43_AUTH_WPA2_AES_PSK, 30000)) {
+		printf("failed to connect.\n");
+		exit(1);
+	} else {
+		printf("Connected.\n");
+	}
+
+	ip_addr_t ping_addr;
+	ip4_addr_set_u32(&ping_addr, ipaddr_addr(PING_ADDR));
+	ping_init(&ping_addr);
+
+	while (true) {
+		// not much to do as LED is in another task, and we're using RAW (callback) lwIP API
+		vTaskDelay(100);
+	}
+
+	cyw43_arch_deinit();
+}
+
 void second_task_entry(__unused void *params)
 {
 	uint32_t count = 0;
@@ -115,7 +150,8 @@ void second_task_entry(__unused void *params)
 void vLaunch(void)
 {
 	xTaskCreateStatic(cic_task_entry, "CICThread", configMINIMAL_STACK_SIZE, NULL, CIC_TASK_PRIORITY, cic_task_stack, &cic_task);
-	xTaskCreateStatic(second_task_entry, "SecondThread", configMINIMAL_STACK_SIZE, NULL, SECOND_TASK_PRIORITY, second_task_stack, &second_task);
+	// xTaskCreateStatic(second_task_entry, "SecondThread", configMINIMAL_STACK_SIZE, NULL, SECOND_TASK_PRIORITY, second_task_stack, &second_task);
+	xTaskCreateStatic(ping_task, "SecondThread", configMINIMAL_STACK_SIZE, NULL, SECOND_TASK_PRIORITY, second_task_stack, &second_task);
 
 	/* Start the tasks and timer running. */
 	vTaskStartScheduler();

@@ -23,7 +23,6 @@
 #include "picocart64_pins.h"
 #include "picocart64.h"
 #include "ringbuf.h"
-#include "sram.h"
 #include "stdio_async_uart.h"
 
 // The rom to load in normal .z64, big endian, format
@@ -31,6 +30,7 @@
 #include "rom.h"
 
 uint16_t rom_mapping[MAPPING_TABLE_LEN];
+uint16_t sram[320 * 240];
 
 #if COMPRESSED_ROM
 // do something
@@ -45,17 +45,7 @@ static uint16_t pc64_uart_tx_buf[PC64_BASE_ADDRESS_LENGTH];
 
 static inline uint32_t resolve_sram_address(uint32_t address)
 {
-	uint32_t bank = (address >> 18) & 0x3;
-	uint32_t resolved_address;
-
-	if (bank) {
-		resolved_address = address & (SRAM_256KBIT_SIZE - 1);
-		resolved_address |= bank << 15;
-	} else {
-		resolved_address = address & (sizeof(sram) - 1);
-	}
-
-	return resolved_address;
+	return address & 0x1FFFF;
 }
 
 static inline uint32_t n64_pi_get_value(PIO pio)
@@ -73,8 +63,7 @@ static inline uint32_t n64_pi_get_value(PIO pio)
 	return value;
 }
 
-void n64_pi_run(void)
-{
+void __no_inline_not_in_flash_func(n64_pi_run) (void) {
 	// Init PIO
 	PIO pio = pio0;
 	uint offset = pio_add_program(pio, &n64_pi_program);
@@ -101,6 +90,8 @@ void n64_pi_run(void)
 
 		// We got a start address
 		last_addr = addr;
+
+		uart_print_hex_u32(last_addr);
 
 		// Handle access based on memory region
 		// Note that the if-cases are ordered in priority from
