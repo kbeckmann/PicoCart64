@@ -18,7 +18,7 @@ mkdir build
 cd build
 
 # Configure cmake. To use NTSC, set -DREGION=NTSC
-cmake -DREGION=PAL ..
+cmake -DREGION=PAL -DFLASH_SIZE_MB=16 -DWIFI_SSID=$WIFI_SSID -DWIFI_PASSWORD=$WIFI_PASSWORD ..
 
 # Build
 make
