@@ -39,7 +39,7 @@
 #define SECOND_TASK_PRIORITY  (tskIDLE_PRIORITY + 1UL)
 
 static StaticTask_t cic_task;
-static StaticTask_t second_task;
+/* static */ StaticTask_t second_task;
 static StackType_t cic_task_stack[configMINIMAL_STACK_SIZE];
 static StackType_t second_task_stack[configMINIMAL_STACK_SIZE];
 
@@ -110,7 +110,7 @@ void ping_task(__unused void *params)
 
 	while (true) {
 		// not much to do as LED is in another task, and we're using RAW (callback) lwIP API
-		vTaskDelay(100);
+		vTaskDelay(10000);
 	}
 
 	cyw43_arch_deinit();
@@ -178,7 +178,7 @@ int main(void)
 	gpio_pull_up(N64_CIC_DIO);
 
 	// Init UART on pin 28/29
-	// stdio_async_uart_init_full(UART_ID, BAUD_RATE, UART_TX_PIN, UART_RX_PIN);
+	stdio_async_uart_init_full(UART_ID, BAUD_RATE, UART_TX_PIN, UART_RX_PIN);
 	printf("PicoCart64 Boot (git rev %08x)\r\n", GIT_REV);
 
 #if ENABLE_N64_PI

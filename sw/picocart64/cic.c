@@ -545,8 +545,22 @@ static void cic_run(void)
 	}
 }
 
+#include "task.h"
+
+extern void *volatile pxCurrentTCB;
+extern StaticTask_t second_task;
+
+void gpio_callback(void)
+{
+	if (pxCurrentTCB == &second_task)
+		printf("%d\n", pxCurrentTCB);
+}
+
 void cic_main(void)
 {
+	// gpio_set_irq_enabled_with_callback(N64_CIC_DIO, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &gpio_callback);
+	// gpio_set_irq_enabled_with_callback(N64_CIC_DCLK, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &gpio_callback);
+
 	while (1) {
 		cic_run();
 

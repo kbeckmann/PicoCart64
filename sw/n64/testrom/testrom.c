@@ -246,6 +246,7 @@ int main(void)
 
 	printf("PicoCart64 Test ROM (git rev %08X)\n\n", GIT_REV);
 
+#if 0
 	///////////////////////////////////////////////////////////////////////////
 
 	// Verify PicoCart64 Magic
@@ -369,7 +370,7 @@ int main(void)
 		printf("[FAIL] (second time) MAGIC = 0x%08lX.\n", read_buf32[0]);
 		printf("       PicoCart64 might stall now and require a power cycle.\n");
 	}
-
+#endif
 	console_render();
 
 	/* Start the shell if the user presses start */
