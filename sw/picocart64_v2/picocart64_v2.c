@@ -5,9 +5,13 @@
  */
 
 #include <stdio.h>
+
 #include "pico/stdlib.h"
 #include "hardware/structs/ssi.h"
 #include "hardware/structs/ioqspi.h"
+
+#include "FreeRTOS.h"
+#include "task.h"
 
 #include "mcu1.h"
 #include "mcu2.h"
@@ -34,6 +38,17 @@
  *
  */
 
+// FreeRTOS boilerplate
+void vApplicationGetTimerTaskMemory(StaticTask_t ** ppxTimerTaskTCBBuffer, StackType_t ** ppxTimerTaskStackBuffer, uint32_t * pulTimerTaskStackSize)
+{
+	static StaticTask_t xTimerTaskTCB;
+	static StackType_t uxTimerTaskStack[configTIMER_TASK_STACK_DEPTH];
+
+	*ppxTimerTaskTCBBuffer = &xTimerTaskTCB;
+	*ppxTimerTaskStackBuffer = uxTimerTaskStack;
+	*pulTimerTaskStackSize = configTIMER_TASK_STACK_DEPTH;
+}
+
 int main(void)
 {
 	// On MCU1, PIN_ID is pulled low externally.
@@ -53,12 +68,17 @@ int main(void)
 								 (IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_VALUE_DISABLE << IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_LSB));
 	}
 
+	// Set to 1 to force mcu2_main()
+#if 0
+	mcu2_main();
+#else
 	if (mcu_id == MCU1_ID) {
 		mcu1_main();
 	} else if (mcu_id == MCU2_ID) {
 		// It's up to MCU2 to let MCU1 boot
 		mcu2_main();
 	}
+#endif
 
 	while (true) {
 		// Never reached
