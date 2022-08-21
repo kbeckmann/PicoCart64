@@ -53,7 +53,7 @@ Data Line, Bidir (DIO):  CIC Pin 15
 
 #include "FreeRTOS.h"
 #include "task.h"
-#define YIELD() vPortYield()
+#define YIELD() taskYIELD()
 
 #elif CONFIG_CIC_YIELD == 0
 #define YIELD()
