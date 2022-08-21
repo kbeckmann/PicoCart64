@@ -40,6 +40,20 @@ void misc_task_entry(__unused void *params)
 	}
 }
 
+void mcu2_core1_entry(void)
+{
+	while (1) {
+		n64_cic_run(N64_COLD_RESET, N64_CIC_DCLK, N64_CIC_DIO);
+
+		// n64_cic_run returns when N64_CR goes low, i.e.
+		// user presses the reset button, or the N64 loses power.
+
+		// TODO: Perform actions when this happens. Commit RAM to flash/SD etc.
+
+		printf("CIC emulation restarting\n");
+	}
+}
+
 void vLaunch(void)
 {
 	xTaskCreateStatic(led_task_entry, "LED", configMINIMAL_STACK_SIZE, NULL, LED_TASK_PRIORITY, led_task_stack, &led_task);
@@ -60,8 +74,7 @@ void mcu2_main(void)
 	gpio_set_dir(PIN_MCU1_RUN, GPIO_OUT);
 	gpio_put(PIN_MCU1_RUN, 1);	// Set GPIO19 / MCU2.RUN to HIGH
 
-	// TODO: Launch CIC emulation on the second core
-	// multicore_launch_core1(n64_cic);
+	multicore_launch_core1(mcu2_core1_entry);
 
 	// Start FreeRTOS on Core0
 	vLaunch();

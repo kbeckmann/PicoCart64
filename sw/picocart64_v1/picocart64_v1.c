@@ -83,7 +83,7 @@ void cic_task_entry(__unused void *params)
 	while (1) {
 		n64_cic_run(N64_COLD_RESET, N64_CIC_DCLK, N64_CIC_DIO);
 
-		// cic_run returns when N64_CR goes low, i.e.
+		// n64_cic_run returns when N64_CR goes low, i.e.
 		// user presses the reset button, or the N64 loses power.
 
 		// Commit SRAM to flash
