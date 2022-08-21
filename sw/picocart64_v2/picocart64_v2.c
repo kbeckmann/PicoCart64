@@ -15,6 +15,7 @@
 
 #include "mcu1.h"
 #include "mcu2.h"
+#include "qspi_helper.h"
 
 #define PIN_ID    (26)
 #define MCU1_ID   ( 1)
@@ -63,10 +64,7 @@ int main(void)
 	ssi_hw->ssienr = 0;
 
 	// Disable output enable (OE) on all QSPI IO pins
-	for (int i = 0; i < 6; i++) {
-		ioqspi_hw->io[i].ctrl = (ioqspi_hw->io[i].ctrl & (~IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_BITS) |
-								 (IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_VALUE_DISABLE << IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_LSB));
-	}
+	qspi_oeover_disable();
 
 	// Set to 1 to force mcu2_main()
 #if 0

@@ -8,6 +8,8 @@
 
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
+#include "hardware/structs/ssi.h"
+#include "hardware/structs/ioqspi.h"
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -17,6 +19,7 @@
 #include "git_info.h"
 #include "led_task.h"
 #include "pins_mcu2.h"
+#include "qspi_helper.h"
 #include "stdio_async_uart.h"
 
 #define UART0_BAUD_RATE  (115200)
@@ -25,19 +28,43 @@
 // Use same priority to force round-robin scheduling
 #define LED_TASK_PRIORITY     (tskIDLE_PRIORITY + 1UL)
 #define ESP32_TASK_PRIORITY   (tskIDLE_PRIORITY + 1UL)
-#define MISC_TASK_PRIORITY    (tskIDLE_PRIORITY + 1UL)
+#define MAIN_TASK_PRIORITY    (tskIDLE_PRIORITY + 1UL)
 
+static StaticTask_t main_task;
 static StaticTask_t led_task;
 static StaticTask_t esp32_task;
-static StaticTask_t misc_task;
 
+static StackType_t main_task_stack[configMINIMAL_STACK_SIZE];
 static StackType_t led_task_stack[configMINIMAL_STACK_SIZE];
 static StackType_t esp32_task_stack[configMINIMAL_STACK_SIZE];
-static StackType_t misc_task_stack[configMINIMAL_STACK_SIZE];
 
-void misc_task_entry(__unused void *params)
+static void psram_test(void)
+{
+	// Set output enable (OE) to normal mode on all QSPI IO pins except SS
+	qspi_oeover_normal(false);
+
+	// Write
+
+	// Read and verify
+
+	qspi_oeover_disable();
+}
+
+void main_task_entry(__unused void *params)
 {
 	int count = 0;
+
+	printf("[MCU2 Main] Hello\n");
+
+	// Test PSRAM - write test pattern and read it back.
+	psram_test();
+
+#if 0
+	// Boot MCU1
+	gpio_init(PIN_MCU1_RUN);
+	gpio_set_dir(PIN_MCU1_RUN, GPIO_OUT);
+	gpio_put(PIN_MCU1_RUN, 1);	// Set GPIO19 / MCU2.RUN to HIGH
+#endif
 
 	while (true) {
 		count++;
@@ -62,9 +89,9 @@ void mcu2_core1_entry(void)
 
 void vLaunch(void)
 {
+	xTaskCreateStatic(main_task_entry, "Main", configMINIMAL_STACK_SIZE, NULL, MAIN_TASK_PRIORITY, main_task_stack, &main_task);
 	xTaskCreateStatic(led_task_entry, "LED", configMINIMAL_STACK_SIZE, NULL, LED_TASK_PRIORITY, led_task_stack, &led_task);
 	xTaskCreateStatic(esp32_task_entry, "ESP32", configMINIMAL_STACK_SIZE, NULL, ESP32_TASK_PRIORITY, esp32_task_stack, &esp32_task);
-	xTaskCreateStatic(misc_task_entry, "Misc", configMINIMAL_STACK_SIZE, NULL, MISC_TASK_PRIORITY, misc_task_stack, &misc_task);
 
 	/* Start the tasks and timer running. */
 	vTaskStartScheduler();
@@ -76,11 +103,6 @@ void mcu2_main(void)
 	stdio_async_uart_init_full(uart0, UART0_BAUD_RATE, PIN_UART0_TX, PIN_UART0_RX);
 
 	printf("PicoCart64 Boot (git rev %08x)\r\n", GIT_REV);
-
-	// Boot MCU1
-	gpio_init(PIN_MCU1_RUN);
-	gpio_set_dir(PIN_MCU1_RUN, GPIO_OUT);
-	gpio_put(PIN_MCU1_RUN, 1);	// Set GPIO19 / MCU2.RUN to HIGH
 
 	multicore_launch_core1(mcu2_core1_entry);
 
