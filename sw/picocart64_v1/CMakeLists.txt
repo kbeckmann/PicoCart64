@@ -39,6 +39,7 @@ target_link_options(picocart64_v1 PRIVATE
 
 target_compile_definitions(picocart64_v1 PRIVATE
     PICO_STDOUT_MUTEX=0
+    CONFIG_CIC_YIELD=1
     CONFIG_REGION_NTSC=${CONFIG_REGION_NTSC}
     CONFIG_REGION_PAL=${CONFIG_REGION_PAL}
 )

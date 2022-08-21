@@ -29,9 +29,6 @@ Data Line, Bidir (DIO):  CIC Pin 15
 #include <stdio.h>
 #include <string.h>
 
-#include "FreeRTOS.h"
-#include "task.h"
-
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 
@@ -50,6 +47,19 @@ Data Line, Bidir (DIO):  CIC Pin 15
 #define GET_REGION() (REGION_PAL)
 #else
 #error Please pass -DREGION=PAL or NTSC to your cmake command line.
+#endif
+
+#if !defined(CONFIG_CIC_YIELD)
+#error CONFIG_YIELD must be defined.
+#elif CONFIG_CIC_YIELD == 1
+
+#include "FreeRTOS.h"
+#include "task.h"
+#define YIELD() vPortYield()
+
+#elif CONFIG_CIC_YIELD == 0
+#define YIELD()
+#else
 #endif
 
 /* SEEDs */
@@ -143,7 +153,7 @@ static unsigned char ReadBit(void)
 	// wait for DCLK to go low
 	do {
 		vin = gpio_get(N64_CIC_DCLK);
-		vPortYield();
+		YIELD();
 	} while (vin && check_running());
 
 	// Read the data bit
@@ -152,7 +162,7 @@ static unsigned char ReadBit(void)
 	// wait for DCLK to go high
 	do {
 		vin = gpio_get(N64_CIC_DCLK);
-		vPortYield();
+		YIELD();
 	} while ((!vin) && check_running());
 
 	return res ? 1 : 0;
@@ -165,7 +175,7 @@ static void WriteBit(unsigned char b)
 	// wait for DCLK to go low
 	do {
 		vin = gpio_get(N64_CIC_DCLK);
-		vPortYield();
+		YIELD();
 	} while (vin && check_running());
 
 	if (b == 0) {
@@ -176,7 +186,7 @@ static void WriteBit(unsigned char b)
 	// wait for DCLK to go high
 	do {
 		vin = gpio_get(N64_CIC_DCLK);
-		vPortYield();
+		YIELD();
 	} while ((!vin) && check_running());
 
 	// Disable output
@@ -198,7 +208,7 @@ static void WriteRamNibbles(unsigned char index)
 	do {
 		WriteNibble(_CicMem[index]);
 		index++;
-		vPortYield();
+		YIELD();
 	} while ((index & 0x0f) != 0);
 }
 
@@ -302,7 +312,7 @@ static void EncodeRound(unsigned char index)
 		a = (a + _CicMem[index]) & 0x0f;
 		_CicMem[index] = a;
 		index++;
-		vPortYield();
+		YIELD();
 	} while ((index & 0x0f) != 0);
 }
 
@@ -363,7 +373,7 @@ static void CicRound(unsigned char *m)
 		a = x + 0xf;
 		x = a & 0xf;
 
-		vPortYield();
+		YIELD();
 	} while (x != 15);
 }
 
@@ -489,7 +499,7 @@ void n64_cic_run(void)
 
 	// Wait for reset to be released
 	while (gpio_get(N64_COLD_RESET) == 0) {
-		vPortYield();
+		YIELD();
 	}
 
 	// read the region setting
@@ -517,7 +527,7 @@ void n64_cic_run(void)
 	_CicMem[0x11] = ReadNibble();
 
 	while (check_running()) {
-		vPortYield();
+		YIELD();
 		// read mode (2 bit)
 		unsigned char cmd = 0;
 		cmd |= (ReadBit() << 1);

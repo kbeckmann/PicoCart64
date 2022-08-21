@@ -26,6 +26,7 @@ add_custom_command(OUTPUT ${GIT_INFO_H}
 
 target_compile_definitions(picocart64_v2 PRIVATE
     PICO_STDOUT_MUTEX=0
+    CONFIG_CIC_YIELD=0
     CONFIG_REGION_NTSC=${CONFIG_REGION_NTSC}
     CONFIG_REGION_PAL=${CONFIG_REGION_PAL}
 )
