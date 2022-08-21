@@ -33,8 +33,6 @@ Data Line, Bidir (DIO):  CIC Pin 15
 #include "hardware/gpio.h"
 
 #include "n64_cic.h"
-#include "sram.h"
-#include "picocart64_pins.h"
 
 // #define DEBUG
 

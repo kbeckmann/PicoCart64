@@ -1,10 +1,25 @@
 add_executable(picocart64_v2
+    esp32_task.c
     led_task.c
     mcu1.c
     mcu2.c
     picocart64_v2.c
     ws2812.c
 )
+
+if(NOT DEFINED REGION)
+    message(FATAL_ERROR "Please set the variable REGION to either NTSC or PAL")
+endif()
+
+if(REGION STREQUAL "NTSC")
+    set(CONFIG_REGION_NTSC 1)
+    set(CONFIG_REGION_PAL 0)
+elseif(REGION STREQUAL "PAL")
+    set(CONFIG_REGION_NTSC 0)
+    set(CONFIG_REGION_PAL 1)
+else()
+    message(FATAL_ERROR "Please set the variable REGION to either NTSC or PAL")
+endif()
 
 pico_generate_pio_header(picocart64_v2
     ${CMAKE_CURRENT_LIST_DIR}/ws2812.pio
@@ -43,6 +58,7 @@ add_dependencies(picocart64_v2
 
 # pull in common dependencies
 target_link_libraries(picocart64_v2
+    n64_cic
     picocart64_shared
     pico_multicore
     pico_stdlib
