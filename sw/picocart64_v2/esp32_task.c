@@ -14,7 +14,12 @@
 #include "esp32_task.h"
 #include "utils.h"
 
-#define UART_BAUD_RATE (115200)
+#define UART_ID   uart1
+#define UART_BAUD_RATE 115200
+#define UART_DATA_BITS 8
+#define UART_STOP_BITS 1
+#define UART_PARITY    UART_PARITY_NONE
+
 #define SPI_FREQ_HZ    (10 * 1000000)
 
 typedef struct {
@@ -32,6 +37,10 @@ static const gpio_config_t gpio_config[] = {
 	{PIN_ESP32_SCK, GPIO_OUT, 0},
 	{PIN_ESP32_EN, GPIO_OUT, 0},
 };
+
+static struct {
+	uint32_t fw_version;
+} self;
 
 static void esp32_gpio_init(void)
 {
@@ -68,9 +77,12 @@ static void esp32_set_en(bool enabled)
 
 static void esp32_uart_init(void)
 {
-	uart_init(uart1, UART_BAUD_RATE);
+	uart_init(UART_ID, UART_BAUD_RATE);
 	gpio_set_function(PIN_ESP32_D0, GPIO_FUNC_UART);	// ESP32_GPIO20/RX
 	gpio_set_function(PIN_ESP32_D1, GPIO_FUNC_UART);	// ESP32_GPIO21/TX
+	uart_set_hw_flow(UART_ID, false, false);
+	uart_set_format(UART_ID, UART_DATA_BITS, UART_STOP_BITS, UART_PARITY);
+	uart_set_fifo_enabled(UART_ID, false);	// or true?
 }
 
 void esp32_task_entry(__unused void *params)
@@ -84,12 +96,16 @@ void esp32_task_entry(__unused void *params)
 	esp32_set_boot_straps(false);
 	esp32_set_en(true);
 
-	vTaskDelay(100);
-
 	// TODO: Check version with SPI
 	// If version does not match, enter bootloader mode and program it.
 
 	while (true) {
-		vTaskDelay(100);
+		// TODO: This is blocking and bad, but ok for bringup
+		while (uart_is_readable(UART_ID)) {
+			uint8_t ch = uart_getc(UART_ID);
+			printf("[rx: %02X]\n", ch);
+		}
+
+		taskYIELD();
 	}
 }
