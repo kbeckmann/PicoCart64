@@ -106,6 +106,10 @@ static void EncodeRound(unsigned char index);
 static void CicRound(unsigned char *);
 static void Cic6105Algo(void);
 
+static uint8_t pin_cr;
+static uint8_t pin_dclk;
+static uint8_t pin_dio;
+
 /* Select SEED and CHECKSUM here */
 const unsigned char _CicSeed = CIC6102_SEED;
 // const unsigned char _CicSeed = CIC6105_SEED;
@@ -137,7 +141,7 @@ unsigned char _6105Mem[32];
 
 static bool check_running(void)
 {
-	if (gpio_get(N64_COLD_RESET) == 0) {
+	if (gpio_get(pin_cr) == 0) {
 		// Reset the CIC
 		return false;
 	}
@@ -152,16 +156,16 @@ static unsigned char ReadBit(void)
 
 	// wait for DCLK to go low
 	do {
-		vin = gpio_get(N64_CIC_DCLK);
+		vin = gpio_get(pin_dclk);
 		YIELD();
 	} while (vin && check_running());
 
 	// Read the data bit
-	res = gpio_get(N64_CIC_DIO);
+	res = gpio_get(pin_dio);
 
 	// wait for DCLK to go high
 	do {
-		vin = gpio_get(N64_CIC_DCLK);
+		vin = gpio_get(pin_dclk);
 		YIELD();
 	} while ((!vin) && check_running());
 
@@ -174,23 +178,23 @@ static void WriteBit(unsigned char b)
 
 	// wait for DCLK to go low
 	do {
-		vin = gpio_get(N64_CIC_DCLK);
+		vin = gpio_get(pin_dclk);
 		YIELD();
 	} while (vin && check_running());
 
 	if (b == 0) {
 		// Drive low
-		gpio_set_dir(N64_CIC_DIO, GPIO_OUT);
-		gpio_put(N64_CIC_DIO, 0);
+		gpio_set_dir(pin_dio, GPIO_OUT);
+		gpio_put(pin_dio, 0);
 	}
 	// wait for DCLK to go high
 	do {
-		vin = gpio_get(N64_CIC_DCLK);
+		vin = gpio_get(pin_dclk);
 		YIELD();
 	} while ((!vin) && check_running());
 
 	// Disable output
-	gpio_set_dir(N64_CIC_DIO, GPIO_IN);
+	gpio_set_dir(pin_dio, GPIO_IN);
 }
 
 /* Writes the lowes 4 bits of the byte */
@@ -264,7 +268,7 @@ static void WriteChecksum(void)
 	// (doesn't seem to be necessary)
 	// int vin;
 	// do {
-	//     vin = gpio_get(N64_CIC_DCLK);
+	//     vin = gpio_get(pin_dclk);
 	// } while ((vin & 1) && check_running());
 
 	// "encrytion" key
@@ -487,9 +491,13 @@ static void InitRam(unsigned char isPal)
 	}
 }
 
-void n64_cic_run(void)
+void n64_cic_run(uint8_t _pin_cr, uint8_t _pin_dclk, uint8_t _pin_dio)
 {
 	unsigned char isPal;
+
+	pin_cr = _pin_cr;
+	pin_dclk = _pin_dclk;
+	pin_dio = _pin_dio;
 
 	// Reset the state
 	memset(_CicMem, 0, sizeof(_CicMem));
@@ -498,7 +506,7 @@ void n64_cic_run(void)
 	// printf("CIC Emulator core running!\r\n");
 
 	// Wait for reset to be released
-	while (gpio_get(N64_COLD_RESET) == 0) {
+	while (gpio_get(pin_cr) == 0) {
 		YIELD();
 	}
 

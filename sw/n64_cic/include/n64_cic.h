@@ -7,4 +7,4 @@
 
 #pragma once
 
-void n64_cic_run(void);
+void n64_cic_run(uint8_t _pin_cr, uint8_t _pin_dclk, uint8_t _pin_dio);
