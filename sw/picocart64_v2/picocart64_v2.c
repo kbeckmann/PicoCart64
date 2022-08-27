@@ -56,6 +56,7 @@ int main(void)
 	// On MCU2, PIN_ID is pulled high externally and connected to MCU1.RUN.
 	gpio_init(PIN_ID);
 	gpio_set_dir(PIN_ID, GPIO_IN);
+	gpio_disable_pulls(PIN_ID);
 
 	// mcu_id will be 1 for MCU1, and 2 for MCU2.
 	int mcu_id = gpio_get(PIN_ID) + 1;
