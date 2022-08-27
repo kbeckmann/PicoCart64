@@ -56,10 +56,16 @@ void main_task_entry(__unused void *params)
 
 	printf("[MCU2 Main] Hello\n");
 
+	vTaskDelay(1000);
+
 	// Test PSRAM - write test pattern and read it back.
 	psram_test();
 
-#if 0
+	gpio_init(PIN_SPI1_CS);
+	gpio_set_dir(PIN_SPI1_CS, GPIO_IN);
+	gpio_disable_pulls(PIN_SPI1_CS);
+
+#if 1
 	// Boot MCU1
 	gpio_init(PIN_MCU1_RUN);
 	gpio_set_dir(PIN_MCU1_RUN, GPIO_OUT);
@@ -100,7 +106,7 @@ void vLaunch(void)
 void mcu2_main(void)
 {
 	// Init async UART on pin 0/1
-	stdio_async_uart_init_full(uart0, UART0_BAUD_RATE, PIN_UART0_TX, PIN_UART0_RX);
+	stdio_async_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
 
 	printf("PicoCart64 Boot (git rev %08x)\r\n", GIT_REV);
 
