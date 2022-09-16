@@ -157,7 +157,7 @@ void n64_pi_run(void)
 
 				if ((addr & 0xffff0000) == 0xffff0000) {
 					// We got a WRITE
-					// 0bxxxxxxxx_xxxxxxxx_11111111_11111111
+					// 0b11111111_11111111_xxxxxxxx_xxxxxxxx
 					sram[resolve_sram_address(last_addr) >> 1] = addr & 0xFFFF;
 					last_addr += 2;
 				} else if (addr == 0) {
@@ -258,7 +258,7 @@ void n64_pi_run(void)
 
 				if ((addr & 0xffff0000) == 0xffff0000) {
 					// We got a WRITE
-					// 0bxxxxxxxx_xxxxxxxx_11111111_11111111
+					// 0b11111111_11111111_xxxxxxxx_xxxxxxxx
 					pc64_uart_tx_buf[(last_addr & (sizeof(pc64_uart_tx_buf) - 1)) >> 1] = swap8(addr);
 					last_addr += 2;
 				} else if (addr == 0) {
