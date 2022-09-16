@@ -185,14 +185,16 @@ void n64_pi_run(void)
 				// Read command/address
 				addr = n64_pi_get_value(pio);
 
+				// The N64 may set the LSB of the address if an unaligned DMA request
+				// is performed.
+				// This is a problem since the LSB is used as a way to inform about
+				// write requests from the PIO code.
+				// Since this memory region is read-only, we can work around this issue
+				// by just handle values where the LSB is set as a normal address.
 				if (addr == 0) {
 					// READ
  handle_d1a2_read:
 					pio_sm_put(pio, 0, swap8(next_word));
-					last_addr += 2;
-				} else if (addr & 0x00000001) {
-					// WRITE
-					// Ignore data since we're asked to write to the ROM.
 					last_addr += 2;
 				} else {
 					// New address
