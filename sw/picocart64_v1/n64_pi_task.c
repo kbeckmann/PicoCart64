@@ -155,10 +155,10 @@ void n64_pi_run(void)
 				// Read command/address
 				addr = n64_pi_get_value(pio);
 
-				if (addr & 0x00000001) {
+				if ((addr & 0xffff0000) == 0xffff0000) {
 					// We got a WRITE
 					// 0bxxxxxxxx_xxxxxxxx_11111111_11111111
-					sram[resolve_sram_address(last_addr) >> 1] = addr >> 16;
+					sram[resolve_sram_address(last_addr) >> 1] = addr & 0xFFFF;
 					last_addr += 2;
 				} else if (addr == 0) {
 					// READ
@@ -190,7 +190,7 @@ void n64_pi_run(void)
  handle_d1a2_read:
 					pio_sm_put(pio, 0, swap8(next_word));
 					last_addr += 2;
-				} else if (addr & 0x00000001) {
+				} else if ((addr & 0xffff0000) == 0xffff0000) {
 					// WRITE
 					// Ignore data since we're asked to write to the ROM.
 					last_addr += 2;
@@ -214,7 +214,7 @@ void n64_pi_run(void)
 					// READ
 					pio_sm_put(pio, 0, next_word);
 					last_addr += 2;
-				} else if (addr & 0x00000001) {
+				} else if ((addr & 0xffff0000) == 0xffff0000) {
 					// WRITE
 					// Ignore
 					last_addr += 2;
@@ -236,7 +236,7 @@ void n64_pi_run(void)
 					// READ
 					pio_sm_put(pio, 0, next_word);
 					last_addr += 2;
-				} else if (addr & 0x00000001) {
+				} else if ((addr & 0xffff0000) == 0xffff0000) {
 					// WRITE
 					// Ignore
 					last_addr += 2;
@@ -256,10 +256,10 @@ void n64_pi_run(void)
 				// Read command/address
 				addr = n64_pi_get_value(pio);
 
-				if (addr & 0x00000001) {
+				if ((addr & 0xffff0000) == 0xffff0000) {
 					// We got a WRITE
 					// 0bxxxxxxxx_xxxxxxxx_11111111_11111111
-					pc64_uart_tx_buf[(last_addr & (sizeof(pc64_uart_tx_buf) - 1)) >> 1] = swap8(addr >> 16);
+					pc64_uart_tx_buf[(last_addr & (sizeof(pc64_uart_tx_buf) - 1)) >> 1] = swap8(addr);
 					last_addr += 2;
 				} else if (addr == 0) {
 					// READ
@@ -277,7 +277,7 @@ void n64_pi_run(void)
 				// Read command/address
 				addr = n64_pi_get_value(pio);
 
-				if (addr & 0x00000001) {
+				if ((addr & 0xffff0000) == 0xffff0000) {
 					// We got a WRITE
 					last_addr += 2;
 				} else if (addr == 0) {
@@ -319,12 +319,12 @@ void n64_pi_run(void)
 
 					pio_sm_put(pio, 0, next_word & 0xFFFF);
 					last_addr += 2;
-				} else if (addr & 0x00000001) {
+				} else if ((addr & 0xffff0000) == 0xffff0000) {
 					// WRITE
 
 					// Read two 16-bit half-words and merge them to a 32-bit value
-					uint32_t write_word = addr & 0xFFFF0000;
-					write_word |= n64_pi_get_value(pio) >> 16;
+					uint32_t write_word = addr << 16;
+					write_word |= n64_pi_get_value(pio) & 0x0000FFFF;
 
 					switch (last_addr - PC64_CIBASE_ADDRESS_START) {
 					case PC64_REGISTER_UART_TX:

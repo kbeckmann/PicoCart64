@@ -101,12 +101,12 @@ wait_for_not_read_or_aleh:
 
 handle_write:
 
-    ; Sample AD0 -> AD15, put in ISR
-    in pins, 16
-
-    ; encode 1 in lsb
+    ; encode 0xffff0000 in msb
     mov x, ~null
     in x, 16
+
+    ; Sample AD0 -> AD15, put in ISR
+    in pins, 16
 
     ; wait for N64_WRITE
     wait 1 gpio 18
