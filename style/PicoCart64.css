@@ -28,7 +28,7 @@ html, body{height:100%}
 	flex-direction: column;
 }
 header{margin: 1% 0 4%}
-header h1{display:none}
+header h1{color:white;}
 footer{padding: 50px 0 20px}
 #wrapper{flex-basis:100%}
 

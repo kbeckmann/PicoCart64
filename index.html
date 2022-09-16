@@ -47,7 +47,8 @@
 <body>
     <div id="column">
         <!-- HEADER -->
-        <header><img src="./style/logo.png" />
+        <header>
+            <!-- <img src="./style/logo.png" /> -->
             <h1>PicoCart64 UF2 ROM Builder</h1>
         </header>
 
@@ -83,6 +84,39 @@
                 <div class="buttons">
                     <span id="message-build" class="message"></span>
                     <button id="button-build" data-localize="build_uf2" class="disabled" disabled>Build UF2</button>
+                </div>
+
+                <div>
+                    <h2>Instructions for PicoCart64 v1 lite:</h2>
+                    <ol>
+                        <li>
+                            Download the latest firmware build for PicoCart64 v1 lite.
+                            You can find it in the <a href="https://github.com/kbeckmann/PicoCart64/actions">GitHub Actions</a>, but it can be a bit of a hassle to find the latest file.
+                            Instead, you can <a href="https://nightly.link/kbeckmann/PicoCart64/workflows/20_build/develop/picocart64">download it via nightly.link</a> instead.
+                        </li>
+                        <li>
+                            Unzip the downloaded file.
+                        </li>
+                        <li>
+                            Program your Raspberry Pi Pico with either picocart64-v1-ntsc.uf2 or picocart64-v1-pal.uf2 depending on your N64.
+                            Consult the official documentation for how to program uf2 files.
+                        </li>
+                        <li>
+                            On this page, press "Choose file", and select the N64 ROM you want to prepare. Note that is has to be in z64 format.
+                        </li>
+                        <li>
+                            Keep "Compress" checked unless you have a reason for using an uncompressed ROM.
+                        </li>
+                        <li>
+                            Press "Build UF2" and wait for a while until the process is done.
+                        </li>
+                        <li>
+                            Program the UF2 file which should be in your Download folder by now.
+                        </li>
+                        <li>
+                            Ensure to power-cycle the Raspberry Pi Pico before starting the N64.
+                        </li>
+                    </ol>
                 </div>
             </div>
         </div>
