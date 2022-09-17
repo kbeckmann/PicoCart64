@@ -103,49 +103,34 @@ void n64_pi_run(void)
 		// Handle access based on memory region
 		// Note that the if-cases are ordered in priority from
 		// most timing critical to least.
-		if (last_addr == 0x10000000) {
-			// Configure bus to run slowly.
-			// This is better patched in the rom, so we won't need a branch here.
-			// But let's keep it here so it's easy to import roms.
-
-			// 0x8037FF40 in big-endian
-			next_word = 0x8037;
-			addr = n64_pi_get_value(pio);
-
-			// Assume addr == 0, i.e. READ request
-			pio_sm_put(pio, 0, next_word);
-			last_addr += 2;
-
-			// Patch bus speed here if needed (e.g. if not overclocking)
-			// next_word = 0xFF40;
-			// next_word = 0x2040;
-
-			// Official SDK standard speed
-			next_word = 0x1240;
-			addr = n64_pi_get_value(pio);
-
-			// Assume addr == 0, i.e. push 16 bits of data
-			pio_sm_put(pio, 0, next_word);
-			last_addr += 2;
-
-			// Pre-fetch
+		if (last_addr >= CART_DOM1_ADDR2_START && last_addr <= CART_DOM1_ADDR2_END) {
+			// Domain 1, Address 2 Cartridge ROM
+			do {
+				// Pre-fetch from the address
 #if COMPRESSED_ROM
-			uint32_t chunk_index = rom_mapping[(last_addr & 0xFFFFFF) >> COMPRESSION_SHIFT_AMOUNT];
-			const uint16_t *chunk_16 = (const uint16_t *)rom_chunks[chunk_index];
-			next_word = chunk_16[(last_addr & COMPRESSION_MASK) >> 1];
+				uint32_t chunk_index = rom_mapping[(last_addr & 0xFFFFFF) >> COMPRESSION_SHIFT_AMOUNT];
+				const uint16_t *chunk_16 = (const uint16_t *)rom_chunks[chunk_index];
+				next_word = swap8(chunk_16[(last_addr & COMPRESSION_MASK) >> 1]);
 #else
-			next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
+				next_word = swap8(rom_file_16[(last_addr & 0xFFFFFF) >> 1]);
 #endif
 
-			// ROM patching done
-			addr = n64_pi_get_value(pio);
-			if (addr == 0) {
-				// I apologise for the use of goto, but it seemed like a fast way
-				// to enter the next state immediately.
-				goto handle_d1a2_read;
-			} else {
-				continue;
-			}
+				// Read command/address
+				addr = n64_pi_get_value(pio);
+
+				if (addr == 0) {
+					// READ
+					pio_sm_put(pio, 0, next_word);
+					last_addr += 2;
+				} else if ((addr & 0xffff0000) == 0xffff0000) {
+					// WRITE
+					// Ignore data since we're asked to write to the ROM.
+					last_addr += 2;
+				} else {
+					// New address
+					break;
+				}
+			} while (1);
 		} else if (last_addr >= CART_SRAM_START && last_addr <= CART_SRAM_END) {
 			// Domain 2, Address 2 Cartridge SRAM
 			do {
@@ -170,84 +155,7 @@ void n64_pi_run(void)
 					break;
 				}
 			} while (1);
-		} else if (last_addr >= 0x10000000 && last_addr <= 0x1FBFFFFF) {
-			// Domain 1, Address 2 Cartridge ROM
-			do {
-				// Pre-fetch from the address
-#if COMPRESSED_ROM
-				uint32_t chunk_index = rom_mapping[(last_addr & 0xFFFFFF) >> COMPRESSION_SHIFT_AMOUNT];
-				const uint16_t *chunk_16 = (const uint16_t *)rom_chunks[chunk_index];
-				next_word = chunk_16[(last_addr & COMPRESSION_MASK) >> 1];
-#else
-				next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
-#endif
-
-				// Read command/address
-				addr = n64_pi_get_value(pio);
-
-				if (addr == 0) {
-					// READ
- handle_d1a2_read:
-					pio_sm_put(pio, 0, swap8(next_word));
-					last_addr += 2;
-				} else if ((addr & 0xffff0000) == 0xffff0000) {
-					// WRITE
-					// Ignore data since we're asked to write to the ROM.
-					last_addr += 2;
-				} else {
-					// New address
-					break;
-				}
-			} while (1);
-		}
-#if 0
-		else if (last_addr >= 0x05000000 && last_addr <= 0x05FFFFFF) {
-			// Domain 2, Address 1 N64DD control registers
-			do {
-				// We don't support this yet, but we have to consume another value
-				next_word = 0;
-
-				// Read command/address
-				addr = n64_pi_get_value(pio);
-
-				if (addr == 0) {
-					// READ
-					pio_sm_put(pio, 0, next_word);
-					last_addr += 2;
-				} else if ((addr & 0xffff0000) == 0xffff0000) {
-					// WRITE
-					// Ignore
-					last_addr += 2;
-				} else {
-					// New address
-					break;
-				}
-			} while (1);
-		} else if (last_addr >= 0x06000000 && last_addr <= 0x07FFFFFF) {
-			// Domain 1, Address 1 N64DD IPL ROM (if present)
-			do {
-				// We don't support this yet, but we have to consume another value
-				next_word = 0;
-
-				// Read command/address
-				addr = n64_pi_get_value(pio);
-
-				if (addr == 0) {
-					// READ
-					pio_sm_put(pio, 0, next_word);
-					last_addr += 2;
-				} else if ((addr & 0xffff0000) == 0xffff0000) {
-					// WRITE
-					// Ignore
-					last_addr += 2;
-				} else {
-					// New address
-					break;
-				}
-			} while (1);
-		}
-#endif
-		else if (last_addr >= PC64_BASE_ADDRESS_START && last_addr <= PC64_BASE_ADDRESS_END) {
+		} else if (last_addr >= PC64_BASE_ADDRESS_START && last_addr <= PC64_BASE_ADDRESS_END) {
 			// PicoCart64 BASE address space
 			do {
 				// Pre-fetch from the address
