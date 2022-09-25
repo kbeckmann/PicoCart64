@@ -42,6 +42,15 @@ void stdio_uart_out_chars(const char *buf, int length)
 	}
 }
 
+void stdio_uart_out_chars_blocking(const char *buf, int length)
+{
+	while (!uart_is_writable(uart_instance)) {
+		// Wait
+	}
+
+	uart_write_blocking(uart_instance, buf, length);
+}
+
 static int stdio_uart_in_chars(char *buf, int length)
 {
 	// NOTE: This is synchronous, and will probably stay that way

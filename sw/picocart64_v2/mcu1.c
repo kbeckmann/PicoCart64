@@ -5,18 +5,188 @@
  */
 
 #include <stdio.h>
+#include <string.h>
+
 #include "pico/stdlib.h"
+#include "pins_mcu1.h"
+#include "qspi_helper.h"
+#include "n64_pi_task.h"
+#include "stdio_async_uart.h"
+#include "reset_reason.h"
+#include "sha256.h"
+#include "rom_vars.h"
+
+#include "gpio_helper.h"
+#include "utils.h"
+
+static const gpio_config_t mcu1_gpio_config[] = {
+	// PIO0 pins
+	{PIN_N64_AD0, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO0},
+	{PIN_N64_AD1, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO0},
+	{PIN_N64_AD2, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO0},
+	{PIN_N64_AD3, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO0},
+	{PIN_N64_AD4, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO0},
+	{PIN_N64_AD5, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO0},
+	{PIN_N64_AD6, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO0},
+	{PIN_N64_AD7, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO0},
+	{PIN_N64_AD8, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO0},
+	{PIN_N64_AD9, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO0},
+	{PIN_N64_AD10, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO0},
+	{PIN_N64_AD11, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO0},
+	{PIN_N64_AD12, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO0},
+	{PIN_N64_AD13, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO0},
+	{PIN_N64_AD14, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO0},
+	{PIN_N64_AD15, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO0},
+	{PIN_N64_ALEL, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO0},
+	{PIN_N64_ALEH, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO0},
+	{PIN_N64_WRITE, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO0},
+	{PIN_N64_READ, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO0},
+
+	// Remaining N64 pins are treated as normal GPIOs
+	{PIN_N64_COLD_RESET, GPIO_IN, false, false, true, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},	// Pulled down
+	{PIN_N64_SI_DAT, GPIO_IN, false, true, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},	// Pulled up, open drain
+	{PIN_N64_INT1, GPIO_IN, false, true, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},	// Pulled up, open drain
+
+	// Demux should be configured as inputs without pulls until we lock the bus
+	{PIN_DEMUX_A0, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+	{PIN_DEMUX_A1, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+	{PIN_DEMUX_A2, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+	{PIN_DEMUX_IE, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+
+	// TODO: Configure as PIO1 later when we have the SPI implementation in place
+	{PIN_MCU2_SCK, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+	// {PIN_MCU2_CS, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+	{PIN_MCU2_CS, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_UART},	// UART for now
+	{PIN_MCU2_DIO, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+};
 
 void mcu1_main(void)
 {
 	int count = 0;
+	// const int freq_khz = 133000;
+	const int freq_khz = 200000;
+	// const int freq_khz = 210000;
+	// const int freq_khz = 220000;
+	// const int freq_khz = 230000;
+	///// below no workie
+	// const int freq_khz = 240000;
+	// const int freq_khz = 266000;
+
+	set_sys_clock_khz(freq_khz, true);
 
 	// Enable STDIO over USB
-	stdio_usb_init();
+	// stdio_usb_init();
+	stdio_async_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
 
+	gpio_configure(mcu1_gpio_config, ARRAY_SIZE(mcu1_gpio_config));
+
+#if 0
+	int pin = PIN_N64_AD0;
+
+	printf("Testing pin %d\n", pin);
+
+	gpio_set_dir(pin, GPIO_OUT);
+	gpio_put(pin, 1);
+
+	while (1) {
+
+	}
+#endif
+
+	// gpio_set_pulls(PIN_N64_COLD_RESET, false, true);
+	// gpio_set_pulls(PIN_N64_SI_DAT, true, false);
+	// gpio_set_pulls(PIN_N64_INT1, true, false);
+
+	printf("Hello, world! I am MCU 1 @%d kHz. Reset reason: 0x%08lX\n", freq_khz, get_reset_reason());
+
+	sleep_ms(100);
+
+#if 0
 	while (true) {
 		count++;
 		printf("Hello, world! I am MCU 1 -- %d\n", count);
 		sleep_ms(1000);
 	}
+
+#else
+
+	qspi_oeover_normal(true);
+	ssi_hw->ssienr = 1;
+
+	sleep_ms(10);
+
+#if 0
+	const uint32_t *data = (const uint32_t *)0x10000000;
+	for (int i = 0; i < 1024 * 1024; i++) {
+		printf("%08x ", *data++);
+		printf("%08x ", *data++);
+		printf("%08x ", *data++);
+		printf("%08x\n", *data++);
+		sleep_ms(10);
+	}
+#endif
+
+	qspi_print_pull();
+
+#if 0
+	while (true) {
+		char hash_str[128];
+
+		sha256_to_string(hash_str, (const BYTE *)0x10000000, 30228);
+		printf("Hash: %s\n", hash_str);
+
+		sleep_ms(500);
+	}
+
+#elif 0
+
+	int unique = 0;
+	int i = 0;
+	while (true) {
+		char hash_str[65];
+		char hash_str_old[65];
+
+		sha256_to_string(hash_str, (const BYTE *)0x10000000, 1024 * 1024);
+		if (strcmp(hash_str, hash_str_old) != 0) {
+			strcpy(hash_str_old, hash_str);
+			unique++;
+			printf("Hash: %s, unique: %d\n", hash_str, unique);
+		}
+		// if (i % 100 == 0) {
+		printf("Still alive, %d %d\n", i, unique);
+		// }
+
+		i++;
+		// sleep_ms(500);
+	}
+
+#else
+
+	{
+		char hash_str[128];
+		sha256_to_string(hash_str, (const BYTE *)0x10000000, 1079028);
+		printf("Hash: %s\n", hash_str);
+	}
+
+#endif
+
+	// Set up ROM mapping table
+	if (memcmp(picocart_header, "picocartcompress", 16) == 0) {
+		// Copy rom compressed map from flash into RAM
+		printf("Found a compressed ROM\n");
+		memcpy(rom_mapping, flash_rom_mapping, MAPPING_TABLE_LEN * sizeof(uint16_t));
+	} else {
+		for (int i = 0; i < MAPPING_TABLE_LEN; i++) {
+			rom_mapping[i] = i;
+		}
+	}
+
+	n64_pi_run();
+
+#endif
+
+	while (true) {
+
+	}
+
 }

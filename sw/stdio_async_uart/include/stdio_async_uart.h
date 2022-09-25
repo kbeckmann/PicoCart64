@@ -41,6 +41,9 @@ extern "C" {
 // Directly write to the ringbuffer, should be super fast
 	void stdio_uart_out_chars(const char *buf, int length);
 
+// Blocking write
+	void stdio_uart_out_chars_blocking(const char *buf, int length);
+
 // Quickly print a 32-bit unsigned value as hex
 	static inline void uart_print_hex_u32(uint32_t word) {
 		uint8_t buf[10];
@@ -55,6 +58,7 @@ extern "C" {
 		buf[9] = '\n';
 
 		stdio_uart_out_chars(buf, sizeof(buf));
+		// stdio_uart_out_chars_blocking(buf, sizeof(buf));
 	}
 
 #ifdef __cplusplus

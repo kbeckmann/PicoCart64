@@ -29,15 +29,10 @@ Data Line, Bidir (DIO):  CIC Pin 15
 #include <stdio.h>
 #include <string.h>
 
-#include "FreeRTOS.h"
-#include "task.h"
-
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 
 #include "n64_cic.h"
-#include "sram.h"
-#include "picocart64_pins.h"
 
 // #define DEBUG
 
@@ -50,6 +45,19 @@ Data Line, Bidir (DIO):  CIC Pin 15
 #define GET_REGION() (REGION_PAL)
 #else
 #error Please pass -DREGION=PAL or NTSC to your cmake command line.
+#endif
+
+#if !defined(CONFIG_CIC_YIELD)
+#error CONFIG_YIELD must be defined.
+#elif CONFIG_CIC_YIELD == 1
+
+#include "FreeRTOS.h"
+#include "task.h"
+#define YIELD() taskYIELD()
+
+#elif CONFIG_CIC_YIELD == 0
+#define YIELD()
+#else
 #endif
 
 /* SEEDs */
@@ -96,6 +104,10 @@ static void EncodeRound(unsigned char index);
 static void CicRound(unsigned char *);
 static void Cic6105Algo(void);
 
+static uint8_t pin_cr;
+static uint8_t pin_dclk;
+static uint8_t pin_dio;
+
 /* Select SEED and CHECKSUM here */
 const unsigned char _CicSeed = CIC6102_SEED;
 // const unsigned char _CicSeed = CIC6105_SEED;
@@ -127,7 +139,7 @@ unsigned char _6105Mem[32];
 
 static bool check_running(void)
 {
-	if (gpio_get(N64_COLD_RESET) == 0) {
+	if (gpio_get(pin_cr) == 0) {
 		// Reset the CIC
 		return false;
 	}
@@ -142,17 +154,17 @@ static unsigned char ReadBit(void)
 
 	// wait for DCLK to go low
 	do {
-		vin = gpio_get(N64_CIC_DCLK);
-		vPortYield();
+		vin = gpio_get(pin_dclk);
+		YIELD();
 	} while (vin && check_running());
 
 	// Read the data bit
-	res = gpio_get(N64_CIC_DIO);
+	res = gpio_get(pin_dio);
 
 	// wait for DCLK to go high
 	do {
-		vin = gpio_get(N64_CIC_DCLK);
-		vPortYield();
+		vin = gpio_get(pin_dclk);
+		YIELD();
 	} while ((!vin) && check_running());
 
 	return res ? 1 : 0;
@@ -164,23 +176,23 @@ static void WriteBit(unsigned char b)
 
 	// wait for DCLK to go low
 	do {
-		vin = gpio_get(N64_CIC_DCLK);
-		vPortYield();
+		vin = gpio_get(pin_dclk);
+		YIELD();
 	} while (vin && check_running());
 
 	if (b == 0) {
 		// Drive low
-		gpio_set_dir(N64_CIC_DIO, GPIO_OUT);
-		gpio_put(N64_CIC_DIO, 0);
+		gpio_set_dir(pin_dio, GPIO_OUT);
+		gpio_put(pin_dio, 0);
 	}
 	// wait for DCLK to go high
 	do {
-		vin = gpio_get(N64_CIC_DCLK);
-		vPortYield();
+		vin = gpio_get(pin_dclk);
+		YIELD();
 	} while ((!vin) && check_running());
 
 	// Disable output
-	gpio_set_dir(N64_CIC_DIO, GPIO_IN);
+	gpio_set_dir(pin_dio, GPIO_IN);
 }
 
 /* Writes the lowes 4 bits of the byte */
@@ -198,7 +210,7 @@ static void WriteRamNibbles(unsigned char index)
 	do {
 		WriteNibble(_CicMem[index]);
 		index++;
-		vPortYield();
+		YIELD();
 	} while ((index & 0x0f) != 0);
 }
 
@@ -254,7 +266,7 @@ static void WriteChecksum(void)
 	// (doesn't seem to be necessary)
 	// int vin;
 	// do {
-	//     vin = gpio_get(N64_CIC_DCLK);
+	//     vin = gpio_get(pin_dclk);
 	// } while ((vin & 1) && check_running());
 
 	// "encrytion" key
@@ -302,7 +314,7 @@ static void EncodeRound(unsigned char index)
 		a = (a + _CicMem[index]) & 0x0f;
 		_CicMem[index] = a;
 		index++;
-		vPortYield();
+		YIELD();
 	} while ((index & 0x0f) != 0);
 }
 
@@ -363,7 +375,7 @@ static void CicRound(unsigned char *m)
 		a = x + 0xf;
 		x = a & 0xf;
 
-		vPortYield();
+		YIELD();
 	} while (x != 15);
 }
 
@@ -477,9 +489,13 @@ static void InitRam(unsigned char isPal)
 	}
 }
 
-void n64_cic_run(void)
+void n64_cic_run(uint8_t _pin_cr, uint8_t _pin_dclk, uint8_t _pin_dio)
 {
 	unsigned char isPal;
+
+	pin_cr = _pin_cr;
+	pin_dclk = _pin_dclk;
+	pin_dio = _pin_dio;
 
 	// Reset the state
 	memset(_CicMem, 0, sizeof(_CicMem));
@@ -488,8 +504,8 @@ void n64_cic_run(void)
 	// printf("CIC Emulator core running!\r\n");
 
 	// Wait for reset to be released
-	while (gpio_get(N64_COLD_RESET) == 0) {
-		vPortYield();
+	while (gpio_get(pin_cr) == 0) {
+		YIELD();
 	}
 
 	// read the region setting
@@ -517,7 +533,7 @@ void n64_cic_run(void)
 	_CicMem[0x11] = ReadNibble();
 
 	while (check_running()) {
-		vPortYield();
+		YIELD();
 		// read mode (2 bit)
 		unsigned char cmd = 0;
 		cmd |= (ReadBit() << 1);

@@ -36,3 +36,8 @@
 #define PIN_MCU2_SCK        (27)
 #define PIN_MCU2_CS         (28)
 #define PIN_MCU2_DIO        (29)
+
+#define DEBUG_UART uart0
+#define DEBUG_UART_BAUD_RATE 115200
+#define DEBUG_UART_TX_PIN (PIN_MCU2_CS)
+#define DEBUG_UART_RX_PIN (-1)

@@ -125,7 +125,7 @@ void n64_pi_program_init(PIO pio, uint sm, uint offset) {
     }
 
     // Set [AD0, AD15] as input
-    pio_sm_set_consecutive_pindirs(pio, sm, 0, 19, false);
+    pio_sm_set_consecutive_pindirs(pio, sm, 0, 16, false);
 
     pio_sm_config c = n64_pi_program_get_default_config(offset);
 

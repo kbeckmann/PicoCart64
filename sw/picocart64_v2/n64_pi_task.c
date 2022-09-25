@@ -18,7 +18,7 @@
 #include "n64_pi.h"
 #include "pc64_rand.h"
 #include "pc64_regs.h"
-#include "picocart64_pins.h"
+#include "pins_mcu1.h"
 #include "ringbuf.h"
 #include "sram.h"
 #include "stdio_async_uart.h"
@@ -80,7 +80,7 @@ void n64_pi_run(void)
 	pio_sm_set_enabled(pio, 0, true);
 
 	// Wait for reset to be released
-	while (gpio_get(N64_COLD_RESET) == 0) {
+	while (gpio_get(PIN_N64_COLD_RESET) == 0) {
 		tight_loop_contents();
 	}
 
@@ -90,6 +90,14 @@ void n64_pi_run(void)
 
 	// Read addr manually before the loop
 	addr = n64_pi_get_value(pio);
+	// // Print bus state
+	// {
+	//  uint32_t gpios = gpio_get_all();
+	//  printf("%08x\n", gpios);
+	//  for (int i = 0; i < 20; i++) {
+	//      printf("%d: %d\n", i, (gpios >> i) & 1);
+	//  }
+	// }
 
 	while (1) {
 		// addr must not be a WRITE or READ request here,
@@ -104,6 +112,18 @@ void n64_pi_run(void)
 		// Note that the if-cases are ordered in priority from
 		// most timing critical to least.
 		if (last_addr == 0x10000000) {
+			//printf("lesgo\n");
+
+			// Print bus state
+			// uint32_t last_gpios = 0;
+			// uint32_t gpios = gpio_get_all();
+			// while (gpios != last_gpios) {
+			//  uart_print_hex_u32(gpios);
+
+			//  last_gpios = gpios;
+			//  gpios = gpio_get_all();
+			// }
+
 			// Configure bus to run slowly.
 			// This is better patched in the rom, so we won't need a branch here.
 			// But let's keep it here so it's easy to import roms.
@@ -111,6 +131,7 @@ void n64_pi_run(void)
 			// 0x8037FF40 in big-endian
 			next_word = 0x8037;
 			addr = n64_pi_get_value(pio);
+			// uart_print_hex_u32(addr);
 
 			// Assume addr == 0, i.e. READ request
 			pio_sm_put(pio, 0, next_word);
@@ -123,6 +144,7 @@ void n64_pi_run(void)
 			// Official SDK standard speed
 			next_word = 0x1240;
 			addr = n64_pi_get_value(pio);
+			// uart_print_hex_u32(addr);
 
 			// Assume addr == 0, i.e. push 16 bits of data
 			pio_sm_put(pio, 0, next_word);
@@ -139,6 +161,7 @@ void n64_pi_run(void)
 
 			// ROM patching done
 			addr = n64_pi_get_value(pio);
+			// uart_print_hex_u32(addr);
 			if (addr == 0) {
 				// I apologise for the use of goto, but it seemed like a fast way
 				// to enter the next state immediately.
@@ -185,16 +208,14 @@ void n64_pi_run(void)
 				// Read command/address
 				addr = n64_pi_get_value(pio);
 
-				// The N64 may set the LSB of the address if an unaligned DMA request
-				// is performed.
-				// This is a problem since the LSB is used as a way to inform about
-				// write requests from the PIO code.
-				// Since this memory region is read-only, we can work around this issue
-				// by just handle values where the LSB is set as a normal address.
 				if (addr == 0) {
 					// READ
  handle_d1a2_read:
 					pio_sm_put(pio, 0, swap8(next_word));
+					last_addr += 2;
+				} else if (addr & 0x00000001) {
+					// WRITE
+					// Ignore data since we're asked to write to the ROM.
 					last_addr += 2;
 				} else {
 					// New address

@@ -41,7 +41,7 @@
  *----------------------------------------------------------*/
 
 /* Scheduler Related */
-#define configUSE_PREEMPTION                    0
+#define configUSE_PREEMPTION                    1	/* TODO: Consider enabling */
 #define configUSE_TICKLESS_IDLE                 0
 #define configUSE_IDLE_HOOK                     0
 #define configUSE_TICK_HOOK                     0
@@ -109,8 +109,9 @@
 #endif
 
 /* RP2040 specific */
-#define configSUPPORT_PICO_SYNC_INTEROP         1
-#define configSUPPORT_PICO_TIME_INTEROP         1
+// Turn off this as it doesn't seem to work?
+#define configSUPPORT_PICO_SYNC_INTEROP         0
+#define configSUPPORT_PICO_TIME_INTEROP         0
 
 #include <assert.h>
 /* Define to trap errors during development. */
