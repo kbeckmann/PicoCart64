@@ -19,6 +19,7 @@
 #include "gpio_helper.h"
 #include "utils.h"
 
+#include "sdcard/internal_sd_card.h"
 #include "pio_uart/pio_uart.h"
 
 static const gpio_config_t mcu1_gpio_config[] = {
@@ -69,8 +70,8 @@ static const gpio_config_t mcu1_gpio_config[] = {
 void mcu1_main(void)
 {
 	int count = 0;
-	const int freq_khz = 133000;
-	// const int freq_khz = 200000;
+	// const int freq_khz = 133000;
+	const int freq_khz = 200000;
 	// const int freq_khz = 210000;
 	// const int freq_khz = 220000;
 	// const int freq_khz = 230000;
@@ -87,44 +88,28 @@ void mcu1_main(void)
 	gpio_configure(mcu1_gpio_config, ARRAY_SIZE(mcu1_gpio_config));
 
 	// Setup PIO UART
-	pio_uart_inst_t uart_rx = {
-        .pio = pio1,
-        .sm = 0
-	};
-
-	pio_uart_inst_t uart_tx = {
-			.pio = pio1,
-			.sm = 1
-	};
-	//uint pioUartRXOffset = pio_add_program(uart_rx.pio, &uart_rx_program);
-	uint pioUartTXOffset = pio_add_program(uart_tx.pio, &uart_tx_program);
-
-	//uart_rx_program_init(uart_rx.pio, uart_rx.sm, pioUartRXOffset, PIN_MCU2_DIO, PIO_UART_BAUD_RATE);
-	uart_tx_program_init(uart_tx.pio, uart_tx.sm, pioUartTXOffset, PIN_MCU2_CS, PIO_UART_BAUD_RATE);
-
-	uint32_t BUFFER_SIZE = 8;
-	uint8_t writeBuffer[BUFFER_SIZE];
-	uint8_t readBuffer[BUFFER_SIZE];
-	//Test to send some characters using pio
-	writeBuffer[0] = 'H';
-	writeBuffer[1] = 'E';
-	writeBuffer[2] = 'L';
-	writeBuffer[3] = 'L';
-	writeBuffer[4] = 'O';
-	writeBuffer[5] = '\n';
-	writeBuffer[6] = 'Y';
-	writeBuffer[7] = 'E';
-	int lastWrite = 0;
-	while(1) {
-		int now = time_us_32();
-		if (now - lastWrite > 6000000) {
-			printf("writing data to pio spi...\n");
-			for (int i = 0; i < BUFFER_SIZE; i++) {
-				uart_tx_program_putc(uart_tx.pio, uart_tx.sm, writeBuffer[i]);
-			}
-			lastWrite = now;
-		}
-	}
+	pio_uart_init(on_uart_rx, PIN_MCU2_DIO, PIN_MCU2_CS);
+	
+	// uint32_t BUFFER_SIZE = 6;
+	// uint8_t writeBuffer[BUFFER_SIZE];
+	// uint8_t readBuffer[BUFFER_SIZE];
+	// //Test to send some characters using pio
+	// writeBuffer[0] = 'H';
+	// writeBuffer[1] = 'E';
+	// writeBuffer[2] = 'L';
+	// writeBuffer[3] = 'L';
+	// writeBuffer[4] = 'O';
+	// writeBuffer[5] = '\n';
+	// int lastWrite = 0;
+	// while(1) {
+	// 	int now = time_us_32();
+	// 	if (now - lastWrite > 6000000) {
+	// 		for (int i = 0; i < BUFFER_SIZE; i++) {
+	// 			uart_tx_program_putc(writeBuffer[i]);
+	// 		}
+	// 		lastWrite = now;
+	// 	}
+	// }
 
 #if 0
 	int pin = PIN_N64_AD0;

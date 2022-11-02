@@ -27,6 +27,7 @@
 #include "gpio_helper.h"
 #include "psram_inline.h"
 
+#include "sdcard/internal_sd_card.h"
 #include "pio_uart/pio_uart.h"
 
 #define UART0_BAUD_RATE  (115200)
@@ -90,9 +91,8 @@ static const gpio_config_t mcu2_gpio_config[] = {
 	{PIN_CIC_DIO, GPIO_IN, false, true, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},	// Pulled up
 	{PIN_CIC_DCLK, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
 
-	// Configure as PIO that implements SPI becase of the way the pins from MCU1 are connected to MCU2
-	{PIN_SPI1_SCK, GPIO_IN, true, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO1}, // used when spi slave
-	// {PIN_SPI1_SCK, GPIO_OUT, true, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO1},
+	// Configure as PIO that implements UART becase of the way the pins from MCU1 are connected to MCU2
+	{PIN_SPI1_SCK, GPIO_IN, true, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO1}, 
 	//{PIN_SPI1_TX, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO1}, // not using
 	{PIN_SPI1_RX, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO1},
 	{PIN_SPI1_CS, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO1},
@@ -160,52 +160,35 @@ void main_task_entry(__unused void *params)
 	// }
 
 	// Setup PIO UART
-	pio_uart_inst_t uart_rx = {
-            .pio = pio1,
-            .sm = 0
-    };
-
-	pio_uart_inst_t uart_tx = {
-            .pio = pio1,
-            .sm = 1
-    };
-	uint pioUartRXOffset = pio_add_program(uart_rx.pio, &uart_rx_program);
-	//uint pioUartTXOffset = pio_add_program(uart_tx.pio, &uart_tx_program);
-
-	uart_rx_program_init(uart_rx.pio, uart_rx.sm, pioUartRXOffset, PIN_SPI1_CS, PIO_UART_BAUD_RATE);
-	//uart_tx_program_init(uart_tx.pio, uart_tx.sm, pioUartTXOffset, PIN_SPI1_RX, PIO_UART_BAUD_RATE);
+	pio_uart_init(on_uart_rx, PIN_SPI1_CS, PIN_SPI1_RX);
 
 	printf("Booting MCU1...\n");
 	// Boot MCU1
 	gpio_put(PIN_MCU1_RUN, 1);
 
-	printf("MCU1 should be booting...\n");
-
-	vTaskDelay(1 * 1500);
-
-	uint32_t BUFFER_SIZE = 8;
-	uint8_t writeBuffer[BUFFER_SIZE];
-	uint8_t readBuffer[BUFFER_SIZE];
-	int lastRead = 0;
-	while(1) {
-		int now = time_us_32();
-		//if (now - lastRead > 3000000) {
-			printf("\nReading pio spi...\n\n");
+	// uint32_t BUFFER_SIZE = 8;
+	// uint8_t writeBuffer[BUFFER_SIZE];
+	// uint8_t readBuffer[BUFFER_SIZE];
+	// int lastRead = 0;
+	// while(1) {
+	// 	int now = time_us_32();
+	// 	//if (now - lastRead > 3000000) {
+	// 		printf("\nReading pio uart...\n\n");
 				
-			for(int i = 0; i < BUFFER_SIZE; i++) {
-				char c = uart_rx_program_getc(uart_rx.pio, uart_rx.sm);
-				printf("%c", c);
-			}
-			printf("\nFinished!\n");
-			lastRead = now;
-		//}
+	// 		for(int i = 0; i < BUFFER_SIZE; i++) {
+	// 			char c = uart_rx_program_getc();
+	// 			printf("%c", c);
+	// 		}
+	// 		printf("\nFinished!\n");
+	// 		lastRead = now;
+	// 	//}
 		
-	}
+	// }
 
 	while (true) {
 		count++;
 
-#if 1
+#if 0
 		printf("----------------------------------------\n");
 		printf("MCU 2 [i=%d]\n", count);
 		printf("Stack usage main_task: %d bytes\n", MAIN_TASK_STACK_SIZE - uxTaskGetStackHighWaterMark(NULL));

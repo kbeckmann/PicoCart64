@@ -46,39 +46,39 @@ void pc64_set_sd_rom_selection(char* title) {
 #define COMMAND_FINISH2  0xEF
 #define COMMAND_SD_READ  0x72 // literally the r char
 void pc64_send_sd_read_command(void) {
-    // // Block cart while waiting for data
-    // sd_is_busy = true;
+    // Block cart while waiting for data
+    sd_is_busy = true;
 
-    // uint64_t sector = sd_read_sector_start;
-    // uint32_t sectorCount = 1;
+    uint64_t sector = sd_read_sector_start;
+    uint32_t sectorCount = 1;
 
-    // // Signal start
-    // uart_tx_program_putc(COMMAND_START);
-    // uart_tx_program_putc(COMMAND_START2);
+    // Signal start
+    uart_tx_program_putc(COMMAND_START);
+    uart_tx_program_putc(COMMAND_START2);
 
-    // // command
-    // uart_tx_program_putc(COMMAND_SD_READ);
+    // command
+    uart_tx_program_putc(COMMAND_SD_READ);
 
-    // // sector
-    // uart_tx_program_putc((char)((sector & 0xFF00000000000000) >> 56));
-    // uart_tx_program_putc((char)((sector & 0x00FF000000000000) >> 48));
-    // uart_tx_program_putc((char)((sector & 0x0000FF0000000000) >> 40));
-    // uart_tx_program_putc((char)((sector & 0x000000FF00000000) >> 32));
+    // sector
+    uart_tx_program_putc((char)((sector & 0xFF00000000000000) >> 56));
+    uart_tx_program_putc((char)((sector & 0x00FF000000000000) >> 48));
+    uart_tx_program_putc((char)((sector & 0x0000FF0000000000) >> 40));
+    uart_tx_program_putc((char)((sector & 0x000000FF00000000) >> 32));
 
-    // uart_tx_program_putc((char)((sector & 0x00000000FF000000) >> 24));
-    // uart_tx_program_putc((char)((sector & 0x0000000000FF0000) >> 16));
-    // uart_tx_program_putc((char)((sector & 0x000000000000FF00) >> 8));
-    // uart_tx_program_putc((char)(sector  & 0x00000000000000FF));
+    uart_tx_program_putc((char)((sector & 0x00000000FF000000) >> 24));
+    uart_tx_program_putc((char)((sector & 0x0000000000FF0000) >> 16));
+    uart_tx_program_putc((char)((sector & 0x000000000000FF00) >> 8));
+    uart_tx_program_putc((char)(sector  & 0x00000000000000FF));
 
-    // // num sectors
-    // uart_tx_program_putc((char)((sectorCount & 0xFF000000) >> 24));
-    // uart_tx_program_putc((char)((sectorCount & 0x00FF0000) >> 16));
-    // uart_tx_program_putc((char)((sectorCount & 0x0000FF00) >> 8));
-    // uart_tx_program_putc((char)(sectorCount & 0x000000FF));
+    // num sectors
+    uart_tx_program_putc((char)((sectorCount & 0xFF000000) >> 24));
+    uart_tx_program_putc((char)((sectorCount & 0x00FF0000) >> 16));
+    uart_tx_program_putc((char)((sectorCount & 0x0000FF00) >> 8));
+    uart_tx_program_putc((char)(sectorCount & 0x000000FF));
 
-    // // Signal finish
-    // uart_tx_program_putc(COMMAND_FINISH);
-    // uart_tx_program_putc(COMMAND_FINISH2);
+    // Signal finish
+    uart_tx_program_putc(COMMAND_FINISH);
+    uart_tx_program_putc(COMMAND_FINISH2);
 }
 
 bool is_sd_busy() {
@@ -89,25 +89,25 @@ bool is_sd_busy() {
 static int bufferIndex = 0;
 bool mightBeFinished = false;
 void on_uart_rx(void) {
-    // while (uart_rx_program_is_readable()) {
-    //     char ch = uart_rx_program_getc();
+    while (uart_rx_program_is_readable()) {
+        char ch = uart_rx_program_getc();
 
-    //     printf("%c", ch);
+        printf("%c", ch);
 
-    //     pc64_uart_tx_buf[bufferIndex++] = ch;
+        pc64_uart_tx_buf[bufferIndex++] = ch;
 
-    //     if (ch == COMMAND_FINISH && bufferIndex > 500) {
-    //         mightBeFinished = true;
-    //     } else if (mightBeFinished && ch == COMMAND_FINISH2) {
-    //         bufferIndex = 0;
-    //         sd_is_busy = false;
-    //         mightBeFinished = false;
-    //     }
+        if (ch == COMMAND_FINISH && bufferIndex > 500) {
+            mightBeFinished = true;
+        } else if (mightBeFinished && ch == COMMAND_FINISH2) {
+            bufferIndex = 0;
+            sd_is_busy = false;
+            mightBeFinished = false;
+        }
 
-    //     // Once we have recieved sd card data for the block, mark it as not busy
-    //     if (bufferIndex >= SD_CARD_SECTOR_SIZE) {
-    //         bufferIndex = 0;
-    //         sd_is_busy = false;
-    //     }
-    // }
+        // Once we have recieved sd card data for the block, mark it as not busy
+        if (bufferIndex >= SD_CARD_SECTOR_SIZE) {
+            bufferIndex = 0;
+            sd_is_busy = false;
+        }
+    }
 }

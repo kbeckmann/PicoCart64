@@ -138,11 +138,11 @@ void n64_pi_run(void)
 			last_addr += 2;
 
 			// Patch bus speed here if needed (e.g. if not overclocking)
-			// next_word = 0xFF40;
+			next_word = 0xFF40;
 			// next_word = 0x2040;
 
 			// Official SDK standard speed
-			next_word = 0x1240;
+			// next_word = 0x1240;
 			addr = n64_pi_get_value(pio);
 			// uart_print_hex_u32(addr);
 

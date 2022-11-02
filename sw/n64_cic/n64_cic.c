@@ -508,6 +508,8 @@ void n64_cic_run(uint8_t _pin_cr, uint8_t _pin_dclk, uint8_t _pin_dio)
 		YIELD();
 	}
 
+	printf("let's go!\n");
+
 	// read the region setting
 	isPal = GET_REGION();
 
