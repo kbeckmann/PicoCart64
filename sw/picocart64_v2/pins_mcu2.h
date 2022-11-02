@@ -37,6 +37,8 @@
 #define PIN_SPI1_RX           (28)
 #define PIN_SPI1_CS           (29)
 
+#define PIO_UART_BAUD_RATE 115200
+
 #define DEBUG_UART uart0
 #define DEBUG_UART_BAUD_RATE 115200
 #define DEBUG_UART_TX_PIN (PIN_UART0_TX)

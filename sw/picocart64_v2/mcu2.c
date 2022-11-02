@@ -27,6 +27,8 @@
 #include "gpio_helper.h"
 #include "psram_inline.h"
 
+#include "pio_uart/pio_uart.h"
+
 #define UART0_BAUD_RATE  (115200)
 
 // Priority 0 = lowest, 31 = highest
@@ -88,11 +90,12 @@ static const gpio_config_t mcu2_gpio_config[] = {
 	{PIN_CIC_DIO, GPIO_IN, false, true, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},	// Pulled up
 	{PIN_CIC_DCLK, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
 
-	// TODO: Configure as SPI later
-	{PIN_SPI1_SCK, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
-	{PIN_SPI1_TX, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
-	{PIN_SPI1_RX, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
-	{PIN_SPI1_CS, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+	// Configure as PIO that implements SPI becase of the way the pins from MCU1 are connected to MCU2
+	{PIN_SPI1_SCK, GPIO_IN, true, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO1}, // used when spi slave
+	// {PIN_SPI1_SCK, GPIO_OUT, true, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO1},
+	//{PIN_SPI1_TX, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO1}, // not using
+	{PIN_SPI1_RX, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO1},
+	{PIN_SPI1_CS, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO1},
 };
 
 static void psram_test(void)
@@ -135,29 +138,69 @@ void main_task_entry(__unused void *params)
 
 	printf("[MCU2 Main] Hello\n");
 
-	// Test PSRAM - write test pattern and read it back.
-	psram_test();
-	while (1) {
-		printf("\n\n**** HALT \n");
-		vTaskDelay(5 * 1000);
-	}
+	// // Test PSRAM - write test pattern and read it back.
+	// psram_test();
+	// while (1) {
+	// 	printf("\n\n**** HALT \n");
+	// 	vTaskDelay(5 * 1000);
+	// }
 
-	vTaskDelay(1000);
+	// vTaskDelay(1000);
 
 	// Write 16 MB (takes a while)
 	// write_random_file("random.bin", 16 * 1024 * 1024);
 
 	// write_random_file("random.bin", 9 * 1024 * 1024);
-	load_rom("random.bin");
+	// load_rom("random.bin");
 
-	// load_rom("testrom.z64");
+	//load_rom("testrom.z64");
 
-	while (1) {
-		vTaskDelay(5 * 1000);
-	}
+	// while (1) {
+	// 	vTaskDelay(5 * 1000);
+	// }
 
+	// Setup PIO UART
+	pio_uart_inst_t uart_rx = {
+            .pio = pio1,
+            .sm = 0
+    };
+
+	pio_uart_inst_t uart_tx = {
+            .pio = pio1,
+            .sm = 1
+    };
+	uint pioUartRXOffset = pio_add_program(uart_rx.pio, &uart_rx_program);
+	//uint pioUartTXOffset = pio_add_program(uart_tx.pio, &uart_tx_program);
+
+	uart_rx_program_init(uart_rx.pio, uart_rx.sm, pioUartRXOffset, PIN_SPI1_CS, PIO_UART_BAUD_RATE);
+	//uart_tx_program_init(uart_tx.pio, uart_tx.sm, pioUartTXOffset, PIN_SPI1_RX, PIO_UART_BAUD_RATE);
+
+	printf("Booting MCU1...\n");
 	// Boot MCU1
 	gpio_put(PIN_MCU1_RUN, 1);
+
+	printf("MCU1 should be booting...\n");
+
+	vTaskDelay(1 * 1500);
+
+	uint32_t BUFFER_SIZE = 8;
+	uint8_t writeBuffer[BUFFER_SIZE];
+	uint8_t readBuffer[BUFFER_SIZE];
+	int lastRead = 0;
+	while(1) {
+		int now = time_us_32();
+		//if (now - lastRead > 3000000) {
+			printf("\nReading pio spi...\n\n");
+				
+			for(int i = 0; i < BUFFER_SIZE; i++) {
+				char c = uart_rx_program_getc(uart_rx.pio, uart_rx.sm);
+				printf("%c", c);
+			}
+			printf("\nFinished!\n");
+			lastRead = now;
+		//}
+		
+	}
 
 	while (true) {
 		count++;

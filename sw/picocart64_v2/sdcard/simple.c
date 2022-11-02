@@ -179,6 +179,29 @@ void load_rom(const char *filename)
 
 	printf("Verified %d bytes with PSRAM in %d ms (%d kB/s)\n\n\n", total, delta, kBps);
 
+	//////////////////////////////
+	t0 = to_us_since_boot(get_absolute_time());
+	len = 64;
+	uint32_t totalRead = 0;
+	do {
+		volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+		for (int i = 0; i < len / 4; i++) {
+			uint32_t address_32 = totalRead / 4 + i;
+			uint32_t address = address_32 * 4;
+			psram_set_cs(psram_addr_to_chip(address));
+			uint32_t word = ptr[address_32];
+			// uint32_t facit = buf32[i];
+			psram_set_cs(0);
+		}
+		totalRead += len;
+	} while (totalRead <= total);
+	t1 = to_us_since_boot(get_absolute_time());
+	delta = (t1 - t0) / 1000;
+	kBps = (uint32_t) ((float)(total / 1024.0f) / (float)(delta / 1000.0f));
+
+	printf("Reread %d bytes from PSRAM in %d ms (%d kB/s)\n\n\n", totalRead, delta, kBps);
+	//////////////////////////////
+
 	fr = f_close(&fil);
 	if (FR_OK != fr) {
 		printf("f_close error: %s (%d)\n", FRESULT_str(fr), fr);

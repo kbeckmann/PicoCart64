@@ -12,10 +12,13 @@ add_executable(picocart64_v2
 
     led/led_task.c
 
+    sdcard/internal_sd_card.c
     sdcard/hw_config.c
     sdcard/simple.c
 
     ws2812/ws2812.c
+
+    pio_uart/pio_uart.c
 )
 
 if(NOT DEFINED REGION)
@@ -111,6 +114,10 @@ target_link_libraries(picocart64_v2
 # stdio config
 pico_enable_stdio_usb(picocart64_v2 0)
 pico_enable_stdio_uart(picocart64_v2 1)
+
+pico_generate_pio_header(picocart64_v2 
+    ${CMAKE_CURRENT_LIST_DIR}/pio_uart/pio_uart.pio
+)
 
 # use custom linker script
 pico_set_linker_script(picocart64_v2 ${CMAKE_CURRENT_LIST_DIR}/memmap_custom.ld)

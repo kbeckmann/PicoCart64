@@ -33,9 +33,11 @@
 #define PIN_DEMUX_A1        (24)
 #define PIN_DEMUX_A2        (25)
 #define PIN_DEMUX_IE        (26)
-#define PIN_MCU2_SCK        (27)
-#define PIN_MCU2_CS         (28)
-#define PIN_MCU2_DIO        (29)
+#define PIN_MCU2_SCK        (27) // MCU2 GPIO pin 26: PIN_SPI1_SCK
+#define PIN_MCU2_CS         (28) // MCU2 GPIO pin 29: PIN_SPI1_CS
+#define PIN_MCU2_DIO        (29) // MCU2 GPIO pin 28: PIN_SPI1_RX
+
+#define PIO_UART_BAUD_RATE 115200
 
 #define DEBUG_UART uart0
 #define DEBUG_UART_BAUD_RATE 115200

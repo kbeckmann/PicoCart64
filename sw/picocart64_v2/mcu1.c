@@ -19,6 +19,8 @@
 #include "gpio_helper.h"
 #include "utils.h"
 
+#include "pio_uart/pio_uart.h"
+
 static const gpio_config_t mcu1_gpio_config[] = {
 	// PIO0 pins
 	{PIN_N64_AD0, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO0},
@@ -53,18 +55,22 @@ static const gpio_config_t mcu1_gpio_config[] = {
 	{PIN_DEMUX_A2, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
 	{PIN_DEMUX_IE, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
 
-	// TODO: Configure as PIO1 later when we have the SPI implementation in place
-	{PIN_MCU2_SCK, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
-	// {PIN_MCU2_CS, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
-	{PIN_MCU2_CS, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_UART},	// UART for now
-	{PIN_MCU2_DIO, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+	// SPI on PIO1
+    // PIN_MCU2_SCK        (27) // MCU2 GPIO pin 26: PIN_SPI1_SCK
+    // PIN_MCU2_CS         (28) // MCU2 GPIO pin 29: PIN_SPI1_CS
+    // PIN_MCU2_DIO        (29) // MCU2 GPIO pin 28: PIN_SPI1_RX
+	{PIN_MCU2_SCK, GPIO_IN, true, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+	// {PIN_MCU2_SCK, GPIO_OUT, true, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO1}, // used when spi master
+	{PIN_MCU2_CS, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO1},
+	// {PIN_MCU2_CS, GPIO_OUT, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_UART},	// UART for now
+	{PIN_MCU2_DIO, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO1},
 };
 
 void mcu1_main(void)
 {
 	int count = 0;
-	// const int freq_khz = 133000;
-	const int freq_khz = 200000;
+	const int freq_khz = 133000;
+	// const int freq_khz = 200000;
 	// const int freq_khz = 210000;
 	// const int freq_khz = 220000;
 	// const int freq_khz = 230000;
@@ -76,9 +82,49 @@ void mcu1_main(void)
 
 	// Enable STDIO over USB
 	// stdio_usb_init();
-	stdio_async_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
+	//stdio_async_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
 
 	gpio_configure(mcu1_gpio_config, ARRAY_SIZE(mcu1_gpio_config));
+
+	// Setup PIO UART
+	pio_uart_inst_t uart_rx = {
+        .pio = pio1,
+        .sm = 0
+	};
+
+	pio_uart_inst_t uart_tx = {
+			.pio = pio1,
+			.sm = 1
+	};
+	//uint pioUartRXOffset = pio_add_program(uart_rx.pio, &uart_rx_program);
+	uint pioUartTXOffset = pio_add_program(uart_tx.pio, &uart_tx_program);
+
+	//uart_rx_program_init(uart_rx.pio, uart_rx.sm, pioUartRXOffset, PIN_MCU2_DIO, PIO_UART_BAUD_RATE);
+	uart_tx_program_init(uart_tx.pio, uart_tx.sm, pioUartTXOffset, PIN_MCU2_CS, PIO_UART_BAUD_RATE);
+
+	uint32_t BUFFER_SIZE = 8;
+	uint8_t writeBuffer[BUFFER_SIZE];
+	uint8_t readBuffer[BUFFER_SIZE];
+	//Test to send some characters using pio
+	writeBuffer[0] = 'H';
+	writeBuffer[1] = 'E';
+	writeBuffer[2] = 'L';
+	writeBuffer[3] = 'L';
+	writeBuffer[4] = 'O';
+	writeBuffer[5] = '\n';
+	writeBuffer[6] = 'Y';
+	writeBuffer[7] = 'E';
+	int lastWrite = 0;
+	while(1) {
+		int now = time_us_32();
+		if (now - lastWrite > 6000000) {
+			printf("writing data to pio spi...\n");
+			for (int i = 0; i < BUFFER_SIZE; i++) {
+				uart_tx_program_putc(uart_tx.pio, uart_tx.sm, writeBuffer[i]);
+			}
+			lastWrite = now;
+		}
+	}
 
 #if 0
 	int pin = PIN_N64_AD0;

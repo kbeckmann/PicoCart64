@@ -10,7 +10,7 @@
 
 #include "psram_inline.h"
 
-#define VERBOSE
+// #define VERBOSE
 
 void qspi_print_pull(void)
 {
