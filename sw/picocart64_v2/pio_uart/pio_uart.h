@@ -19,6 +19,7 @@ void pio_uart_init(irq_handler_t rx_handler, uint rxPin, uint txPin);
 void uart_tx_program_putc(char c);
 void uart_tx_program_puts(const char *s);
 char uart_rx_program_getc();
-char uart_rx_program_is_readable();
+bool uart_rx_program_is_readable();
+bool uart_tx_program_is_writable();
 
 #endif

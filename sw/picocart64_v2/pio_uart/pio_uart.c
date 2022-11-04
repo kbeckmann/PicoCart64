@@ -48,6 +48,10 @@ char uart_rx_program_getc() {
 }
 
 // If there is data in the rx fifo, then return true
-char uart_rx_program_is_readable() {
+bool uart_rx_program_is_readable() {
     return !pio_sm_is_rx_fifo_empty(uart_rx.pio, uart_rx.sm);
+}
+
+bool uart_tx_program_is_writable() {
+    return !pio_sm_is_tx_fifo_full(uart_tx.pio, uart_tx.sm);
 }

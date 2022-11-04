@@ -136,54 +136,17 @@ void main_task_entry(__unused void *params)
 {
 	int count = 0;
 
-	printf("[MCU2 Main] Hello\n");
-
-	// // Test PSRAM - write test pattern and read it back.
-	// psram_test();
-	// while (1) {
-	// 	printf("\n\n**** HALT \n");
-	// 	vTaskDelay(5 * 1000);
-	// }
-
-	// vTaskDelay(1000);
-
-	// Write 16 MB (takes a while)
-	// write_random_file("random.bin", 16 * 1024 * 1024);
-
-	// write_random_file("random.bin", 9 * 1024 * 1024);
-	// load_rom("random.bin");
-
-	//load_rom("testrom.z64");
-
-	// while (1) {
-	// 	vTaskDelay(5 * 1000);
-	// }
+	printf("MCU2 Main Entry\n");
 
 	// Setup PIO UART
-	pio_uart_init(on_uart_rx, PIN_SPI1_CS, PIN_SPI1_RX);
+	pio_uart_init(on_uart_rx_mcu2, PIN_SPI1_CS, PIN_SPI1_RX);
 
-	printf("Booting MCU1...\n");
 	// Boot MCU1
+	printf("Booting MCU1...\n");
 	gpio_put(PIN_MCU1_RUN, 1);
 
-	// uint32_t BUFFER_SIZE = 8;
-	// uint8_t writeBuffer[BUFFER_SIZE];
-	// uint8_t readBuffer[BUFFER_SIZE];
-	// int lastRead = 0;
-	// while(1) {
-	// 	int now = time_us_32();
-	// 	//if (now - lastRead > 3000000) {
-	// 		printf("\nReading pio uart...\n\n");
-				
-	// 		for(int i = 0; i < BUFFER_SIZE; i++) {
-	// 			char c = uart_rx_program_getc();
-	// 			printf("%c", c);
-	// 		}
-	// 		printf("\nFinished!\n");
-	// 		lastRead = now;
-	// 	//}
-		
-	// }
+	// Mount the SD card
+	mount_sd();
 
 	while (true) {
 		count++;

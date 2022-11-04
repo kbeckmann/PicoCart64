@@ -17,6 +17,8 @@
 #include "mcu2.h"
 #include "qspi_helper.h"
 
+#include "sdcard/internal_sd_card.h"
+
 #define PIN_ID    (26)
 #define MCU1_ID   ( 1)
 #define MCU2_ID   ( 2)
@@ -60,6 +62,7 @@ int main(void)
 
 	// mcu_id will be 1 for MCU1, and 2 for MCU2.
 	int mcu_id = gpio_get(PIN_ID) + 1;
+	PC64_MCU_ID = mcu_id;
 
 	// Turn off SSI
 	ssi_hw->ssienr = 0;

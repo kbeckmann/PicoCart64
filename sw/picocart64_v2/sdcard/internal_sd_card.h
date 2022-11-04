@@ -13,14 +13,7 @@
 
 #define SD_CARD_SECTOR_SIZE 512 // 512 bytes
 
-/* Results of Disk Functions */
-typedef enum {
-	RES_OK = 0,		/* 0: Successful */
-	RES_ERROR,		/* 1: R/W Error */
-	RES_WRPRT,		/* 2: Write Protected */
-	RES_NOTRDY,		/* 3: Not Ready */
-	RES_PARERR		/* 4: Invalid Parameter */
-} DRESULT;
+extern int PC64_MCU_ID;
 
 // UART TX buffer
 extern uint16_t pc64_uart_tx_buf[PC64_BASE_ADDRESS_LENGTH];
@@ -40,4 +33,11 @@ void pc64_send_sd_read_command(void);
 
 bool is_sd_busy();
 
-void on_uart_rx(void);
+// UART RX methods, unique per MCU
+void on_uart_rx_mcu1(void);
+void on_uart_rx_mcu2(void);
+// Internal method that is called once MCU2 has data ready to return MCU1
+void send_data(uint32_t sector, uint32_t sectorCount);
+
+// SD Card functions
+void mount_sd(void);

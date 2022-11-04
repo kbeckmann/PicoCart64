@@ -83,12 +83,12 @@ void mcu1_main(void)
 
 	// Enable STDIO over USB
 	// stdio_usb_init();
-	//stdio_async_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
+	// stdio_async_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
 
 	gpio_configure(mcu1_gpio_config, ARRAY_SIZE(mcu1_gpio_config));
 
 	// Setup PIO UART
-	pio_uart_init(on_uart_rx, PIN_MCU2_DIO, PIN_MCU2_CS);
+	pio_uart_init(on_uart_rx_mcu1, PIN_MCU2_DIO, PIN_MCU2_CS);
 	
 	// uint32_t BUFFER_SIZE = 6;
 	// uint8_t writeBuffer[BUFFER_SIZE];
@@ -204,7 +204,7 @@ void mcu1_main(void)
 	// Set up ROM mapping table
 	if (memcmp(picocart_header, "picocartcompress", 16) == 0) {
 		// Copy rom compressed map from flash into RAM
-		uart_tx_program_puts("Found a compressed ROM\n");
+		// uart_tx_program_puts("Found a compressed ROM\n");
 		memcpy(rom_mapping, flash_rom_mapping, MAPPING_TABLE_LEN * sizeof(uint16_t));
 	} else {
 		for (int i = 0; i < MAPPING_TABLE_LEN; i++) {

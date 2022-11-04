@@ -24,6 +24,8 @@
 #include "stdio_async_uart.h"
 #include "utils.h"
 
+#include "sdcard/internal_sd_card.h"
+
 // The rom to load in normal .z64, big endian, format
 #include "rom_vars.h"
 #include "rom.h"
@@ -39,7 +41,7 @@ static const uint16_t *rom_file_16 = (uint16_t *) rom_chunks;
 RINGBUF_CREATE(ringbuf, 64, uint32_t);
 
 // UART TX buffer
-static uint16_t pc64_uart_tx_buf[PC64_BASE_ADDRESS_LENGTH];
+//static uint16_t pc64_uart_tx_buf[PC64_BASE_ADDRESS_LENGTH];
 
 static inline uint32_t resolve_sram_address(uint32_t address)
 {
@@ -206,12 +208,6 @@ void n64_pi_run(void)
 				uint32_t chunk_index = rom_mapping[(last_addr & 0xFFFFFF) >> COMPRESSION_SHIFT_AMOUNT];
 				const uint16_t *chunk_16 = (const uint16_t *)rom_chunks[chunk_index];
 				next_word = chunk_16[(last_addr & COMPRESSION_MASK) >> 1];
-
-				// uart_tx_program_putc((next_word & 0xFF000000) >> 24);
-				// uart_tx_program_putc((next_word & 0x00FF0000) >> 16);
-				// uart_tx_program_putc((next_word & 0x0000FF00) >> 8);
-				// uart_tx_program_putc((next_word & 0x000000FF));
-				// uart_tx_program_putc('\n');
 #else
 				next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
 #endif
@@ -336,6 +332,9 @@ void n64_pi_run(void)
 					case PC64_REGISTER_MAGIC:
 						next_word = PC64_MAGIC;
 						break;
+					case PC64_REGISTER_SD_BUSY:
+						next_word = is_sd_busy() ? 0x00000001 : 0x00000000;
+					break;
 					default:
 						next_word = 0;
 					}
@@ -358,20 +357,51 @@ void n64_pi_run(void)
 
 					// Read two 16-bit half-words and merge them to a 32-bit value
 					uint32_t write_word = addr & 0xFFFF0000;
-					write_word |= n64_pi_get_value(pio) >> 16;
+					uint addr_advance = 4;
 
 					switch (last_addr - PC64_CIBASE_ADDRESS_START) {
 					case PC64_REGISTER_UART_TX:
+						write_word |= n64_pi_get_value(pio) >> 16;
 						stdio_uart_out_chars((const char *)pc64_uart_tx_buf, write_word & (sizeof(pc64_uart_tx_buf) - 1));
 						break;
+
 					case PC64_REGISTER_RAND_SEED:
+						write_word |= n64_pi_get_value(pio) >> 16;
 						pc64_rand_seed(write_word);
 						break;
+
+					case PC64_COMMAND_SD_READ:
+						write_word |= n64_pi_get_value(pio) >> 16;
+						pc64_send_sd_read_command();
+						break;
+
+					case PC64_REGISTER_SD_READ_SECTOR0:
+						addr_advance = 2;
+						pc64_set_sd_read_sector_part(0, write_word);
+						break;
+					case PC64_REGISTER_SD_READ_SECTOR1:
+						addr_advance = 2;
+						pc64_set_sd_read_sector_part(1, write_word);
+						break;
+					case PC64_REGISTER_SD_READ_SECTOR2:
+						addr_advance = 2;
+						pc64_set_sd_read_sector_part(2, write_word);
+						break;
+					case PC64_REGISTER_SD_READ_SECTOR3:
+						addr_advance = 2;
+						pc64_set_sd_read_sector_part(3, write_word);
+						break;
+
+					case PC64_REGISTER_SD_READ_NUM_SECTORS:
+						write_word |= n64_pi_get_value(pio) >> 16;
+						pc64_set_sd_read_sector_count(write_word);
+						break;
+
 					default:
 						break;
 					}
 
-					last_addr += 4;
+					last_addr += addr_advance;
 				} else {
 					// New address
 					break;
