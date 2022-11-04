@@ -70,8 +70,8 @@ static const gpio_config_t mcu1_gpio_config[] = {
 void mcu1_main(void)
 {
 	int count = 0;
-	// const int freq_khz = 133000;
-	const int freq_khz = 200000;
+	const int freq_khz = 133000;
+	// const int freq_khz = 200000;
 	// const int freq_khz = 210000;
 	// const int freq_khz = 220000;
 	// const int freq_khz = 230000;
@@ -128,9 +128,9 @@ void mcu1_main(void)
 	// gpio_set_pulls(PIN_N64_SI_DAT, true, false);
 	// gpio_set_pulls(PIN_N64_INT1, true, false);
 
-	printf("Hello, world! I am MCU 1 @%d kHz. Reset reason: 0x%08lX\n", freq_khz, get_reset_reason());
+	//printf("Hello, world! I am MCU 1 @%d kHz. Reset reason: 0x%08lX\n", freq_khz, get_reset_reason());
 
-	sleep_ms(100);
+	//sleep_ms(100);
 
 #if 0
 	while (true) {
@@ -144,7 +144,7 @@ void mcu1_main(void)
 	qspi_oeover_normal(true);
 	ssi_hw->ssienr = 1;
 
-	sleep_ms(10);
+	// sleep_ms(10);
 
 #if 0
 	const uint32_t *data = (const uint32_t *)0x10000000;
@@ -157,7 +157,7 @@ void mcu1_main(void)
 	}
 #endif
 
-	qspi_print_pull();
+	// qspi_print_pull();
 
 #if 0
 	while (true) {
@@ -204,7 +204,7 @@ void mcu1_main(void)
 	// Set up ROM mapping table
 	if (memcmp(picocart_header, "picocartcompress", 16) == 0) {
 		// Copy rom compressed map from flash into RAM
-		printf("Found a compressed ROM\n");
+		uart_tx_program_puts("Found a compressed ROM\n");
 		memcpy(rom_mapping, flash_rom_mapping, MAPPING_TABLE_LEN * sizeof(uint16_t));
 	} else {
 		for (int i = 0; i < MAPPING_TABLE_LEN; i++) {

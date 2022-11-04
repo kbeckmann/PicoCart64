@@ -65,7 +65,11 @@ static inline uint32_t n64_pi_get_value(PIO pio)
 #if 0
 	ringbuf_add(ringbuf, value);
 #elif 0
-	uart_print_hex_u32(value);
+	uart_tx_program_putc((value & 0xFF000000) >> 24);
+	uart_tx_program_putc((value & 0x00FF0000) >> 16);
+	uart_tx_program_putc((value & 0x0000FF00) >> 8);
+	uart_tx_program_putc((value & 0x000000FF));
+	uart_tx_program_putc('\n');
 #endif
 
 	return value;
@@ -155,6 +159,7 @@ void n64_pi_run(void)
 			uint32_t chunk_index = rom_mapping[(last_addr & 0xFFFFFF) >> COMPRESSION_SHIFT_AMOUNT];
 			const uint16_t *chunk_16 = (const uint16_t *)rom_chunks[chunk_index];
 			next_word = chunk_16[(last_addr & COMPRESSION_MASK) >> 1];
+			
 #else
 			next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
 #endif
@@ -201,6 +206,12 @@ void n64_pi_run(void)
 				uint32_t chunk_index = rom_mapping[(last_addr & 0xFFFFFF) >> COMPRESSION_SHIFT_AMOUNT];
 				const uint16_t *chunk_16 = (const uint16_t *)rom_chunks[chunk_index];
 				next_word = chunk_16[(last_addr & COMPRESSION_MASK) >> 1];
+
+				// uart_tx_program_putc((next_word & 0xFF000000) >> 24);
+				// uart_tx_program_putc((next_word & 0x00FF0000) >> 16);
+				// uart_tx_program_putc((next_word & 0x0000FF00) >> 8);
+				// uart_tx_program_putc((next_word & 0x000000FF));
+				// uart_tx_program_putc('\n');
 #else
 				next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
 #endif

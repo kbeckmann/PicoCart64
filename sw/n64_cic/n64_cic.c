@@ -185,6 +185,7 @@ static void WriteBit(unsigned char b)
 		gpio_set_dir(pin_dio, GPIO_OUT);
 		gpio_put(pin_dio, 0);
 	}
+
 	// wait for DCLK to go high
 	do {
 		vin = gpio_get(pin_dclk);
@@ -508,8 +509,6 @@ void n64_cic_run(uint8_t _pin_cr, uint8_t _pin_dclk, uint8_t _pin_dio)
 		YIELD();
 	}
 
-	printf("let's go!\n");
-
 	// read the region setting
 	isPal = GET_REGION();
 
@@ -518,7 +517,6 @@ void n64_cic_run(uint8_t _pin_cr, uint8_t _pin_dclk, uint8_t _pin_dio)
 	if (isPal) {
 		hello |= 0x4;
 	}
-	// printf("W: %02X\n", hello);
 	WriteNibble(hello);
 
 	// encode and send the seed
@@ -540,6 +538,7 @@ void n64_cic_run(uint8_t _pin_cr, uint8_t _pin_dclk, uint8_t _pin_dio)
 		unsigned char cmd = 0;
 		cmd |= (ReadBit() << 1);
 		cmd |= ReadBit();
+
 		switch (cmd) {
 		case 0:
 			// 00 (compare)

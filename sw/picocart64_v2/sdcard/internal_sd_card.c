@@ -91,8 +91,11 @@ bool mightBeFinished = false;
 void on_uart_rx(void) {
     while (uart_rx_program_is_readable()) {
         char ch = uart_rx_program_getc();
-
-        printf("%c", ch);
+        if (ch == '\n') {
+            printf("%c", ch);
+        } else {
+            printf("%x ", ch);
+        }
 
         pc64_uart_tx_buf[bufferIndex++] = ch;
 
