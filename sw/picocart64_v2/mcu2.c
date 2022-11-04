@@ -148,8 +148,26 @@ void main_task_entry(__unused void *params)
 	// Mount the SD card
 	mount_sd();
 
+	int t = time_us_32();
+	int bc = 0;
 	while (true) {
-		count++;
+		tight_loop_contents();
+
+		if(sendDataReady) {
+			printf("Calling send_sd_card_data\n");
+			send_sd_card_data();
+		}
+
+		// if (time_us_32() - t > 1000000) {
+		// 	printf(".");
+		// 	bc++;
+		// 	t = time_us_32();
+
+		// 	if (bc >= 10) {
+		// 		printf("\n");
+		// 		bc = 0;
+		// 	} 
+		// }
 
 #if 0
 		printf("----------------------------------------\n");
@@ -159,8 +177,6 @@ void main_task_entry(__unused void *params)
 		printf("Stack usage esp32_task: %d bytes\n", ESP32_TASK_STACK_SIZE - uxTaskGetStackHighWaterMark((TaskHandle_t) & esp32_task));
 		printf("----------------------------------------\n\n");
 #endif
-
-		vTaskDelay(1000);
 	}
 }
 

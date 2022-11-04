@@ -333,7 +333,7 @@ void n64_pi_run(void)
 						next_word = PC64_MAGIC;
 						break;
 					case PC64_REGISTER_SD_BUSY:
-						next_word = is_sd_busy() ? 0x00000001 : 0x00000000;
+						next_word = is_sd_busy() ? 0x1 : 0x0;
 					break;
 					default:
 						next_word = 0;
@@ -362,7 +362,7 @@ void n64_pi_run(void)
 					switch (last_addr - PC64_CIBASE_ADDRESS_START) {
 					case PC64_REGISTER_UART_TX:
 						write_word |= n64_pi_get_value(pio) >> 16;
-						stdio_uart_out_chars((const char *)pc64_uart_tx_buf, write_word & (sizeof(pc64_uart_tx_buf) - 1));
+						//stdio_uart_out_chars((const char *)pc64_uart_tx_buf, write_word & (sizeof(pc64_uart_tx_buf) - 1));
 						break;
 
 					case PC64_REGISTER_RAND_SEED:
