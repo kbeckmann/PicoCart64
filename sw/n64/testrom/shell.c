@@ -42,6 +42,17 @@ color_t MENU_BAR_COLOR = { .r = 0x82, .g = 0x00, .b = 0x2E, .a = 0x00 }; // 0x82
 color_t BOTTOM_BAR_COLOR = { .r = 0x00, .g = 0x67, .b = 0xC7, .a = 0x55 }; // 0x82002E, Berry
 color_t SELECTION_COLOR = { .r = 0x00, .g = 0x67, .b = 0xC7, .a = 0x00 }; // 0x0067C7, Bright Blue
 
+void waitForStart() {
+    printf("Start to continue...\n");
+    while (true) {
+            controller_scan();
+            struct controller_data keys = get_keys_pressed();
+            if (keys.c[0].start) {
+                break;
+            }
+    }
+}
+
 /* Assume default font size*/
 static int calculate_num_rows_per_page(void) {
     // ---top of screen---
@@ -135,14 +146,24 @@ int ls(char** file_list, const char *dir) {
     //     p_dir = cwdbuf;
     // }
     // printf("Directory Listing: %s\n", p_dir);
+
+    printf("memset stuff for ls\n");
+    waitForStart();
+
     DIR dj;      /* Directory object */
     FILINFO fno; /* File information */
     memset(&dj, 0, sizeof dj);
     memset(&fno, 0, sizeof fno);
+    printf("f_findfirst\n");
+    waitForStart();
     fr = f_findfirst(&dj, &fno, p_dir, "*");
+
+    printf("f_findfirst finished\n");
+    waitForStart();
     
     if (FR_OK != fr) {
         printf("f_findfirst error: (%d)\n", fr);
+        waitForStart();
         return 0;
     }
 	int num_entries = 0;
@@ -163,8 +184,17 @@ int ls(char** file_list, const char *dir) {
         }
         /* Create a string that includes the file name, the file size and the
          attributes string. */
+        printf("print attributes\n");
+        waitForStart();
+
         printf("%s [%s] [size=%llu]\n", fno.fname, pcAttrib, fno.fsize);
-		sprintf(file_list[num_entries++], "%s [size=%llu]\n", fno.fname, fno.fsize);
+
+        // printf("sprintf stuff\n");
+        // waitForStart();
+		// sprintf(file_list[num_entries++], "%s [size=%llu]\n", fno.fname, fno.fsize);
+
+        // printf("attributes printed\n");
+        // waitForStart();
 
         fr = f_findnext(&dj, &fno); /* Search for next item */
     }
@@ -209,14 +239,20 @@ static void show_list(void)
 	// 	"Final Fight 64 (JPN).n64",
 	// };
 
-	char *entries[256];
     printf("Reading SD card...\n");
+    waitForStart();
+
+    char *entries[256];
 	NUM_ENTRIES = ls(entries, "/");
 
-    for (int i = 0; i < 50; i++) {
-        printf(".");
-        wait_ms(100);
-    }
+    // for (int i = 0; i < 50; i++) {
+    //     printf(".");
+    //     wait_ms(100);
+    // }
+
+    waitForStart();
+
+    display_init(RESOLUTION_512x240, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE);
 
 	int currently_selected = 0;
 	int first_visible = 0;
@@ -268,17 +304,19 @@ static void show_list(void)
 }
 
 static void init_sprites(void) {
+    printf("init sprites\n");
     int fp = dfs_open("/a_button_icon.sprite");
     a_button_icon = malloc( dfs_size( fp ) );
     dfs_read( a_button_icon, 1, dfs_size( fp ), fp );
     dfs_close( fp );
+    printf("done!\n");
 
     //api_write_raw_button_icon = read_sprite( "rom://a_button_icon.sprite" );
 }
 
 void start_shell(void) {
     /* Init the screen, controller, and filesystem */
-    display_init(RESOLUTION_512x240, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE);
+    // display_init(RESOLUTION_512x240, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE);
     // display_init(RESOLUTION_512x480, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE); // jitters in cen64
     controller_init();
     
@@ -289,11 +327,25 @@ void start_shell(void) {
     } else {
         printf("Initing sd access");
         wait_ms( 100 );
+
 		// Try to init the sd card
-		if (!debug_init_sdfs("sd:/", -1)) {
-			printf("Unable to access SD Card on Picocart64.\n");
-            wait_ms(5000);
-		}
+        if (!debug_init_sdfs("sd:/", -1)) {
+            printf("Unable to access SD Card on Picocart64.\n");
+        } else {
+            printf("\nSUCCESS!!\n");
+        }
+
+        printf("Press START to load The Shell.\n");
+        while (true) {
+            controller_scan();
+            struct controller_data keys = get_keys_pressed();
+            if (keys.c[0].start) {
+                break;
+            }
+        }
+        console_clear();
+
+        waitForStart();
 
         /* Load sprites for shell from the filesystem */
         init_sprites();

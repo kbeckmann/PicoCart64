@@ -27,7 +27,7 @@ void pio_uart_init(irq_handler_t rx_handler, uint rxPin, uint txPin) {
     // Finally, set irq for rx
     irq_set_exclusive_handler(PIO1_IRQ_0, rx_handler);
 	pio_set_irq0_source_enabled(pio1, pis_sm0_rx_fifo_not_empty, true);
-    irq_set_enabled(PIO1_IRQ_0, true);   
+    irq_set_enabled(PIO1_IRQ_0, true);  
 }
 
 void uart_tx_program_putc(char c) {

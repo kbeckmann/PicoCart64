@@ -33,6 +33,8 @@
 #define COMMAND_SD_WRITE 0x77 // literally the w char
 #define DISK_READ_BUFFER_SIZE 512
 
+#define PRINT_BUFFER_AFTER_SEND 0
+
 int PC64_MCU_ID = -1;
 
 volatile int bufferIndex = 0; // Used on MCU1 to track where to put the next byte received from MCU2
@@ -167,7 +169,7 @@ void on_uart_rx_mcu2() {
     while (uart_rx_program_is_readable()) {
         char ch = uart_rx_program_getc();
         
-        printf("%x ", ch);
+        printf("%02x ", ch);
         if (ch == 0xAA) {
             printf("\n");
         }
@@ -248,16 +250,15 @@ void send_data(uint64_t sector, uint32_t sectorCount) {
     // Repeat if we are reading more than 1 sector
     } while(sectorCount > 1);
 
-    // uart_tx_program_putc(COMMAND_FINISH);
-    // uart_tx_program_putc(COMMAND_FINISH2);    
-
     printf("Sent %d sectors starting at Sector %ld\n", loopCount, sector);
 
-    // printf("buffer: \n");
-    // for (uint diskBufferIndex = 0; diskBufferIndex < DISK_READ_BUFFER_SIZE; diskBufferIndex++) {
-    //         printf("%x ", diskReadBuffer[diskBufferIndex]);
-    //     }
-    // printf("\n");
+    #if PRINT_BUFFER_AFTER_SEND == 1
+        printf("buffer for sector: %ld\n", sector);
+        for (uint diskBufferIndex = 0; diskBufferIndex < DISK_READ_BUFFER_SIZE; diskBufferIndex++) {
+                printf("%02x ", diskReadBuffer[diskBufferIndex]);
+            }
+        printf("\n");
+    #endif
 }
 
 void send_sd_card_data() {
@@ -265,6 +266,7 @@ void send_sd_card_data() {
     sendDataReady = false; 
 
     // Send the data over uart back to MCU1 so the rom can read it
+    uint64_t s = sectorToSend;
     send_data(sectorToSend, 1);
 
     // Reset our other variables

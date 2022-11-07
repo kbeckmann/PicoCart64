@@ -213,9 +213,33 @@ void mcu1_main(void)
 	}
 
 	// Put something in this array for sanity testing
-	for(int i = 0; i < 128; i++) {
+	for(int i = 0; i < 512; i++) {
 		pc64_uart_tx_buf[i] = 0xFFFF - i;
 	}
+
+	// THIS COMMENTED OUT CODE WILL ECHO BACK DATA SENT FROM MCU2
+	// busy_wait_ms(2000);
+	// uint64_t s = 2048;
+	// pc64_set_sd_read_sector(s);
+	// pc64_send_sd_read_command();
+
+	// bool hasPrinted = false;
+	// while(1) {
+	// 	tight_loop_contents();
+
+	// 	if (!sd_is_busy) {
+	// 		if (!hasPrinted) {
+	// 			hasPrinted = true;
+	// 			for(int i = 0; i < 256; i++) {
+	// 				uint16_t value = pc64_uart_tx_buf[i];
+	// 				uart_tx_program_putc(value >> 8);
+	// 				uart_tx_program_putc(value);
+					
+	// 				busy_wait_ms(10);
+	// 			}
+	// 		}
+	// 	}
+	// }
 
 	n64_pi_run();
 

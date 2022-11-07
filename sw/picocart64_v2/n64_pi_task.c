@@ -40,7 +40,6 @@ static const uint16_t *rom_file_16 = (uint16_t *) rom_chunks;
 #endif
 
 RINGBUF_CREATE(ringbuf, 64, uint32_t);
-
 // UART TX buffer
 //static uint16_t pc64_uart_tx_buf[PC64_BASE_ADDRESS_LENGTH];
 
@@ -365,40 +364,30 @@ void n64_pi_run(void)
 
 				if (addr == 0) {
 					// READ
-				switch (last_addr - PC64_CIBASE_ADDRESS_START) {
-				case PC64_REGISTER_MAGIC:
-					next_word = PC64_MAGIC;
+					switch (last_addr - PC64_CIBASE_ADDRESS_START) {
+					case PC64_REGISTER_MAGIC:
+						next_word = PC64_MAGIC;
 
-					// Write as a 32-bit word
-					pio_sm_put(pio, 0, next_word >> 16);
-					last_addr += 2;
-					// Get the next command/address
-					addr = n64_pi_get_value(pio);
-					if (addr != 0) {
-						continue;
-					}
-
-					pio_sm_put(pio, 0, next_word & 0xFFFF);
-
-					break;
-				case PC64_REGISTER_SD_BUSY:
-				uart_tx_program_putc(0xAF);
-					next_word = sd_is_busy ? 0x1 : 0x0;
-					pio_sm_put(pio, 0, next_word >> 16);
-
-					if (!next_word) {
-						uart_tx_program_putc(0xFD);
-						for (int i = 0; i < 256; i++) {
-							uart_tx_program_putc(pc64_uart_tx_buf[i] >> 16);
-							uart_tx_program_putc(pc64_uart_tx_buf[i] & 0x00FF);
+						// Write as a 32-bit word
+						pio_sm_put(pio, 0, next_word >> 16);
+						last_addr += 2;
+						// Get the next command/address
+						addr = n64_pi_get_value(pio);
+						if (addr != 0) {
+							continue;
 						}
-						uart_tx_program_putc(0xAA);
+
+						pio_sm_put(pio, 0, next_word & 0xFFFF);
+
+						break;
+					case PC64_REGISTER_SD_BUSY:
+						next_word = sd_is_busy ? 0x00000001 : 0x00000000;
+						pio_sm_put(pio, 0, next_word);
+						
+						break;
+					default:
+						next_word = 0;
 					}
-					
-					break;
-				default:
-					next_word = 0;
-				}
 
 					// if (addr != 0) {
 					// 	// Handle 16-bit reads even if we shouldn't get them here.
