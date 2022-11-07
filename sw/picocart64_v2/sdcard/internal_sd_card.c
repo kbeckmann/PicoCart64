@@ -126,34 +126,33 @@ void pc64_send_sd_read_command(void) {
 // }
 
 // MCU1 will rx data from MCU2, this is SD card data
+static char lastBufChar = 0;
+volatile int rx_character_index = 0;
 void on_uart_rx_mcu1() {
     while (uart_rx_program_is_readable()) {
         char ch = uart_rx_program_getc();
 
-        // Only buffer data if the sd card is marked as busy
-        //if (sd_is_busy && bufferIndex < PC64_BASE_ADDRESS_LENGTH) {
-        tight_loop_contents();
-        pc64_uart_tx_buf[bufferIndex++] = ch;
-        //}
-
-        if (bufferIndex >= DISK_READ_BUFFER_SIZE - 1) {
-            //bufferIndex = 0;
-            sd_is_busy = false;
+        // Combine two char values into a 16 bit value
+        // Only increment bufferIndex when adding a value
+        // else, store the ch into the holding field
+        if (rx_character_index % 2 == 1) {
+            uint16_t value = lastBufChar << 8 | ch;
+            pc64_uart_tx_buf[bufferIndex] = value;
+            bufferIndex += 1;
+        } else {
+            lastBufChar = ch;
         }
 
-        // if (ch == COMMAND_FINISH && bufferIndex >= 500) {
-        //     mightBeFinished = true;
-        // } else if (mightBeFinished && ch == COMMAND_FINISH2) {
-        //     bufferIndex = 0;
-        //     sd_is_busy = false;
-        //     mightBeFinished = false;
-        // }
-
-        // // Once we have recieved sd card data for the block, mark it as not busy
-        // if (bufferIndex >= SD_CARD_SECTOR_SIZE) {
-        //     bufferIndex = 0;
-        //     sd_is_busy = false;
-        // }
+        // always increment this value
+        rx_character_index++;
+        
+        // We expect characters = DISK_READ_BUFFER_SIZE, as we are sending values as 8bit chars.
+        // So we are done once we have read DISK_READ_BUFFER_SIZE characters.
+        if (rx_character_index >= DISK_READ_BUFFER_SIZE) {
+            bufferIndex = 0;
+            rx_character_index = 0;
+            sd_is_busy = false;
+        }
     }
 }
 
@@ -228,8 +227,9 @@ void send_data(uint64_t sector, uint32_t sectorCount) {
         loopCount++;
         // read 1 sector at a time
         // assume 512 byte sectors
-        DRESULT dr = disk_read(0, diskReadBuffer, sector, 1);
         // DRESULT dr = sd_read_blocks(pSD, diskReadBuffer, sector, 1);
+        DRESULT dr = disk_read(0, diskReadBuffer, sector, 1);
+        
         if (dr != RES_OK) {
             printf("Error reading disk: %d\n", dr);
         } 
@@ -237,14 +237,13 @@ void send_data(uint64_t sector, uint32_t sectorCount) {
         sectorCount--;
 
         // Send sector worth of data
-        for (uint diskBufferIndex = 0; diskBufferIndex < DISK_READ_BUFFER_SIZE; diskBufferIndex++) {
+        for (int diskBufferIndex = 0; diskBufferIndex < DISK_READ_BUFFER_SIZE; diskBufferIndex++) {
             // wait until uart is writable
             while (!uart_tx_program_is_writable()) {
                 tight_loop_contents();
             }
 
-            uart_tx_program_putc(0x99);
-            //uart_tx_program_putc(diskReadBuffer[diskBufferIndex]);
+            uart_tx_program_putc(diskReadBuffer[diskBufferIndex]);
         }
     // Repeat if we are reading more than 1 sector
     } while(sectorCount > 1);
@@ -265,10 +264,8 @@ void send_sd_card_data() {
     // Reset send data flag
     sendDataReady = false; 
 
-    uint64_t s = sectorToSend;
-    uint32_t n = numSectorsToSend;
     // Send the data over uart back to MCU1 so the rom can read it
-    send_data(s, n);
+    send_data(sectorToSend, 1);
 
     // Reset our other variables
     //sectorToSend = 0;
@@ -292,6 +289,17 @@ static FATFS *sd_get_fs_by_name(const char *name) {
 
 void mount_sd(void) {
     printf("Mounting SD Card\n");
+
+    for (int i = 0; i < 512; i++) {
+        
+        if (i == 511) {
+            diskReadBuffer[i] == 0xBB;
+        } else if (i == 0) {
+            diskReadBuffer[i] = 0xFF;
+        } else {
+            diskReadBuffer[i] = 0x01;
+        }
+    }
 
     // // See FatFs - Generic FAT Filesystem Module, "Application Interface",
 	// // http://elm-chan.org/fsw/ff/00index_e.html

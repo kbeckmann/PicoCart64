@@ -56,8 +56,8 @@ static uint8_t pc64_sd_wait() {
 // 	// pi_write_raw(buf, base, offset, sizeof(buf));
 // }
 
-uint32_t SECTOR_READ_SIZE = 16;
-void test_tx_buffer_read(uint8_t *buff, uint64_t sector) {
+uint32_t SECTOR_READ_SIZE = 32;
+void test_tx_buffer_read(uint8_t *buff, uint64_t sector, uint32_t dmaReadSize) {
 
 	uint64_t current_sector = sector;
 	uint16_t part0[] = { (current_sector & 0xFFFF000000000000LL) >> 48 };
@@ -88,23 +88,87 @@ void test_tx_buffer_read(uint8_t *buff, uint64_t sector) {
 
 	// wait for the sd card to finish
 	if(pc64_sd_wait() == 0) {
-		printf("\nsizeof(buff) again1 %d\n", sizeof(buff));
-		// data_cache_hit_writeback_invalidate(buff, sizeof(buff));
-		pi_read_raw(buff, PC64_BASE_ADDRESS_START, 0, sizeof(buff));
+		printf("\nDMA size of(%ld)\n", dmaReadSize);
+		data_cache_hit_writeback_invalidate(buff, dmaReadSize/2);
+		pi_read_raw(buff, PC64_BASE_ADDRESS_START, 0, dmaReadSize/2);
 		
-		// dump the contents
-		for (int k = 0; k < sizeof(buff); k++) {
+		// // dump the contents
+		for (int k = 0; k < dmaReadSize; k++) {
 			printf("%x ", buff[k]);
 		}
 
 		printf("\nRead with dma?\n");
-		dma_read_raw_async(buff, PC64_BASE_ADDRESS_START, sizeof(buff));
+		data_cache_hit_writeback_invalidate(buff, dmaReadSize);
+		dma_read_raw_async(buff, PC64_BASE_ADDRESS_START, dmaReadSize);
 		// dump the contents
-		for (int k = 0; k < sizeof(buff); k++) {
+		for (int k = 0; k < dmaReadSize; k++) {
 			printf("%x ", buff[k]);
 		}
 
+		// data_cache_hit_writeback_invalidate(buff, dmaReadSize/2);
+    	// dma_read_raw_async(buff, PC64_BASE_ADDRESS_START, dmaReadSize/2);
+    	// dma_wait();
+
+		// for (int k = 0; k < dmaReadSize; k++) {
+		// 	printf("%x ", buff[k]);
+		// }
+
 		printf("\nread of sector %lld finished\n", current_sector);
+	} else {
+		printf("\nwait timeout\n");
+	}
+}
+
+void test_tx_buffer_read16(uint16_t *buff, uint64_t sector, uint32_t dmaReadSize) {
+
+	uint64_t current_sector = sector;
+	uint16_t part0[] = { (current_sector & 0xFFFF000000000000LL) >> 48 };
+	uint16_t part1[] = { (current_sector & 0x0000FFFF00000000LL) >> 32 };
+	uint16_t part2[] = { (current_sector & 0x00000000FFFF0000LL) >> 16 };
+	uint16_t part3[] = { current_sector &  0x000000000000FFFFLL }; 
+	
+	// send sector
+	data_cache_hit_writeback_invalidate(part0, sizeof(part0));
+	pi_write_raw(part0, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_READ_SECTOR0, sizeof(part0));
+	
+	data_cache_hit_writeback_invalidate(part1, sizeof(part1));
+	pi_write_raw(part1, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_READ_SECTOR1, sizeof(part1));
+	
+	data_cache_hit_writeback_invalidate(part2, sizeof(part2));
+	pi_write_raw(part2, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_READ_SECTOR2, sizeof(part2));
+	
+	data_cache_hit_writeback_invalidate(part3, sizeof(part3));
+	pi_write_raw(part3, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_READ_SECTOR3, sizeof(part3));
+
+	uint32_t buf2[] = { 1 };
+	data_cache_hit_writeback_invalidate(buf2, sizeof(buf2));
+	pi_write_raw(buf2, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_READ_NUM_SECTORS, sizeof(buf2));
+
+	uint32_t buf3[] = { 1 };
+	data_cache_hit_writeback_invalidate(buf3, sizeof(buf3));
+	pi_write_raw(buf3, PC64_CIBASE_ADDRESS_START, PC64_COMMAND_SD_READ, sizeof(buf3));
+
+	// wait for the sd card to finish
+	if(pc64_sd_wait() == 0) {
+		printf("\nDMA size of(%ld) buff16\n", dmaReadSize);
+		data_cache_hit_writeback_invalidate(buff, dmaReadSize);
+		pi_read_raw(buff, PC64_BASE_ADDRESS_START, 0, dmaReadSize);
+
+		for (int k = 0; k < dmaReadSize; k++) {
+			if (k % 28 == 0 && k != 0) {
+				printf("\n");
+			}
+			printf("%x ", buff[k]);
+		}
+		printf("\n");
+
+		// printf("\nRead with dma\n");
+		// data_cache_hit_writeback_invalidate(buff, dmaReadSize * 4);
+		// dma_read_raw_async(buff, PC64_BASE_ADDRESS_START, dmaReadSize*4);
+		// // dump the contents
+		// for (int k = 0; k < dmaReadSize; k++) {
+		// 	printf("%x ", buff[k]);
+		// }
 	} else {
 		printf("\nwait timeout\n");
 	}
@@ -120,6 +184,8 @@ int main(void)
 
 	display_init(RESOLUTION_320x240, DEPTH_32_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
 	console_init();
+	console_set_render_mode(RENDER_AUTOMATIC);
+	controller_init();
 	// debug_init_isviewer();
 
 	printf("PicoCart64 Test ROM (git rev %08X)\n\n", GIT_REV);
@@ -248,36 +314,177 @@ int main(void)
 		printf("       PicoCart64 might stall now and require a power cycle.\n");
 	}
 
+	console_clear();	
+    
 	// uint32_t w_buf[] = { 1 };
 	// pc_pi_write_raw(w_buf, PC64_BASE_ADDRESS_START, PC64_COMMAND_SD_READ, sizeof(buf2));
 	printf("Test SD Read Buffer\n");	
 	// for(uint64_t i = 0; i < 16; i++) {
 
 	uint64_t sectorToRead = 0;
-	uint8_t __attribute__((aligned(16))) buff[SECTOR_READ_SIZE];
-
-	// Populate with something other than 0s
-	for(int i = 0; i < SECTOR_READ_SIZE; i++) {
-		buff[i] = (char)i;
-	}
-	printf("\nsizeof(buff)=%d\n", sizeof(buff));
+	// uint8_t __attribute__((aligned(8))) buff[1024];
+	uint16_t __attribute__((aligned(8))) buff16[256];
 
 	// Try to populate the buffer with sd card data
-	test_tx_buffer_read(buff, sectorToRead);
+	// c = 0x00;
+	// test_tx_buffer_read(buff, sectorToRead, 32);
+	// for(int i = 0; i < 1024; i++) {
+	// 	buff[i] = c;
+	// 	if (i % 8 == 1) {
+	// 		c++;
+	// 	}
+	// }
 
+	// while (true) {
+    //     controller_scan();
+    //     struct controller_data keys = get_keys_pressed();
+    //     if (keys.c[0].start) {
+    //         printf("Press START for next test\n");
+    //         break;
+    //     }
+    // }
+	// console_clear();
+
+	for(int i = 0; i < 100; i++) {
+		if (i == 0) {
+			printf("S");
+		} else if (i > 0 &&  i < 511) {
+			printf("%d", i % 10);
+		} else {
+			printf("E");
+		}
+		buff16[i] = i;
+	}
+	printf("\n");
+
+	while (true) {
+        controller_scan();
+        struct controller_data keys = get_keys_pressed();
+        if (keys.c[0].start) {
+            printf("Press START for 1st test\n");
+			console_clear();
+            break;
+        }
+    }
+
+	test_tx_buffer_read16(buff16, sectorToRead, 64);
+	while (true) {
+        controller_scan();
+        struct controller_data keys = get_keys_pressed();
+        if (keys.c[0].start) {
+            printf("Press START for next test\n");
+            break;
+        }
+    }
+	console_clear();
+
+	test_tx_buffer_read16(buff16, sectorToRead, 128);
+	while (true) {
+        controller_scan();
+        struct controller_data keys = get_keys_pressed();
+        if (keys.c[0].start) {
+            printf("Press START for next test\n");
+            break;
+        }
+    }
+	console_clear();
+
+	
+	test_tx_buffer_read16(buff16, sectorToRead, 256);
+	while (true) {
+        controller_scan();
+        struct controller_data keys = get_keys_pressed();
+        if (keys.c[0].start) {
+            printf("Press START for next test\n");
+            break;
+        }
+    }
+	console_clear();
+
+	// test_tx_buffer_read16(buff16, sectorToRead, 64);
+	// while (true) {
+    //     controller_scan();
+    //     struct controller_data keys = get_keys_pressed();
+    //     if (keys.c[0].start) {
+    //         printf("Press START for next test\n");
+    //         break;
+    //     }
+    // }
+	// console_clear();
+	
+
+	// c = 0x00;
+	// test_tx_buffer_read(buff, sectorToRead, 64);
+	// for(int i = 0; i < 1024; i++) {
+	// 	buff[i] = c;
+	// 	if (i % 8 == 1) {
+	// 		c++;
+	// 	}
+	// }
+
+	// while (true) {
+    //     controller_scan();
+    //     struct controller_data keys = get_keys_pressed();
+    //     if (keys.c[0].start) {
+    //         printf("Press START for next test\n");
+    //         break;
+    //     }
+    // }
+	// console_clear();
+
+	// c = 0x00;
+	// test_tx_buffer_read(buff, sectorToRead, 128);
+	// for(int i = 0; i < 1024; i++) {
+	// 	buff[i] = c;
+	// 	if (i % 8 == 1) {
+	// 		c++;
+	// 	}
+	// }
+
+	// while (true) {
+    //     controller_scan();
+    //     struct controller_data keys = get_keys_pressed();
+    //     if (keys.c[0].start) {
+    //         printf("Press START for next test\n");
+    //         break;
+    //     }
+    // }
+	// console_clear();
+	
+	// test_tx_buffer_read(buff, sectorToRead, 256);
+	// for(int i = 0; i < 1024; i++) {
+	// 	buff[i] = (char)i;
+	// }
+
+	// while (true) {
+    //     controller_scan();
+    //     struct controller_data keys = get_keys_pressed();
+    //     if (keys.c[0].start) {
+    //         printf("Press START for next test\n");
+    //         break;
+    //     }
+    // }
+	// console_clear();
+
+	// test_tx_buffer_read(buff, sectorToRead, 512);
+	// for(int i = 0; i < 1024; i++) {
+	// 	buff[i] = (char)i;
+	// }
+
+	while (true) {
+        controller_scan();
+        struct controller_data keys = get_keys_pressed();
+        if (keys.c[0].start) {
+            printf("Press START to finsh test\n");
+            break;
+        }
+    }
+	
 	console_render();
     
     /* Start the shell if the user presses start */
     printf("\n\nPress START to continue to the shell...\n");
-    controller_init();
-    while (true) {
-        controller_scan();
-        struct controller_data keys = get_keys_pressed();
-        if (keys.c[0].start) {
-            printf("Start pressed.\n");
-            break;
-        }
-    }
+    
     
     start_shell();
 }
