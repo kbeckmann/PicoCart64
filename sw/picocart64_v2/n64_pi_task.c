@@ -287,7 +287,6 @@ void n64_pi_run(void)
 
 				// Read command/address
 				addr = n64_pi_get_value(pio);
-				uart_tx_program_putc(addr);
 
 				if (addr & 0x00000001) {
 					// We got a WRITE
@@ -296,7 +295,6 @@ void n64_pi_run(void)
 					last_addr += 2;
 				} else if (addr == 0) {
 					// READ
-					uart_tx_program_putc('r');
 					// pio_sm_put(pio, 0, 0xBBAA0000);
 					// //pio_sm_put(pio, 0, next_word);
 					// last_addr += 2;
@@ -309,7 +307,12 @@ void n64_pi_run(void)
 					// Get the next command/address
 					addr = n64_pi_get_value(pio);
 					if (addr != 0) {
-						uart_tx_program_putc('s');
+						uart_tx_program_putc(0xBF);
+						uart_tx_program_putc(addr >> 24);
+						uart_tx_program_putc(addr >> 16);
+						uart_tx_program_putc(addr >> 8);
+						uart_tx_program_putc(addr);
+						uart_tx_program_putc(0xAA);
 						// Handle 16-bit reads even if we shouldn't get them here.
 						continue;
 					}

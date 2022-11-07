@@ -88,18 +88,19 @@ void test_tx_buffer_read(uint8_t *buff, uint64_t sector) {
 
 	// wait for the sd card to finish
 	if(pc64_sd_wait() == 0) {
-		printf("\nsizeof(buff) again %d\n", sizeof(buff));
-		pi_read_raw(buff, PC64_BASE_ADDRESS_START, 0, SECTOR_READ_SIZE);
+		printf("\nsizeof(buff) again1 %d\n", sizeof(buff));
+		// data_cache_hit_writeback_invalidate(buff, sizeof(buff));
+		pi_read_raw(buff, PC64_BASE_ADDRESS_START, 0, sizeof(buff));
 		
 		// dump the contents
-		for (int k = 0; k < SECTOR_READ_SIZE; k++) {
+		for (int k = 0; k < sizeof(buff); k++) {
 			printf("%x ", buff[k]);
 		}
 
 		printf("\nRead with dma?\n");
-		dma_read_raw_async(buff, PC64_BASE_ADDRESS_START, SECTOR_READ_SIZE);
+		dma_read_raw_async(buff, PC64_BASE_ADDRESS_START, sizeof(buff));
 		// dump the contents
-		for (int k = 0; k < SECTOR_READ_SIZE; k++) {
+		for (int k = 0; k < sizeof(buff); k++) {
 			printf("%x ", buff[k]);
 		}
 

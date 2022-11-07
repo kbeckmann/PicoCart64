@@ -212,6 +212,11 @@ void mcu1_main(void)
 		}
 	}
 
+	// Put something in this array for sanity testing
+	for(int i = 0; i < 32; i++) {
+		pc64_uart_tx_buf[i] = 0xDD;
+	}
+
 	n64_pi_run();
 
 #endif

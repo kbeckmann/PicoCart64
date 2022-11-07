@@ -243,7 +243,7 @@ void send_data(uint64_t sector, uint32_t sectorCount) {
                 tight_loop_contents();
             }
 
-            uart_tx_program_putc(0xA1);
+            uart_tx_program_putc(0x99);
             //uart_tx_program_putc(diskReadBuffer[diskBufferIndex]);
         }
     // Repeat if we are reading more than 1 sector
