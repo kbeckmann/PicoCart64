@@ -18,218 +18,95 @@
 #include "pc64_regs.h"
 #include "pc64_rand.h"
 #include "n64_defs.h"
+#include "pc64_utils.h"
 
-typedef struct PI_regs_s {
-	volatile void *ram_address;
-	uint32_t pi_address;
-	uint32_t read_length;
-	uint32_t write_length;
-} PI_regs_t;
-static volatile PI_regs_t *const PI_regs = (PI_regs_t *) 0xA4600000;
+static uint8_t pc64_sd_wait() {
+    uint32_t timeout = 0;
+    uint32_t read_buf[] = { 1 };
+	uint32_t busy[] = { 1 };
+    
+    // Wait until the cartridge interface is ready
+    do {
+        // returns 1 while sd card is busy
+        //pi_read_raw(read_buf, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_BUSY, sizeof(uint32_t))
+		data_cache_hit_writeback_invalidate(read_buf, sizeof(read_buf));
+        pi_read_raw(read_buf, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_BUSY, sizeof(uint32_t));
+        
+        // Took too long, abort
+        if((timeout++) > 10000000) {
+			printf("SD_WAIT timed out. read_buf: %ld\n", read_buf[0]);
+			return -1;
+		}
+    }
+    while(memcmp(busy, read_buf, sizeof(uint32_t)) == 0);
+    (void) timeout; // Needed to stop unused variable warning
 
-// SRAM constants
-#define SRAM_256KBIT_SIZE         0x00008000
-#define SRAM_768KBIT_SIZE         0x00018000
-#define SRAM_1MBIT_SIZE           0x00020000
-#define SRAM_BANK_SIZE            SRAM_256KBIT_SIZE
-#define SRAM_256KBIT_BANKS        1
-#define SRAM_768KBIT_BANKS        3
-#define SRAM_1MBIT_BANKS          4
+    // Success
+    return 0;
+}
 
-static void verify_memory_range(uint32_t base, uint32_t offset, uint32_t len)
-{
-	uint32_t start = base | offset;
-	uint32_t end = start + len - 1;
+// void test_sector_count_send(uint32_t sectorCount) {
+// 	//pc_write(PC64_CIBASE_ADDRESS_START + PC64_REGISTER_SD_READ_NUM_SECTORS, 1);
+// 	uint32_t buf2[] = { sectorCount };
+// 	data_cache_hit_writeback_invalidate(buf2, sizeof(buf2));
+// 	pi_write_raw(buf2, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_READ_NUM_SECTORS, sizeof(buf2));
 
-	switch (base) {
-	case CART_DOM2_ADDR1_START:
-		assert(start >= CART_DOM2_ADDR1_START);
-		assert(start <= CART_DOM2_ADDR1_END);
-		assert(end >= CART_DOM2_ADDR1_START);
-		assert(end <= CART_DOM2_ADDR1_END);
-		break;
+// 	//uint32_t buf[] = { value };
+// 	// data_cache_hit_writeback_invalidate(buf, sizeof(buf));
+// 	// pi_write_raw(buf, base, offset, sizeof(buf));
+// }
 
-	case CART_DOM1_ADDR1_START:
-		assert(start >= CART_DOM1_ADDR1_START);
-		assert(start <= CART_DOM1_ADDR1_END);
-		assert(end >= CART_DOM1_ADDR1_START);
-		assert(end <= CART_DOM1_ADDR1_END);
-		break;
+uint32_t SECTOR_READ_SIZE = 16;
+void test_tx_buffer_read(uint8_t *buff, uint64_t sector) {
 
-	case CART_DOM2_ADDR2_START:
-		assert(start >= CART_DOM2_ADDR2_START);
-		assert(start <= CART_DOM2_ADDR2_END);
-		assert(end >= CART_DOM2_ADDR2_START);
-		assert(end <= CART_DOM2_ADDR2_END);
-		break;
+	uint64_t current_sector = sector;
+	uint16_t part0[] = { (current_sector & 0xFFFF000000000000LL) >> 48 };
+	uint16_t part1[] = { (current_sector & 0x0000FFFF00000000LL) >> 32 };
+	uint16_t part2[] = { (current_sector & 0x00000000FFFF0000LL) >> 16 };
+	uint16_t part3[] = { current_sector &  0x000000000000FFFFLL }; 
+	
+	// send sector
+	data_cache_hit_writeback_invalidate(part0, sizeof(part0));
+	pi_write_raw(part0, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_READ_SECTOR0, sizeof(part0));
+	
+	data_cache_hit_writeback_invalidate(part1, sizeof(part1));
+	pi_write_raw(part1, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_READ_SECTOR1, sizeof(part1));
+	
+	data_cache_hit_writeback_invalidate(part2, sizeof(part2));
+	pi_write_raw(part2, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_READ_SECTOR2, sizeof(part2));
+	
+	data_cache_hit_writeback_invalidate(part3, sizeof(part3));
+	pi_write_raw(part3, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_READ_SECTOR3, sizeof(part3));
 
-	case CART_DOM1_ADDR2_START:
-		assert(start >= CART_DOM1_ADDR2_START);
-		assert(start <= CART_DOM1_ADDR2_END);
-		assert(end >= CART_DOM1_ADDR2_START);
-		assert(end <= CART_DOM1_ADDR2_END);
-		break;
+	uint32_t buf2[] = { 1 };
+	data_cache_hit_writeback_invalidate(buf2, sizeof(buf2));
+	pi_write_raw(buf2, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_READ_NUM_SECTORS, sizeof(buf2));
 
-	case CART_DOM1_ADDR3_START:
-		assert(start >= CART_DOM1_ADDR3_START);
-		assert(start <= CART_DOM1_ADDR3_END);
-		assert(end >= CART_DOM1_ADDR3_START);
-		assert(end <= CART_DOM1_ADDR3_END);
-		break;
+	uint32_t buf3[] = { 1 };
+	data_cache_hit_writeback_invalidate(buf3, sizeof(buf3));
+	pi_write_raw(buf3, PC64_CIBASE_ADDRESS_START, PC64_COMMAND_SD_READ, sizeof(buf3));
 
-	case PC64_BASE_ADDRESS_START:
-		assert(start >= PC64_BASE_ADDRESS_START);
-		assert(start <= PC64_BASE_ADDRESS_END);
-		assert(end >= PC64_BASE_ADDRESS_START);
-		assert(end <= PC64_BASE_ADDRESS_END);
-		break;
+	// wait for the sd card to finish
+	if(pc64_sd_wait() == 0) {
+		printf("\nsizeof(buff) again %d\n", sizeof(buff));
+		pi_read_raw(buff, PC64_BASE_ADDRESS_START, 0, SECTOR_READ_SIZE);
+		
+		// dump the contents
+		for (int k = 0; k < SECTOR_READ_SIZE; k++) {
+			printf("%x ", buff[k]);
+		}
 
-	case PC64_RAND_ADDRESS_START:
-		assert(start >= PC64_RAND_ADDRESS_START);
-		assert(start <= PC64_RAND_ADDRESS_END);
-		assert(end >= PC64_RAND_ADDRESS_START);
-		assert(end <= PC64_RAND_ADDRESS_END);
-		break;
+		printf("\nRead with dma?\n");
+		dma_read_raw_async(buff, PC64_BASE_ADDRESS_START, SECTOR_READ_SIZE);
+		// dump the contents
+		for (int k = 0; k < SECTOR_READ_SIZE; k++) {
+			printf("%x ", buff[k]);
+		}
 
-	case PC64_CIBASE_ADDRESS_START:
-		assert(start >= PC64_CIBASE_ADDRESS_START);
-		assert(start <= PC64_CIBASE_ADDRESS_END);
-		assert(end >= PC64_CIBASE_ADDRESS_START);
-		assert(end <= PC64_CIBASE_ADDRESS_END);
-		break;
-
-	default:
-		assert(!"Unsupported base");
+		printf("\nread of sector %lld finished\n", current_sector);
+	} else {
+		printf("\nwait timeout\n");
 	}
-}
-
-static void pi_read_raw(void *dest, uint32_t base, uint32_t offset, uint32_t len)
-{
-	assert(dest != NULL);
-	verify_memory_range(base, offset, len);
-
-	disable_interrupts();
-	dma_wait();
-
-	MEMORY_BARRIER();
-	PI_regs->ram_address = UncachedAddr(dest);
-	MEMORY_BARRIER();
-	PI_regs->pi_address = offset | base;
-	MEMORY_BARRIER();
-	PI_regs->write_length = len - 1;
-	MEMORY_BARRIER();
-
-	enable_interrupts();
-	dma_wait();
-}
-
-static void pi_write_raw(const void *src, uint32_t base, uint32_t offset, uint32_t len)
-{
-	assert(src != NULL);
-	verify_memory_range(base, offset, len);
-
-	disable_interrupts();
-	dma_wait();
-
-	MEMORY_BARRIER();
-	PI_regs->ram_address = UncachedAddr(src);
-	MEMORY_BARRIER();
-	PI_regs->pi_address = offset | base;
-	MEMORY_BARRIER();
-	PI_regs->read_length = len - 1;
-	MEMORY_BARRIER();
-
-	enable_interrupts();
-	dma_wait();
-}
-
-static void pi_write_u32(const uint32_t value, uint32_t base, uint32_t offset)
-{
-	uint32_t buf[] = { value };
-
-	data_cache_hit_writeback_invalidate(buf, sizeof(buf));
-	pi_write_raw(buf, base, offset, sizeof(buf));
-}
-
-static uint8_t __attribute__((aligned(16))) facit_buf[SRAM_1MBIT_SIZE];
-static uint8_t __attribute__((aligned(16))) read_buf[SRAM_1MBIT_SIZE];
-static char __attribute__((aligned(16))) write_buf[0x1000];
-
-static void pc64_uart_write(const uint8_t * buf, uint32_t len)
-{
-	// 16-bit aligned
-	assert((((uint32_t) buf) & 0x1) == 0);
-
-	uint32_t len_aligned32 = (len + 3) & (-4);
-
-	data_cache_hit_writeback_invalidate((uint8_t *) buf, len_aligned32);
-	pi_write_raw(write_buf, PC64_BASE_ADDRESS_START, 0, len_aligned32);
-
-	pi_write_u32(len, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_UART_TX);
-}
-
-static void configure_sram(void)
-{
-	// PI registers
-#define PI_BASE_REG          0x04600000
-#define PI_STATUS_REG        (PI_BASE_REG+0x10)
-#define	PI_STATUS_ERROR      0x04
-#define PI_STATUS_IO_BUSY    0x02
-#define PI_STATUS_DMA_BUSY   0x01
-
-#define PI_BSD_DOM1_LAT_REG  (PI_BASE_REG+0x14)
-#define PI_BSD_DOM1_PWD_REG  (PI_BASE_REG+0x18)
-#define PI_BSD_DOM1_PGS_REG  (PI_BASE_REG+0x1C)
-#define PI_BSD_DOM1_RLS_REG  (PI_BASE_REG+0x20)
-#define PI_BSD_DOM2_LAT_REG  (PI_BASE_REG+0x24)
-#define PI_BSD_DOM2_PWD_REG  (PI_BASE_REG+0x28)
-#define PI_BSD_DOM2_PGS_REG  (PI_BASE_REG+0x2C)
-#define PI_BSD_DOM2_RLS_REG  (PI_BASE_REG+0x30)
-
-	// MIPS addresses
-#define KSEG0 0x80000000
-#define KSEG1 0xA0000000
-
-	// Memory translation stuff
-#define	PHYS_TO_K1(x)       ((uint32_t)(x)|KSEG1)
-#define	IO_WRITE(addr,data) (*(volatile uint32_t *)PHYS_TO_K1(addr)=(uint32_t)(data))
-#define	IO_READ(addr)       (*(volatile uint32_t *)PHYS_TO_K1(addr))
-
-	// Initialize the PI
-	IO_WRITE(PI_STATUS_REG, 3);
-
-	// SDK default, 0x80371240
-	//                  DCBBAA
-	// AA = LAT
-	// BB = PWD
-	//  C = PGS
-	//  D = RLS
-	//
-	// 1 cycle = 1/62.5 MHz = 16ns
-	// Time = (register+1)*16ns
-	// LAT = tL = 0x40 = 65 cycles
-	// PWM = tP = 0x12 = 19 cycles
-	// PGS      = 0x07 = 512 bytes page size
-	// RLS = tR = 0x03 = 4 cycles
-
-#if 0
-	IO_WRITE(PI_BSD_DOM1_LAT_REG, 0x40);
-	IO_WRITE(PI_BSD_DOM1_PWD_REG, 0x12);
-	IO_WRITE(PI_BSD_DOM1_PGS_REG, 0x07);
-	IO_WRITE(PI_BSD_DOM1_RLS_REG, 0x03);
-
-	IO_WRITE(PI_BSD_DOM2_LAT_REG, 0x40);
-	IO_WRITE(PI_BSD_DOM2_PWD_REG, 0x12);
-	IO_WRITE(PI_BSD_DOM2_PGS_REG, 0x07);
-	IO_WRITE(PI_BSD_DOM2_RLS_REG, 0x03);
-
-#else
-	// Fast SRAM access (should match SDK values)
-	IO_WRITE(PI_BSD_DOM2_LAT_REG, 0x40);
-	IO_WRITE(PI_BSD_DOM2_PWD_REG, 0x0C);
-	IO_WRITE(PI_BSD_DOM2_PGS_REG, 0x07);
-	IO_WRITE(PI_BSD_DOM2_RLS_REG, 0x03);
-#endif
 }
 
 int main(void)
@@ -250,7 +127,7 @@ int main(void)
 
 	// Verify PicoCart64 Magic
 	data_cache_hit_writeback_invalidate(read_buf, sizeof(read_buf));
-	pi_read_raw(read_buf, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_MAGIC, sizeof(uint32_t));
+	pi_read_raw(read_buf32, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_MAGIC, sizeof(uint32_t));
 	if (read_buf32[0] == PC64_MAGIC) {
 		printf("[ OK ] MAGIC = 0x%08lX.\n", read_buf32[0]);
 	} else {
@@ -325,31 +202,31 @@ int main(void)
 	pc64_rand_seed(0);
 
 	// Compare buffer with RNG
-	printf("[ -- ] RNG Test: ");
-	bool rng_ok = true;
-	for (int j = 0; j < 64 && rng_ok; j++) {
-		// Read back 1Mbit of RAND values
-		data_cache_hit_writeback_invalidate(read_buf, sizeof(read_buf));
-		pi_read_raw(read_buf, PC64_RAND_ADDRESS_START, 0, sizeof(read_buf));
-		printf(".");
-		fflush(stdout);
+	// printf("[ -- ] RNG Test: ");
+	// bool rng_ok = true;
+	// for (int j = 0; j < 64 && rng_ok; j++) {
+	// 	// Read back 1Mbit of RAND values
+	// 	data_cache_hit_writeback_invalidate(read_buf, sizeof(read_buf));
+	// 	pi_read_raw(read_buf, PC64_RAND_ADDRESS_START, 0, sizeof(read_buf));
+	// 	printf(".");
+	// 	fflush(stdout);
 
-		for (int i = 0; i < sizeof(read_buf) / sizeof(uint16_t); i++) {
-			uint16_t value = pc64_rand16();
+	// 	for (int i = 0; i < sizeof(read_buf) / sizeof(uint16_t); i++) {
+	// 		uint16_t value = pc64_rand16();
 
-			if (value != read_buf16[i]) {
-				printf("\n       Error @%d: ours %04X != theirs %04X", i, value, read_buf16[i]);
-				rng_ok = false;
-				break;
-			}
-		}
-	}
+	// 		if (value != read_buf16[i]) {
+	// 			printf("\n       Error @%d: ours %04X != theirs %04X", i, value, read_buf16[i]);
+	// 			rng_ok = false;
+	// 			break;
+	// 		}
+	// 	}
+	// }
 
-	if (rng_ok) {
-		printf("\n[ OK ] Random stress test verified correctly.\n");
-	} else {
-		printf("\n[FAIL] Random stress test failed.\n");
-	}
+	// if (rng_ok) {
+	// 	printf("\n[ OK ] Random stress test verified correctly.\n");
+	// } else {
+	// 	printf("\n[FAIL] Random stress test failed.\n");
+	// }
 
 	///////////////////////////////////////////////////////////////////////////
 
@@ -370,19 +247,36 @@ int main(void)
 		printf("       PicoCart64 might stall now and require a power cycle.\n");
 	}
 
-	console_render();
+	// uint32_t w_buf[] = { 1 };
+	// pc_pi_write_raw(w_buf, PC64_BASE_ADDRESS_START, PC64_COMMAND_SD_READ, sizeof(buf2));
+	printf("Test SD Read Buffer\n");	
+	// for(uint64_t i = 0; i < 16; i++) {
 
-	/* Start the shell if the user presses start */
-	printf("\n\nPress START to continue to the shell...\n");
-	controller_init();
-	while (true) {
-		controller_scan();
-		struct controller_data keys = get_keys_pressed();
-		if (keys.c[0].start) {
-			printf("Start pressed.\n");
-			break;
-		}
+	uint64_t sectorToRead = 0;
+	uint8_t __attribute__((aligned(16))) buff[SECTOR_READ_SIZE];
+
+	// Populate with something other than 0s
+	for(int i = 0; i < SECTOR_READ_SIZE; i++) {
+		buff[i] = (char)i;
 	}
+	printf("\nsizeof(buff)=%d\n", sizeof(buff));
 
-	start_shell();
+	// Try to populate the buffer with sd card data
+	test_tx_buffer_read(buff, sectorToRead);
+
+	console_render();
+    
+    /* Start the shell if the user presses start */
+    printf("\n\nPress START to continue to the shell...\n");
+    controller_init();
+    while (true) {
+        controller_scan();
+        struct controller_data keys = get_keys_pressed();
+        if (keys.c[0].start) {
+            printf("Start pressed.\n");
+            break;
+        }
+    }
+    
+    start_shell();
 }

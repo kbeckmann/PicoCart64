@@ -6,4 +6,5 @@
 
 #pragma once
 
-void		start_shell(void);
+uint8_t pc64_sd_wait();
+DRESULT fat_disk_read_pc64(BYTE* buff, LBA_t sector, UINT count);

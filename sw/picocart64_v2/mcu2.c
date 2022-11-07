@@ -158,17 +158,6 @@ void main_task_entry(__unused void *params)
 			send_sd_card_data();
 		}
 
-		// if (time_us_32() - t > 1000000) {
-		// 	printf(".");
-		// 	bc++;
-		// 	t = time_us_32();
-
-		// 	if (bc >= 10) {
-		// 		printf("\n");
-		// 		bc = 0;
-		// 	} 
-		// }
-
 #if 0
 		printf("----------------------------------------\n");
 		printf("MCU 2 [i=%d]\n", count);

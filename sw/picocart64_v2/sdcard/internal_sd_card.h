@@ -22,7 +22,7 @@ extern volatile uint16_t pc64_uart_tx_buf[PC64_BASE_ADDRESS_LENGTH];
 // set the sector to start reading from
 void pc64_set_sd_read_sector(uint64_t sector);
 
-void pc64_set_sd_read_sector_part(uint index, uint16_t value);
+void pc64_set_sd_read_sector_part(int index, uint16_t value);
 
 // set the number of sectors to read
 void pc64_set_sd_read_sector_count(uint32_t count);
@@ -32,7 +32,8 @@ void pc64_set_sd_rom_selection(char* title);
 
 void pc64_send_sd_read_command(void);
 
-bool is_sd_busy();
+extern volatile bool sd_is_busy;
+//bool is_sd_busy();
 
 // UART RX methods, unique per MCU
 void on_uart_rx_mcu1(void);

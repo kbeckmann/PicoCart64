@@ -10,6 +10,7 @@ LD = $(GCCN64PREFIX)ld
 OBJCOPY = $(GCCN64PREFIX)objcopy
 N64TOOL = $(ROOTDIR)/bin/n64tool
 CHKSUM64 = $(ROOTDIR)/bin/chksum64
+MKDFS = $(ROOTDIR)/bin/mkdfs
 ECHO = echo
 
 # To enable verbose prints, set VERBOSE=1 when building:
@@ -34,7 +35,7 @@ vpath %.c $(sort $(dir $(C_SOURCES)))
 ASFLAGS = -mtune=vr4300 -march=vr4300
 CFLAGS = -std=gnu99 -march=vr4300 -mtune=vr4300 -Wall $(C_INCLUDES)
 LDFLAGS = -L$(ROOTDIR)/mips64-elf/lib -ldragon -lc -lm -ldragonsys -Tn64.ld --gc-sections
-N64TOOLFLAGS = -l 1M -h $(ROOTDIR)/mips64-elf/lib/header -t "PicoCart64 Test ROM"
+N64TOOLFLAGS = -l 1536K -h $(ROOTDIR)/mips64-elf/lib/header -t "PicoCart64 Test ROM"
 
 all: $(BUILD_DIR)/$(PROG_NAME).z64
 
@@ -43,15 +44,18 @@ $(BUILD_DIR)/%.o: %.c | $(BUILD_DIR)
 	$(V)$(ECHO) "[  CC ]" $(notdir $<)
 	$(V)$(CC) -o $@ $< -c $(CFLAGS) -Wa,-a,-ad,-alms=$(BUILD_DIR)/$(notdir $(<:.c=.lst)) 
 
-$(BUILD_DIR)/$(PROG_NAME).z64: $(BUILD_DIR)/$(PROG_NAME).bin
+$(BUILD_DIR)/$(PROG_NAME).z64: $(BUILD_DIR)/$(PROG_NAME).bin $(BUILD_DIR)/$(PROG_NAME).dfs
 	$(V)$(ECHO) "[ Z64 ]" $(notdir $@)
-	$(V)$(N64TOOL) $(N64TOOLFLAGS) -o $@ $^
+	$(N64TOOL) $(N64TOOLFLAGS) -o $@ $(BUILD_DIR)/$(PROG_NAME).bin -s 1M $(BUILD_DIR)/$(PROG_NAME).dfs
 	$(V)$(ECHO) "[ CHK ]" $(notdir $@)
 	$(V)$(CHKSUM64) $@
 
 $(BUILD_DIR)/$(PROG_NAME).bin: $(BUILD_DIR)/$(PROG_NAME).elf
 	$(V)$(ECHO) "[ BIN ]" $(notdir $@)
 	$(V)$(OBJCOPY) $< $@ -O binary
+
+$(BUILD_DIR)/$(PROG_NAME).dfs: $(wildcard filesystem/*)
+	$(MKDFS) $@ filesystem
 
 $(BUILD_DIR)/$(PROG_NAME).elf: $(OBJECTS)
 	$(V)$(ECHO) "[  LD ]" $(notdir $@)

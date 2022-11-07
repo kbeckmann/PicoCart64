@@ -31,29 +31,34 @@ const int MARGIN_PADDING = 20;
 const int ROW_SELECTION_WIDTH = SCREEN_WIDTH;
 const int MENU_BAR_HEIGHT = 15;
 const int LIST_TOP_PADDING = MENU_BAR_HEIGHT + ROW_HEIGHT;
+const int BOTTOM_BAR_HEIGHT = 32;
+const int BOTTOM_BAR_Y = SCREEN_HEIGHT - BOTTOM_BAR_HEIGHT;
+
+// Sprites
+sprite_t *a_button_icon;
 
 /* Colors */
-color_t MENU_BAR_COLOR = {.r = 0x82,.g = 0x00,.b = 0x2E,.a = 0x00 };	// 0x82002E, Berry
-color_t SELECTION_COLOR = {.r = 0x00,.g = 0x67,.b = 0xC7,.a = 0x00 };	// 0x0067C7, Bright Blue
+color_t MENU_BAR_COLOR = { .r = 0x82, .g = 0x00, .b = 0x2E, .a = 0x00 }; // 0x82002E, Berry
+color_t BOTTOM_BAR_COLOR = { .r = 0x00, .g = 0x67, .b = 0xC7, .a = 0x55 }; // 0x82002E, Berry
+color_t SELECTION_COLOR = { .r = 0x00, .g = 0x67, .b = 0xC7, .a = 0x00 }; // 0x0067C7, Bright Blue
 
 /* Assume default font size*/
-static int calculate_num_rows_per_page(void)
-{
-	// ---top of screen---
-	// menu bar
-	// padding + more files above indicator space
-	// list of files...
-	// ...
-	// more file indicator space
-	// ---bottom of screen---
+static int calculate_num_rows_per_page(void) {
+    // ---top of screen---
+    // menu bar
+    // padding + more files above indicator space
+    // list of files...
+    // ...
+    // more file indicator space
+    // ---bottom of screen---
 
-	// Start by subtracting the menu bar height, and paddings from the total height
-	int availableHeight = SCREEN_HEIGHT - MENU_BAR_HEIGHT - (ROW_HEIGHT * 2);
+    // Start by subtracting the menu bar height, and paddings from the total height
+    int availableHeight = SCREEN_HEIGHT - MENU_BAR_HEIGHT - (ROW_HEIGHT * 2) - BOTTOM_BAR_HEIGHT;
 
-	// Since there is currently no other dynamic portion, we can use a simple calculation to find rows that will fit in the space
-	int rows = availableHeight / ROW_HEIGHT;
+    // Since there is currently no other dynamic portion, we can use a simple calculation to find rows that will fit in the space
+    int rows = availableHeight / ROW_HEIGHT;
 
-	return rows;
+    return rows;
 }
 
 /*
@@ -100,14 +105,77 @@ static void render_list(display_context_t display, char *list[], int currently_s
 	}
 }
 
-static void draw_header_bar(display_context_t display, int fileCount)
-{
-	int x = 0, y = 0, width = SCREEN_WIDTH, height = MENU_BAR_HEIGHT;
-	graphics_draw_box(display, x, y, width, height, graphics_convert_color(MENU_BAR_COLOR));
+static void draw_header_bar(display_context_t display, int fileCount) {
+    int x = 0, y = 0, width = SCREEN_WIDTH, height = MENU_BAR_HEIGHT;
+    graphics_draw_box(display, x, y, width, height, graphics_convert_color(MENU_BAR_COLOR));
+    
+    char menuHeaderBuffer[100];
+    sprintf(menuHeaderBuffer, "PicoCart64 OS (git rev %08x)\t\t\t\t%d Files", GIT_REV, fileCount);
+    graphics_draw_text(display, MARGIN_PADDING, y+6, menuHeaderBuffer);
+}
 
-	char menuHeaderBuffer[100];
-	sprintf(menuHeaderBuffer, "PicoCart64 OS (git rev %08x)\t\t\t\t%d Files", GIT_REV, fileCount);
-	graphics_draw_text(display, MARGIN_PADDING, y + 4, menuHeaderBuffer);
+static void draw_bottom_bar(display_context_t display) {
+    graphics_draw_box_trans(display, 0, BOTTOM_BAR_Y, SCREEN_WIDTH, BOTTOM_BAR_HEIGHT, graphics_convert_color(BOTTOM_BAR_COLOR));
+    graphics_draw_sprite_trans(display, MARGIN_PADDING, BOTTOM_BAR_Y, a_button_icon);
+    graphics_draw_text(display, MARGIN_PADDING + 32, BOTTOM_BAR_Y + BOTTOM_BAR_HEIGHT/2 - 4, "Load ROM");
+}
+
+int ls(char** file_list, const char *dir) {
+    // char cwdbuf[FF_LFN_BUF] = {0};
+    FRESULT fr; /* Return value */
+    char const *p_dir = dir;
+    // if (dir[0]) {
+    //     p_dir = dir;
+    // } else {
+    //     fr = f_getcwd(cwdbuf, sizeof cwdbuf);
+    //     if (FR_OK != fr) {
+    //         printf("f_getcwd error: %s (%d)\n", FRESULT_str(fr), fr);
+    //         return;
+    //     }
+    //     p_dir = cwdbuf;
+    // }
+    // printf("Directory Listing: %s\n", p_dir);
+    DIR dj;      /* Directory object */
+    FILINFO fno; /* File information */
+    memset(&dj, 0, sizeof dj);
+    memset(&fno, 0, sizeof fno);
+    fr = f_findfirst(&dj, &fno, p_dir, "*");
+    
+    if (FR_OK != fr) {
+        printf("f_findfirst error: (%d)\n", fr);
+        return 0;
+    }
+	int num_entries = 0;
+    while (fr == FR_OK && fno.fname[0]) { /* Repeat while an item is found */
+        /* Create a string that includes the file name, the file size and the
+         attributes string. */
+        const char *pcWritableFile = "writable file",
+                   *pcReadOnlyFile = "read only file",
+                   *pcDirectory = "directory";
+        const char *pcAttrib;
+        /* Point pcAttrib to a string that describes the file. */
+        if (fno.fattrib & AM_DIR) {
+            pcAttrib = pcDirectory;
+        } else if (fno.fattrib & AM_RDO) {
+            pcAttrib = pcReadOnlyFile;
+        } else {
+            pcAttrib = pcWritableFile;
+        }
+        /* Create a string that includes the file name, the file size and the
+         attributes string. */
+        printf("%s [%s] [size=%llu]\n", fno.fname, pcAttrib, fno.fsize);
+		sprintf(file_list[num_entries++], "%s [size=%llu]\n", fno.fname, fno.fsize);
+
+        fr = f_findnext(&dj, &fno); /* Search for next item */
+    }
+    f_closedir(&dj);
+
+	return num_entries;
+}
+
+// Pass in a reference to an array of strings
+void fetch_rom_list(char** entries) {
+
 }
 
 /*
@@ -116,30 +184,39 @@ static void draw_header_bar(display_context_t display, int fileCount)
 static void show_list(void)
 {
 	// For now, hard code some strings in so we can have something to test with
-	char *entries[21] = {
-		"Goldeneye 007 (USA).n64",
-		"Mario 64 (USA).n64",
-		"Star Wars Rouge Squadron (USA).n64",
-		"Star Wars Shadows of the Empire (USA).n64",
-		"The Legend of Zelda, Ocarina of Time (USA).n64",
-		"Perfect Dark (USA).n64",
-		"Mario Kart 64 (USA).n64",
-		"Killer Instinct 64 (USA).n64",
-		"Star Wars Podracer (USA).n64",
-		"007 Tomorrow Never Dies (USA).n64",
-		"Donkey Kong 64 (USA).n64",
-		"testrom.n64",
-		/*"お母さん３(JPN).n64", */// I don't think it likes this entry too much, will need a font that supports UTF8
-		"Harvest Moon 64 (JPN).n64",
-		"Crusin' USA (USA).n64",
-		"Metriod 64 (USA).n64",
-		"Super Secret Menu Rom.n64",
-		"Winback (USA).n64",
-		"Resident Evil 2 (USA).n64",
-		"Best Game You Have Never Hear Of (USA).n64",
-		"testrom2.n64",
-		"Final Fight 64 (JPN).n64",
-	};
+	// char *entries[21] = {
+	// 	"Goldeneye 007 (USA).n64",
+	// 	"Mario 64 (USA).n64",
+	// 	"Star Wars Rouge Squadron (USA).n64",
+	// 	"Star Wars Shadows of the Empire (USA).n64",
+	// 	"The Legend of Zelda, Ocarina of Time (USA).n64",
+	// 	"Perfect Dark (USA).n64",
+	// 	"Mario Kart 64 (USA).n64",
+	// 	"Killer Instinct 64 (USA).n64",
+	// 	"Star Wars Podracer (USA).n64",
+	// 	"007 Tomorrow Never Dies (USA).n64",
+	// 	"Donkey Kong 64 (USA).n64",
+	// 	"testrom.n64",
+	// 	/*"お母さん３(JPN).n64", */// I don't think it likes this entry too much, will need a font that supports UTF8
+	// 	"Harvest Moon 64 (JPN).n64",
+	// 	"Crusin' USA (USA).n64",
+	// 	"Metriod 64 (USA).n64",
+	// 	"Super Secret Menu Rom.n64",
+	// 	"Winback (USA).n64",
+	// 	"Resident Evil 2 (USA).n64",
+	// 	"Best Game You Have Never Hear Of (USA).n64",
+	// 	"testrom2.n64",
+	// 	"Final Fight 64 (JPN).n64",
+	// };
+
+	char *entries[256];
+    printf("Reading SD card...\n");
+	NUM_ENTRIES = ls(entries, "/");
+
+    for (int i = 0; i < 50; i++) {
+        printf(".");
+        wait_ms(100);
+    }
 
 	int currently_selected = 0;
 	int first_visible = 0;
@@ -171,28 +248,57 @@ static void show_list(void)
 
 		if ((mag > 0 && currently_selected + mag < NUM_ENTRIES) || (mag < 0 && currently_selected > 0)) {
 			currently_selected += mag;
-		}
-		// If we have moved the cursor to an entry not yet visible on screen, move first_visible as well
-		if ((mag > 0 && currently_selected >= (first_visible + max_on_screen)) || (mag < 0 && currently_selected < first_visible && currently_selected >= 0)) {
-			first_visible += mag;
-		}
+        }
 
-		/* A little debug text at the bottom of the screen */
-		char debugTextBuffer[100];
-		snprintf(debugTextBuffer, 100, "currently_selected=%d, first_visible=%d, max_per_page=%d", currently_selected, first_visible, max_on_screen);
-		graphics_draw_text(display, 5, 230, debugTextBuffer);
+        // If we have moved the cursor to an entry not yet visible on screen, move first_visible as well
+        if ((mag > 0 && currently_selected >= (first_visible + max_on_screen)) || (mag < 0 && currently_selected < first_visible && currently_selected >= 0)) {
+            first_visible += mag;
+        }
 
-		/* Force the backbuffer flip */
-		display_show(display);
-	}
+        /* A little debug text at the bottom of the screen */
+        // char debugTextBuffer[100];
+        // snprintf(debugTextBuffer, 100, "currently_selected=%d, first_visible=%d, max_per_page=%d", currently_selected, first_visible, max_on_screen);
+        // graphics_draw_text(display, 5, 230, debugTextBuffer);
+
+        draw_bottom_bar(display);
+
+        /* Force the backbuffer flip */
+        display_show(display);
+    }
 }
 
-void start_shell(void)
-{
-	/* Init the screen and controller */
-	display_init(RESOLUTION_512x240, DEPTH_16_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE);
-	controller_init();
+static void init_sprites(void) {
+    int fp = dfs_open("/a_button_icon.sprite");
+    a_button_icon = malloc( dfs_size( fp ) );
+    dfs_read( a_button_icon, 1, dfs_size( fp ), fp );
+    dfs_close( fp );
 
-	/* Starts the shell by rendering the list of files from the SD card */
-	show_list();
+    //api_write_raw_button_icon = read_sprite( "rom://a_button_icon.sprite" );
+}
+
+void start_shell(void) {
+    /* Init the screen, controller, and filesystem */
+    display_init(RESOLUTION_512x240, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE);
+    // display_init(RESOLUTION_512x480, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE); // jitters in cen64
+    controller_init();
+    
+    int ret = dfs_init(DFS_DEFAULT_LOCATION);
+    if (ret != DFS_ESUCCESS) {
+        printf("Unable to init filesystem. ret: %d\n", ret);
+		printf("git rev %08x\n", GIT_REV);
+    } else {
+        printf("Initing sd access");
+        wait_ms( 100 );
+		// Try to init the sd card
+		if (!debug_init_sdfs("sd:/", -1)) {
+			printf("Unable to access SD Card on Picocart64.\n");
+            wait_ms(5000);
+		}
+
+        /* Load sprites for shell from the filesystem */
+        init_sprites();
+
+        /* Starts the shell by rendering the list of files from the SD card*/
+        show_list();
+    }
 }
