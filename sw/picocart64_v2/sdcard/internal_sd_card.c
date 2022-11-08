@@ -169,10 +169,10 @@ void on_uart_rx_mcu2() {
     while (uart_rx_program_is_readable()) {
         char ch = uart_rx_program_getc();
         
-        printf("%02x ", ch);
-        if (ch == 0xAA) {
-            printf("\n");
-        }
+        // printf("%02x ", ch);
+        // if (ch == 0xAA) {
+        //     printf("\n");
+        // }
 
         if (ch == COMMAND_START) {
             mayHaveStart = true;
@@ -222,8 +222,7 @@ void on_uart_rx_mcu2() {
 BYTE diskReadBuffer[DISK_READ_BUFFER_SIZE*2];
 // MCU2 will send data once it has the information it needs
 void send_data(uint64_t sector, uint32_t sectorCount) {
-    printf("Sending data. Sector: %ld, Count: %d\n", sector, sectorCount);
-
+    //printf("Sending data. Sector: %ld, Count: %d\n", sector, sectorCount);
     int loopCount = 0;
     do {
         loopCount++;
@@ -247,6 +246,7 @@ void send_data(uint64_t sector, uint32_t sectorCount) {
 
             uart_tx_program_putc(diskReadBuffer[diskBufferIndex]);
         }
+
     // Repeat if we are reading more than 1 sector
     } while(sectorCount > 1);
 
@@ -266,12 +266,9 @@ void send_sd_card_data() {
     sendDataReady = false; 
 
     // Send the data over uart back to MCU1 so the rom can read it
-    uint64_t s = sectorToSend;
-    send_data(sectorToSend, 1);
-
-    // Reset our other variables
-    //sectorToSend = 0;
-    //numSectorsToSend = 0;
+    uint64_t sector = sectorToSend;
+    uint32_t numSectors = 1;
+    send_data(sector, numSectors);
 }
 
 // SD mount helper function

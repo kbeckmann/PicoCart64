@@ -154,7 +154,6 @@ void main_task_entry(__unused void *params)
 		tight_loop_contents();
 
 		if(sendDataReady) {
-			printf("Calling send_sd_card_data\n");
 			send_sd_card_data();
 		}
 

@@ -147,15 +147,10 @@ int ls(char** file_list, const char *dir) {
     // }
     // printf("Directory Listing: %s\n", p_dir);
 
-    printf("memset stuff for ls\n");
-    waitForStart();
-
     DIR dj;      /* Directory object */
     FILINFO fno; /* File information */
     memset(&dj, 0, sizeof dj);
     memset(&fno, 0, sizeof fno);
-    printf("f_findfirst\n");
-    waitForStart();
     fr = f_findfirst(&dj, &fno, p_dir, "*");
 
     printf("f_findfirst finished\n");
@@ -184,21 +179,25 @@ int ls(char** file_list, const char *dir) {
         }
         /* Create a string that includes the file name, the file size and the
          attributes string. */
-        printf("print attributes\n");
-        waitForStart();
 
         printf("%s [%s] [size=%llu]\n", fno.fname, pcAttrib, fno.fsize);
 
-        // printf("sprintf stuff\n");
-        // waitForStart();
-		// sprintf(file_list[num_entries++], "%s [size=%llu]\n", fno.fname, fno.fsize);
+        printf("sprintf stuff\n");
+        waitForStart();
+		sprintf(file_list[num_entries++], "%s [size=%llu]\n", fno.fname, fno.fsize);
 
         // printf("attributes printed\n");
         // waitForStart();
-
+        //num_entries++;
+        
+        printf("find next\n");
+        waitForStart();
         fr = f_findnext(&dj, &fno); /* Search for next item */
     }
     f_closedir(&dj);
+
+    printf("num_entries %d\n", num_entries);
+    waitForStart();
 
 	return num_entries;
 }
@@ -243,6 +242,10 @@ static void show_list(void)
     waitForStart();
 
     char *entries[256];
+    entries[0] = "A0123456789ABCDEF";
+    entries[1] = "B0123456789ABCDEF";
+    entries[2] = "C0123456789ABCDEF";
+    entries[3] = "D0123456789ABCDEF";
 	NUM_ENTRIES = ls(entries, "/");
 
     // for (int i = 0; i < 50; i++) {
@@ -330,7 +333,13 @@ void start_shell(void) {
 
 		// Try to init the sd card
         if (!debug_init_sdfs("sd:/", -1)) {
-            printf("Unable to access SD Card on Picocart64.\n");
+            printf("Unable to access SD Card on Picocart64. Trying again...\n");
+            
+            if (!debug_init_sdfs("sd:/", -1)) {
+                printf("Unable to access SD Card on Picocart64 on second attempt :(\n");
+            } else {
+                printf("\nSUCCESS!!\n");
+            }
         } else {
             printf("\nSUCCESS!!\n");
         }

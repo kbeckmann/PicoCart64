@@ -86,9 +86,6 @@ void mcu1_main(void)
 	// stdio_async_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
 
 	gpio_configure(mcu1_gpio_config, ARRAY_SIZE(mcu1_gpio_config));
-
-	// Setup PIO UART
-	pio_uart_init(on_uart_rx_mcu1, PIN_MCU2_DIO, PIN_MCU2_CS);
 	
 	// uint32_t BUFFER_SIZE = 6;
 	// uint8_t writeBuffer[BUFFER_SIZE];
@@ -217,12 +214,13 @@ void mcu1_main(void)
 		pc64_uart_tx_buf[i] = 0xFFFF - i;
 	}
 
+	pio_uart_init(on_uart_rx_mcu1, PIN_MCU2_DIO, PIN_MCU2_CS);
+
 	// THIS COMMENTED OUT CODE WILL ECHO BACK DATA SENT FROM MCU2
 	// busy_wait_ms(2000);
-	// uint64_t s = 2048;
+	// uint64_t s = 0;
 	// pc64_set_sd_read_sector(s);
 	// pc64_send_sd_read_command();
-
 	// bool hasPrinted = false;
 	// while(1) {
 	// 	tight_loop_contents();
@@ -230,6 +228,20 @@ void mcu1_main(void)
 	// 	if (!sd_is_busy) {
 	// 		if (!hasPrinted) {
 	// 			hasPrinted = true;
+	// 			uart_tx_program_putc(0xBA);
+	// 			uart_tx_program_putc(bufferIndex >> 24);
+	// 			uart_tx_program_putc(bufferIndex >> 16);
+	// 			uart_tx_program_putc(bufferIndex >> 8);
+	// 			uart_tx_program_putc(bufferIndex);
+	// 			uart_tx_program_putc(0xAA);
+
+	// 			uart_tx_program_putc(0xBC);
+	// 			uart_tx_program_putc(rx_character_index >> 24);
+	// 			uart_tx_program_putc(rx_character_index >> 16);
+	// 			uart_tx_program_putc(rx_character_index >> 8);
+	// 			uart_tx_program_putc(rx_character_index);
+	// 			uart_tx_program_putc(0xAA);
+	// 			busy_wait_ms(100);
 	// 			for(int i = 0; i < 256; i++) {
 	// 				uint16_t value = pc64_uart_tx_buf[i];
 	// 				uart_tx_program_putc(value >> 8);
@@ -240,6 +252,8 @@ void mcu1_main(void)
 	// 		}
 	// 	}
 	// }
+
+	// multicore_launch_core1(mcu1_core1_entry);
 
 	n64_pi_run();
 

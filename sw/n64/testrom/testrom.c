@@ -90,8 +90,15 @@ void test_tx_buffer_read(uint8_t *buff, uint64_t sector, uint32_t dmaReadSize) {
 	if(pc64_sd_wait() == 0) {
 		int dmaSize = 512;
 		printf("\nDMA size of(%d) buff8\n", dmaSize);
+		wait_ms(40);
+
 		data_cache_hit_writeback_invalidate(buff, dmaSize);
 		pi_read_raw(buff, PC64_BASE_ADDRESS_START, 0, dmaSize);
+
+	
+		// Make a second read because it will work
+		// data_cache_hit_writeback_invalidate(buff, dmaSize);
+		// pi_read_raw(buff, PC64_BASE_ADDRESS_START, 0, dmaSize);
 
 		for (int k = 0; k < dmaSize; k++) {
 			if (k % 20 == 0 && k != 0) {
@@ -335,206 +342,16 @@ int main(void)
 		printf("       PicoCart64 might stall now and require a power cycle.\n");
 	}
 
-	// printf("Test SD BUSY register read\n");
-	// test_sd_read_reg();
-
-	// test_tx_buffer_read(read_buf, 0, 512);
-	// printf("Press START for next test\n");
-	// while (true) {
-    //     controller_scan();
-    //     struct controller_data keys = get_keys_pressed();
-    //     if (keys.c[0].start) {
-    //         break;
-    //     }
-    // }
+	// wait_ms(3000);
 	// console_clear();
-	wait_ms(3000);
-	console_clear();
-	test_tx_buffer_read(read_buf, 2048, 512);
-	while (true) {
-        controller_scan();
-        struct controller_data keys = get_keys_pressed();
-        if (keys.c[0].start) {
-            break;
-        }
-    }
-    
-	// // uint32_t w_buf[] = { 1 };
-	// // pc_pi_write_raw(w_buf, PC64_BASE_ADDRESS_START, PC64_COMMAND_SD_READ, sizeof(buf2));
-	// printf("Test SD Read Buffer\n");	
-	// // for(uint64_t i = 0; i < 16; i++) {
-
-	// uint64_t sectorToRead = 0;
-	// // uint8_t __attribute__((aligned(8))) buff[1024];
-	// uint16_t __attribute__((aligned(8))) buff16[256];
-
-	// // Try to populate the buffer with sd card data
-	// // c = 0x00;
-	// // test_tx_buffer_read(buff, sectorToRead, 32);
-	// // for(int i = 0; i < 1024; i++) {
-	// // 	buff[i] = c;
-	// // 	if (i % 8 == 1) {
-	// // 		c++;
-	// // 	}
-	// // }
-
-	// // while (true) {
-    // //     controller_scan();
-    // //     struct controller_data keys = get_keys_pressed();
-    // //     if (keys.c[0].start) {
-    // //         printf("Press START for next test\n");
-    // //         break;
-    // //     }
-    // // }
-	// // console_clear();
-
-	// for(int i = 0; i < 100; i++) {
-	// 	if (i == 0) {
-	// 		printf("S");
-	// 	} else if (i > 0 &&  i < 511) {
-	// 		printf("%d", i % 10);
-	// 	} else {
-	// 		printf("E");
-	// 	}
-	// 	buff16[i] = i;
-	// }
-	// printf("\n");
-
+	// test_tx_buffer_read(read_buf, 2048, 512);
 	// while (true) {
     //     controller_scan();
     //     struct controller_data keys = get_keys_pressed();
     //     if (keys.c[0].start) {
-    //         printf("Press START for 1st test\n");
-	// 		console_clear();
     //         break;
     //     }
     // }
-
-	// test_tx_buffer_read16(buff16, sectorToRead, 64);
-	// while (true) {
-    //     controller_scan();
-    //     struct controller_data keys = get_keys_pressed();
-    //     if (keys.c[0].start) {
-    //         printf("Press START for next test\n");
-    //         break;
-    //     }
-    // }
-	// console_clear();
-
-	// test_tx_buffer_read16(buff16, sectorToRead, 128);
-	// while (true) {
-    //     controller_scan();
-    //     struct controller_data keys = get_keys_pressed();
-    //     if (keys.c[0].start) {
-    //         printf("Press START for next test\n");
-    //         break;
-    //     }
-    // }
-	// console_clear();
-
-	
-	// test_tx_buffer_read16(buff16, sectorToRead, 256);
-	// while (true) {
-    //     controller_scan();
-    //     struct controller_data keys = get_keys_pressed();
-    //     if (keys.c[0].start) {
-    //         printf("Press START for next test\n");
-    //         break;
-    //     }
-    // }
-	// console_clear();
-
-	// test_tx_buffer_read16(buff16, sectorToRead, 512);
-	// while (true) {
-    //     controller_scan();
-    //     struct controller_data keys = get_keys_pressed();
-    //     if (keys.c[0].start) {
-    //         printf("Press START for next test\n");
-    //         break;
-    //     }
-    // }
-	// console_clear();
-
-	// // test_tx_buffer_read16(buff16, sectorToRead, 64);
-	// // while (true) {
-    // //     controller_scan();
-    // //     struct controller_data keys = get_keys_pressed();
-    // //     if (keys.c[0].start) {
-    // //         printf("Press START for next test\n");
-    // //         break;
-    // //     }
-    // // }
-	// // console_clear();
-	
-
-	// // c = 0x00;
-	// // test_tx_buffer_read(buff, sectorToRead, 64);
-	// // for(int i = 0; i < 1024; i++) {
-	// // 	buff[i] = c;
-	// // 	if (i % 8 == 1) {
-	// // 		c++;
-	// // 	}
-	// // }
-
-	// // while (true) {
-    // //     controller_scan();
-    // //     struct controller_data keys = get_keys_pressed();
-    // //     if (keys.c[0].start) {
-    // //         printf("Press START for next test\n");
-    // //         break;
-    // //     }
-    // // }
-	// // console_clear();
-
-	// // c = 0x00;
-	// // test_tx_buffer_read(buff, sectorToRead, 128);
-	// // for(int i = 0; i < 1024; i++) {
-	// // 	buff[i] = c;
-	// // 	if (i % 8 == 1) {
-	// // 		c++;
-	// // 	}
-	// // }
-
-	// // while (true) {
-    // //     controller_scan();
-    // //     struct controller_data keys = get_keys_pressed();
-    // //     if (keys.c[0].start) {
-    // //         printf("Press START for next test\n");
-    // //         break;
-    // //     }
-    // // }
-	// // console_clear();
-	
-	// // test_tx_buffer_read(buff, sectorToRead, 256);
-	// // for(int i = 0; i < 1024; i++) {
-	// // 	buff[i] = (char)i;
-	// // }
-
-	// // while (true) {
-    // //     controller_scan();
-    // //     struct controller_data keys = get_keys_pressed();
-    // //     if (keys.c[0].start) {
-    // //         printf("Press START for next test\n");
-    // //         break;
-    // //     }
-    // // }
-	// // console_clear();
-
-	// // test_tx_buffer_read(buff, sectorToRead, 512);
-	// // for(int i = 0; i < 1024; i++) {
-	// // 	buff[i] = (char)i;
-	// // }
-
-	// while (true) {
-    //     controller_scan();
-    //     struct controller_data keys = get_keys_pressed();
-    //     if (keys.c[0].start) {
-    //         printf("Press START to finsh test\n");
-    //         break;
-    //     }
-    // }
-	
-	// console_render();
     
     /* Start the shell if the user presses start */
     printf("\n\nPress START to continue to the shell...\n");

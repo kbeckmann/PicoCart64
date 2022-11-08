@@ -42,7 +42,7 @@ void send_sd_card_data();
 
 // Internal method that is called once MCU2 has data ready to return MCU1
 // Call send_sd_card_data instead, it will call this function with arguments defined from received data
-void send_data(uint64_t sector, uint32_t sectorCount);
+//void send_data(uint64_t sector, uint32_t sectorCount);
 
 // SD Card functions
 void mount_sd(void);
