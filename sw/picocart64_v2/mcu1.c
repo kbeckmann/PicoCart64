@@ -8,6 +8,8 @@
 #include <string.h>
 
 #include "pico/stdlib.h"
+#include "pico/multicore.h"
+
 #include "pins_mcu1.h"
 #include "qspi_helper.h"
 #include "n64_pi_task.h"
@@ -66,6 +68,49 @@ static const gpio_config_t mcu1_gpio_config[] = {
 	// {PIN_MCU2_CS, GPIO_OUT, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_UART},	// UART for now
 	{PIN_MCU2_DIO, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO1},
 };
+
+void mcu1_core1_entry() {
+	pio_uart_init(PIN_MCU2_DIO, PIN_MCU2_CS);
+	
+	bool readingData = false;
+	uint8_t i = 0;
+	while (1) {
+		tight_loop_contents();
+
+		// uart_tx_program_putc(i++);
+		// sleep_ms(500);
+
+		if (readingData) {
+			// Process anything that might be on the uart buffer
+			mcu1_process_rx_buffer();
+
+			if (sendDataReady) {
+				// Now that the data is written to the array, go ahead and release the lock
+				sd_is_busy = false;
+				readingData = false;
+			}
+		}
+
+		if (multicore_fifo_rvalid()) {
+			int32_t cmd = multicore_fifo_pop_blocking();
+			switch (cmd) {
+				case CORE1_SEND_SD_READ_CMD:
+					// Block cart while waiting for data
+					sd_is_busy = true;
+
+					// Finally start processing the uart buffer
+					readingData = true;
+					rx_uart_buffer_reset();
+					
+					pc64_send_sd_read_command();
+					
+					break;
+				default:
+					break;
+			}
+		}
+	}
+}
 
 void mcu1_main(void)
 {
@@ -214,8 +259,6 @@ void mcu1_main(void)
 		pc64_uart_tx_buf[i] = 0xFFFF - i;
 	}
 
-	pio_uart_init(on_uart_rx_mcu1, PIN_MCU2_DIO, PIN_MCU2_CS);
-
 	// THIS COMMENTED OUT CODE WILL ECHO BACK DATA SENT FROM MCU2
 	// busy_wait_ms(2000);
 	// uint64_t s = 0;
@@ -253,7 +296,7 @@ void mcu1_main(void)
 	// 	}
 	// }
 
-	// multicore_launch_core1(mcu1_core1_entry);
+	multicore_launch_core1(mcu1_core1_entry);
 
 	n64_pi_run();
 

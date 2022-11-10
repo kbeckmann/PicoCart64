@@ -139,7 +139,7 @@ void main_task_entry(__unused void *params)
 	printf("MCU2 Main Entry\n");
 
 	// Setup PIO UART
-	pio_uart_init(on_uart_rx_mcu2, PIN_SPI1_CS, PIN_SPI1_RX);
+	pio_uart_init(PIN_SPI1_CS, PIN_SPI1_RX);
 
 	// Boot MCU1
 	printf("Booting MCU1...\n");
@@ -148,10 +148,11 @@ void main_task_entry(__unused void *params)
 	// Mount the SD card
 	mount_sd();
 
-	int t = time_us_32();
-	int bc = 0;
 	while (true) {
 		tight_loop_contents();
+
+		// process the buffer look for cmd data
+		mcu2_process_rx_buffer();
 
 		if(sendDataReady) {
 			send_sd_card_data();

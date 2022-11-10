@@ -15,7 +15,19 @@ typedef struct pio_uart_inst {
     uint sm;
 } pio_uart_inst_t;
 
-void pio_uart_init(irq_handler_t rx_handler, uint rxPin, uint txPin);
+#define RX_RING_BUFFER_SIZE 512
+typedef struct RXRingBuffer_t {                                                                  
+    uint8_t  buf[RX_RING_BUFFER_SIZE];                                                
+    uint32_t head;                                                   
+    uint32_t tail;                                                   
+} RXRingBuffer_t;
+
+bool rx_uart_buffer_has_data();
+uint8_t rx_uart_buffer_get();
+void rx_uart_buffer_reset();
+
+// Use the rxRingBuffer to read from the uart
+void pio_uart_init(uint rxPin, uint txPin);
 void uart_tx_program_putc(char c);
 void uart_tx_program_puts(const char *s);
 char uart_rx_program_getc();

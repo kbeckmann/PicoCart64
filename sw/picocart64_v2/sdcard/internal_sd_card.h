@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "pc64_regs.h"
+#include "pio_uart/pio_uart.h"
 
 #define SD_CARD_SECTOR_SIZE 512 // 512 bytes
 
@@ -36,13 +37,12 @@ extern volatile bool sd_is_busy;
 //bool is_sd_busy();
 
 // UART RX methods, unique per MCU
-void on_uart_rx_mcu1(void);
-void on_uart_rx_mcu2(void);
-void send_sd_card_data();
+void mcu1_process_rx_buffer();
+void mcu2_process_rx_buffer();
 
-// Internal method that is called once MCU2 has data ready to return MCU1
-// Call send_sd_card_data instead, it will call this function with arguments defined from received data
-//void send_data(uint64_t sector, uint32_t sectorCount);
+// Variables are extracted via mcu2_process_rx_buffer
+// Then data is read from the SD Card and sent over uart
+void send_sd_card_data();
 
 // SD Card functions
 void mount_sd(void);

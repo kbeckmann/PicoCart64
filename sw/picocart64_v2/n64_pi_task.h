@@ -5,5 +5,7 @@
  */
 
 #pragma once
-
+enum {
+    CORE1_SEND_SD_READ_CMD
+};
 void n64_pi_run(void);
