@@ -255,7 +255,7 @@ void mcu1_main(void)
 	}
 
 	// Put something in this array for sanity testing
-	for(int i = 0; i < 512; i++) {
+	for(int i = 0; i < 256; i++) {
 		pc64_uart_tx_buf[i] = 0xFFFF - i;
 	}
 

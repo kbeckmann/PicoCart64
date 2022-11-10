@@ -30,6 +30,9 @@
 #include "sdcard/internal_sd_card.h"
 #include "pio_uart/pio_uart.h"
 
+#include "ff.h"
+#include <string.h>
+
 #define UART0_BAUD_RATE  (115200)
 
 // Priority 0 = lowest, 31 = highest
@@ -132,6 +135,52 @@ static void psram_test(void)
 	qspi_disable();
 }
 
+int ls(const char *dir) {
+    // char cwdbuf[FF_LFN_BUF] = {0};
+    FRESULT fr; /* Return value */
+    char const *p_dir = dir;
+
+    DIR dj;      /* Directory object */
+    FILINFO fno; /* File information */
+    memset(&dj, 0, sizeof dj);
+    memset(&fno, 0, sizeof fno);
+    fr = f_findfirst(&dj, &fno, p_dir, "*");
+    
+    if (FR_OK != fr) {
+        printf("f_findfirst error: (%d)\n", fr);
+        return 0;
+    }
+	int num_entries = 0;
+    while (fr == FR_OK && fno.fname[0]) { /* Repeat while an item is found */
+        /* Create a string that includes the file name, the file size and the
+         attributes string. */
+        const char *pcWritableFile = "writable file",
+                   *pcReadOnlyFile = "read only file",
+                   *pcDirectory = "directory";
+        const char *pcAttrib;
+        /* Point pcAttrib to a string that describes the file. */
+        if (fno.fattrib & AM_DIR) {
+            pcAttrib = pcDirectory;
+        } else if (fno.fattrib & AM_RDO) {
+            pcAttrib = pcReadOnlyFile;
+        } else {
+            pcAttrib = pcWritableFile;
+        }
+        /* Create a string that includes the file name, the file size and the
+         attributes string. */
+
+        printf("%s [%s] [size=%llu]\n", fno.fname, pcAttrib, fno.fsize);
+		//sprintf(file_list[num_entries++], "%s [size=%llu]\n", fno.fname, fno.fsize);
+
+        fr = f_findnext(&dj, &fno); /* Search for next item */
+    }
+    f_closedir(&dj);
+
+    printf("num_entries %d\n", num_entries);
+
+	return num_entries;
+}
+
 void main_task_entry(__unused void *params)
 {
 	int count = 0;
@@ -147,6 +196,8 @@ void main_task_entry(__unused void *params)
 
 	// Mount the SD card
 	mount_sd();
+
+	ls("/");
 
 	while (true) {
 		tight_loop_contents();

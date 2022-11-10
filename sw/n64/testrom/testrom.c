@@ -89,16 +89,8 @@ void test_tx_buffer_read(uint8_t *buff, uint64_t sector, uint32_t dmaReadSize) {
 	// wait for the sd card to finish
 	if(pc64_sd_wait() == 0) {
 		int dmaSize = 512;
-		printf("\nDMA size of(%d) buff8\n", dmaSize);
-		wait_ms(40);
-
 		data_cache_hit_writeback_invalidate(buff, dmaSize);
 		pi_read_raw(buff, PC64_BASE_ADDRESS_START, 0, dmaSize);
-
-	
-		// Make a second read because it will work
-		// data_cache_hit_writeback_invalidate(buff, dmaSize);
-		// pi_read_raw(buff, PC64_BASE_ADDRESS_START, 0, dmaSize);
 
 		for (int k = 0; k < dmaSize; k++) {
 			if (k % 20 == 0 && k != 0) {
@@ -342,16 +334,15 @@ int main(void)
 		printf("       PicoCart64 might stall now and require a power cycle.\n");
 	}
 
-	// wait_ms(3000);
-	// console_clear();
-	// test_tx_buffer_read(read_buf, 2048, 512);
-	// while (true) {
-    //     controller_scan();
-    //     struct controller_data keys = get_keys_pressed();
-    //     if (keys.c[0].start) {
-    //         break;
-    //     }
-    // }
+	console_clear();
+	test_tx_buffer_read(read_buf, 2048, 512);
+	while (true) {
+        controller_scan();
+        struct controller_data keys = get_keys_pressed();
+        if (keys.c[0].start) {
+            break;
+        }
+    }
     
     /* Start the shell if the user presses start */
     printf("\n\nPress START to continue to the shell...\n");

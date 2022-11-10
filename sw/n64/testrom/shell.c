@@ -23,6 +23,7 @@ Load selected rom into memory and start
 
 #define SCREEN_WIDTH 512
 #define SCREEN_HEIGHT 240
+char *entries[256];
 int NUM_ENTRIES = 21;
 
 /* Layout */
@@ -131,30 +132,32 @@ static void draw_bottom_bar(display_context_t display) {
     graphics_draw_text(display, MARGIN_PADDING + 32, BOTTOM_BAR_Y + BOTTOM_BAR_HEIGHT/2 - 4, "Load ROM");
 }
 
-int ls(char** file_list, const char *dir) {
+// int ls2(char** file_list, const char *dir) {
+
+//     int numFiles = 0;
+//     char filenameBuffer[255];
+//     int type = dfs_dir_findfirst("/", filenameBuffer);
+//     do {
+//         printf("%s [%d]\n", filenameBuffer, type);
+//         sprintf(file_list[numFiles++], "%s [size=%llu]\n", filenameBuffer, 1);
+//         type = dfs_dir_findnext(filenameBuffer);
+//     } while (type != FLAGS_EOF);
+
+//     printf("Found %d files.\n", numFiles);
+//     waitForStart();
+//     return numFiles;
+// }
+
+int ls(const char *dir) {
     // char cwdbuf[FF_LFN_BUF] = {0};
     FRESULT fr; /* Return value */
     char const *p_dir = dir;
-    // if (dir[0]) {
-    //     p_dir = dir;
-    // } else {
-    //     fr = f_getcwd(cwdbuf, sizeof cwdbuf);
-    //     if (FR_OK != fr) {
-    //         printf("f_getcwd error: %s (%d)\n", FRESULT_str(fr), fr);
-    //         return;
-    //     }
-    //     p_dir = cwdbuf;
-    // }
-    // printf("Directory Listing: %s\n", p_dir);
 
     DIR dj;      /* Directory object */
     FILINFO fno; /* File information */
     memset(&dj, 0, sizeof dj);
     memset(&fno, 0, sizeof fno);
     fr = f_findfirst(&dj, &fno, p_dir, "*");
-
-    printf("f_findfirst finished\n");
-    waitForStart();
     
     if (FR_OK != fr) {
         printf("f_findfirst error: (%d)\n", fr);
@@ -181,17 +184,8 @@ int ls(char** file_list, const char *dir) {
          attributes string. */
 
         printf("%s [%s] [size=%llu]\n", fno.fname, pcAttrib, fno.fsize);
+		sprintf(entries[num_entries++], "%s [size=%llu]\n", fno.fname, fno.fsize);
 
-        printf("sprintf stuff\n");
-        waitForStart();
-		sprintf(file_list[num_entries++], "%s [size=%llu]\n", fno.fname, fno.fsize);
-
-        // printf("attributes printed\n");
-        // waitForStart();
-        //num_entries++;
-        
-        printf("find next\n");
-        waitForStart();
         fr = f_findnext(&dj, &fno); /* Search for next item */
     }
     f_closedir(&dj);
@@ -239,20 +233,12 @@ static void show_list(void)
 	// };
 
     printf("Reading SD card...\n");
-    waitForStart();
-
-    char *entries[256];
-    entries[0] = "A0123456789ABCDEF";
-    entries[1] = "B0123456789ABCDEF";
-    entries[2] = "C0123456789ABCDEF";
-    entries[3] = "D0123456789ABCDEF";
-	NUM_ENTRIES = ls(entries, "/");
-
-    // for (int i = 0; i < 50; i++) {
-    //     printf(".");
-    //     wait_ms(100);
-    // }
-
+    for(int i = 0; i < 256; i++) {
+        entries[i] = "000000000100000000020000000003000000000400000000050000000006000A";
+    }
+    
+	NUM_ENTRIES = ls("/");
+    printf("ls - done\n");
     waitForStart();
 
     display_init(RESOLUTION_512x240, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE);
@@ -332,16 +318,25 @@ void start_shell(void) {
         wait_ms( 100 );
 
 		// Try to init the sd card
-        if (!debug_init_sdfs("sd:/", -1)) {
-            printf("Unable to access SD Card on Picocart64. Trying again...\n");
-            
-            if (!debug_init_sdfs("sd:/", -1)) {
-                printf("Unable to access SD Card on Picocart64 on second attempt :(\n");
+        bool retrying = true;
+        while (retrying) {
+            if(!debug_init_sdfs("sd:/", -1)) {
+                printf("Unable to access SD Card on Picocart64. Try again(Start)? Abort(B)\n");
+                while (true) {
+                    controller_scan();
+                    struct controller_data keys = get_keys_pressed();
+                    if (keys.c[0].start) {
+                        retrying = true;
+                        break;
+                    } else if (keys.c[0].B) {
+                        retrying = false;
+                        break;
+                    }
+                }
             } else {
-                printf("\nSUCCESS!!\n");
+                printf("\nSD Init... SUCCESS!!\n");
+                retrying = false;
             }
-        } else {
-            printf("\nSUCCESS!!\n");
         }
 
         printf("Press START to load The Shell.\n");
