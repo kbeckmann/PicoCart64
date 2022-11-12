@@ -28,6 +28,7 @@
 
 #include "sdcard/internal_sd_card.h"
 #include "pio_uart/pio_uart.h"
+#include "psram.h"
 
 #include "ff.h"
 #include <string.h>
@@ -98,24 +99,6 @@ static const gpio_config_t mcu2_gpio_config[] = {
 	//{PIN_SPI1_TX, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO1}, // not using
 	{PIN_SPI1_RX, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO1},
 	{PIN_SPI1_CS, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO1},
-};
-
-// DEMUX enable
-static const gpio_config_t mcu2_demux_enabled_config[] = {
-	// Demux should be configured as inputs without pulls until we lock the bus
-	{PIN_DEMUX_A0, GPIO_OUT, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
-	{PIN_DEMUX_A1, GPIO_OUT, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
-	{PIN_DEMUX_A2, GPIO_OUT, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
-	{PIN_DEMUX_IE, GPIO_OUT, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
-};
-
-// DEMUX disable
-static const gpio_config_t mcu2_demux_disabled_config[] = {
-	// Demux should be configured as inputs without pulls until we lock the bus
-	{PIN_DEMUX_A0, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
-	{PIN_DEMUX_A1, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
-	{PIN_DEMUX_A2, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
-	{PIN_DEMUX_IE, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
 };
 
 void main_task_entry(__unused void *params)
@@ -219,6 +202,7 @@ void mcu2_main(void)
 	// stdio_usb_init();
 
 	gpio_configure(mcu2_gpio_config, ARRAY_SIZE(mcu2_gpio_config));
+	set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
 
 	// Enable a 12MHz clock output on GPIO21 / clk_gpout0
 	clock_gpio_init(PIN_MCU2_GPIO21, CLOCKS_CLK_GPOUT0_CTRL_AUXSRC_VALUE_XOSC_CLKSRC, 1);

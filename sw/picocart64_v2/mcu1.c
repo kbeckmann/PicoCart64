@@ -23,6 +23,7 @@
 
 #include "sdcard/internal_sd_card.h"
 #include "pio_uart/pio_uart.h"
+#include "psram.h"
 
 static const gpio_config_t mcu1_gpio_config[] = {
 	// PIO0 pins
@@ -68,25 +69,6 @@ static const gpio_config_t mcu1_gpio_config[] = {
 	// {PIN_MCU2_CS, GPIO_OUT, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_UART},	// UART for now
 	{PIN_MCU2_DIO, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO1},
 };
-
-// DEMUX enable
-static const gpio_config_t mcu1_demux_enabled_config[] = {
-	// Demux should be configured as inputs without pulls until we lock the bus
-	{PIN_DEMUX_A0, GPIO_OUT, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
-	{PIN_DEMUX_A1, GPIO_OUT, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
-	{PIN_DEMUX_A2, GPIO_OUT, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
-	{PIN_DEMUX_IE, GPIO_OUT, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
-};
-
-// DEMUX disable
-static const gpio_config_t mcu1_demux_disabled_config[] = {
-	// Demux should be configured as inputs without pulls until we lock the bus
-	{PIN_DEMUX_A0, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
-	{PIN_DEMUX_A1, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
-	{PIN_DEMUX_A2, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
-	{PIN_DEMUX_IE, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
-};
-
 
 static inline uint8_t psram_addr_to_chip2(uint32_t address)
 {
@@ -140,7 +122,7 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 
 			if (it == 10) {
 
-				qspi_enable(mcu1_demux_enabled_config);
+				qspi_enable();
 				printf("MCU1 PSRAM via qspi_read1\n");
 				char buf2[64];
 				qspi_read(0, buf2, 64);
@@ -150,7 +132,7 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 				printf("\n");
 
 				printf("MCU1 try to read with ptr\n");
-				qspi_enable(mcu1_demux_enabled_config);
+				qspi_enable();
 				qspi_enter_cmd_xip();
 				volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
 				printf("Access at [0x10000000]\n");
@@ -163,19 +145,8 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 					printf("PSRAM-MCU1[%d] = %08x\n", address_32, word);
 				}
 
-				qspi_disable(mcu1_demux_disabled_config);
+				qspi_disable();
 			} 
-			// else if (it > 10) {
-			// 	volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
-			// 	for(int i = 0; i < 4; i++) {
-			// 		uint32_t address_32 = i;
-			// 		psram_set_cs2(1);
-			// 		uint32_t word = ptr[address_32];
-			// 		psram_set_cs2(0);
-
-			// 		printf("PSRAM[%d] = %08x\n", address_32, word);
-			// 	}
-			// }
 		}
 
 		if (readingData) {
@@ -225,123 +196,12 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 	set_sys_clock_khz(freq_khz, true);
 
 	gpio_configure(mcu1_gpio_config, ARRAY_SIZE(mcu1_gpio_config));
+	set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
 
 	// Enable STDIO over USB
 	// stdio_usb_init();
 	// stdio_async_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
 	stdio_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
-	
-	// uint32_t BUFFER_SIZE = 6;
-	// uint8_t writeBuffer[BUFFER_SIZE];
-	// uint8_t readBuffer[BUFFER_SIZE];
-	// //Test to send some characters using pio
-	// writeBuffer[0] = 'H';
-	// writeBuffer[1] = 'E';
-	// writeBuffer[2] = 'L';
-	// writeBuffer[3] = 'L';
-	// writeBuffer[4] = 'O';
-	// writeBuffer[5] = '\n';
-	// int lastWrite = 0;
-	// while(1) {
-	// 	int now = time_us_32();
-	// 	if (now - lastWrite > 6000000) {
-	// 		for (int i = 0; i < BUFFER_SIZE; i++) {
-	// 			uart_tx_program_putc(writeBuffer[i]);
-	// 		}
-	// 		lastWrite = now;
-	// 	}
-	// }
-
-#if 0
-	int pin = PIN_N64_AD0;
-
-	printf("Testing pin %d\n", pin);
-
-	gpio_set_dir(pin, GPIO_OUT);
-	gpio_put(pin, 1);
-
-	while (1) {
-
-	}
-#endif
-
-	// gpio_set_pulls(PIN_N64_COLD_RESET, false, true);
-	// gpio_set_pulls(PIN_N64_SI_DAT, true, false);
-	// gpio_set_pulls(PIN_N64_INT1, true, false);
-
-	//printf("Hello, world! I am MCU 1 @%d kHz. Reset reason: 0x%08lX\n", freq_khz, get_reset_reason());
-
-	//sleep_ms(100);
-
-#if 0
-	while (true) {
-		count++;
-		printf("Hello, world! I am MCU 1 -- %d\n", count);
-		sleep_ms(1000);
-	}
-
-#else
-
-	// This can't be enabled when mcu2 is accessing psram
-	// qspi_oeover_normal(true);
-	// ssi_hw->ssienr = 1;
-
-	// sleep_ms(10);
-
-#if 0
-	const uint32_t *data = (const uint32_t *)0x10000000;
-	for (int i = 0; i < 1024 * 1024; i++) {
-		printf("%08x ", *data++);
-		printf("%08x ", *data++);
-		printf("%08x ", *data++);
-		printf("%08x\n", *data++);
-		sleep_ms(10);
-	}
-#endif
-
-	// qspi_print_pull();
-
-#if 0
-	while (true) {
-		char hash_str[128];
-
-		sha256_to_string(hash_str, (const BYTE *)0x10000000, 30228);
-		printf("Hash: %s\n", hash_str);
-
-		sleep_ms(500);
-	}
-
-#elif 0
-
-	int unique = 0;
-	int i = 0;
-	while (true) {
-		char hash_str[65];
-		char hash_str_old[65];
-
-		sha256_to_string(hash_str, (const BYTE *)0x10000000, 1024 * 1024);
-		if (strcmp(hash_str, hash_str_old) != 0) {
-			strcpy(hash_str_old, hash_str);
-			unique++;
-			printf("Hash: %s, unique: %d\n", hash_str, unique);
-		}
-		// if (i % 100 == 0) {
-		printf("Still alive, %d %d\n", i, unique);
-		// }
-
-		i++;
-		// sleep_ms(500);
-	}
-
-#else
-
-	{
-		char hash_str[128];
-		sha256_to_string(hash_str, (const BYTE *)0x10000000, 1079028);
-		printf("Hash: %s\n", hash_str);
-	}
-
-#endif
 
 	// // Set up ROM mapping table
 	// if (memcmp(picocart_header, "picocartcompress", 16) == 0) {
@@ -363,8 +223,6 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 
 	// printf("launching n64_pi_run...\n");
 	// n64_pi_run();
-
-#endif
 
 	while (true) {
 

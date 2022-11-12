@@ -5,6 +5,9 @@
 #include "stdio.h"
 #include "utils.h"
 
+#include "psram.h"
+
+// #include "gpio_helper.h"
 // #define VERBOSE
 
 void qspi_print_pull(void)
@@ -131,36 +134,6 @@ void qspi_oeover_disable(void)
 #define FLASHCMD_READ_STATUS      0x05
 
 static ssi_hw_t *const ssi = (ssi_hw_t *) XIP_SSI_BASE;
-
-static int PIN_DEMUX_IE = 0;
-static int PIN_DEMUX_A0 = 0;
-static int PIN_DEMUX_A1 = 0;
-static int PIN_DEMUX_A2 = 0;
-static uint8_t psram_addr_to_chip(uint32_t address)
-{
-	return ((address >> 23) & 0x7) + 1;
-}
-
-//   0: Deassert all CS
-// 1-8: Assert the specific PSRAM CS (1 indexed, matches U1, U2 ... U8)
-static void psram_set_cs(uint8_t chip)
-{
-	uint32_t mask = (1 << PIN_DEMUX_IE) | (1 << PIN_DEMUX_A0) | (1 << PIN_DEMUX_A1) | (1 << PIN_DEMUX_A2);
-	uint32_t new_mask;
-
-	// printf("qspi_set_cs(%d)\n", chip);
-
-	if (chip >= 1 && chip <= 8) {
-		chip--;					// convert to 0-indexed
-		new_mask = (1 << PIN_DEMUX_IE) | (chip << PIN_DEMUX_A0);
-	} else {
-		// Set PIN_DEMUX_IE = 0 to pull all PSRAM CS-lines high
-		new_mask = 0;
-	}
-
-	uint32_t old_gpio_out = sio_hw->gpio_out;
-	sio_hw->gpio_out = (old_gpio_out & (~mask)) | new_mask;
-}
 
 // Set up the SSI controller for standard SPI mode,i.e. for every byte sent we get one back
 // This is only called by flash_exit_xip(), not by any of the other functions.
@@ -547,25 +520,10 @@ void qspi_enter_cmd_xip(void)
 	// ssi->ssienr = 1;
 }
 
-void qspi_demux_enable(bool enabled, const gpio_config_t *demuxConfig)
-{
-	PIN_DEMUX_IE = (&demuxConfig[3])->gpio;
-	PIN_DEMUX_A0 = (&demuxConfig[0])->gpio;
-	PIN_DEMUX_A1 = (&demuxConfig[1])->gpio;
-	PIN_DEMUX_A2 = (&demuxConfig[2])->gpio;
-	printf("%d, %d, %d, %d\n", PIN_DEMUX_IE, PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2);
-
-	if (enabled) {
-		gpio_configure(demuxConfig, ARRAY_SIZE(demuxConfig));
-	} else {
-		gpio_configure(demuxConfig, ARRAY_SIZE(demuxConfig));
-	}
-}
-
-void qspi_enable(const gpio_config_t *demuxConfig)
+void qspi_enable()
 {
 	qspi_oeover_normal(false);
-	qspi_demux_enable(true, demuxConfig);
+	current_mcu_enable_demux(true);
 	qspi_init_spi();
 	// Turn off the XIP cache
 	xip_ctrl_hw->ctrl = (xip_ctrl_hw->ctrl & (~XIP_CTRL_EN_BITS));
@@ -574,7 +532,7 @@ void qspi_enable(const gpio_config_t *demuxConfig)
 
 void qspi_disable(const gpio_config_t *demuxConfig)
 {
-	qspi_demux_enable(false, demuxConfig);
+	current_mcu_enable_demux(false);
 	qspi_oeover_disable();
 }
 
