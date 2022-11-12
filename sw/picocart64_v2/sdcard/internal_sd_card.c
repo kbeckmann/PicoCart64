@@ -386,21 +386,11 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
         printf("%02x ", buf2[i]);
     }
     printf("\n");
-    
-    qspi_enable();
-    qspi_enter_cmd_xip();
-    printf("Read from PSRAM via qspi_read2\n");
-    qspi_read(0, buf2, 64);
-    for(int i = 0; i < 64; i++) {
-        printf("%02x ", buf2[i]);
-    }
-    printf("\n");
-    
 
     qspi_enter_cmd_xip();
     printf("WITH qspi_enter_cmd_xip\n");
     volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 16; i++) {
         uint32_t modifiedAddress = i;
         psram_set_cs(1);
         uint32_t word = ptr[modifiedAddress];

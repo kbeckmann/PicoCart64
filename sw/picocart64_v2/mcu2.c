@@ -121,8 +121,10 @@ void main_task_entry(__unused void *params)
 
 	vTaskDelay(2000);
 
-	load_rom("Doom 64 (USA) (Rev 1).z64");
-	printf("\nfinished loading rom.\n");
+	// load_rom("Doom 64 (USA) (Rev 1).z64");
+	// load_rom("testrom.z64");
+	// printf("\nfinished loading rom.\n");
+	printf("No rom to load this time\n");
 
 	// Setup PIO UART
 	// pio_uart_init(PIN_SPI1_CS, PIN_SPI1_RX);
@@ -202,7 +204,7 @@ void mcu2_main(void)
 	// stdio_usb_init();
 
 	gpio_configure(mcu2_gpio_config, ARRAY_SIZE(mcu2_gpio_config));
-	set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
+	// set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
 
 	// Enable a 12MHz clock output on GPIO21 / clk_gpout0
 	clock_gpio_init(PIN_MCU2_GPIO21, CLOCKS_CLK_GPOUT0_CTRL_AUXSRC_VALUE_XOSC_CLKSRC, 1);

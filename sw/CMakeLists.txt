@@ -36,9 +36,9 @@ add_subdirectory(stdio_async_uart)
 add_subdirectory(picocart64_shared)
 
 # Add applications
-add_subdirectory(picocart64_v1)
+#add_subdirectory(picocart64_v1)
 add_subdirectory(picocart64_v2)
-add_subdirectory(dualpico)
+#add_subdirectory(dualpico)
 
 add_compile_options(
         -Wall
