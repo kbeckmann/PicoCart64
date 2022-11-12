@@ -65,7 +65,9 @@ void qspi_set_pull(bool disabled, bool pullup, bool pulldown)
 		(0 << PADS_QSPI_GPIO_QSPI_SCLK_PDE_LSB) | (0 << PADS_QSPI_GPIO_QSPI_SCLK_SCHMITT_LSB) | (0 << PADS_QSPI_GPIO_QSPI_SCLK_SLEWFAST_LSB);
 
 	for (int i = 0; i < NUM_QSPI_GPIOS; i++) {
-		printf("%d %08X -> %08X\n", i, pads_qspi_hw->io[i], values[i]);
+		#if VERBOSE
+			printf("%d %08X -> %08X\n", i, pads_qspi_hw->io[i], values[i]);
+		#endif
 		pads_qspi_hw->io[i] = values[i];
 	}
 }
@@ -215,16 +217,18 @@ static void empty_tx_fifo(uint8_t limit)
 	}
 }
 
-static void empty_rx_fifo(void)
+static void empty_rx_fifo(bool print)
 {
 	uint32_t rx_level;
 	do {
 		rx_level = ssi_hw->rxflr;
 		if (rx_level > 0) {
 			uint32_t junk = ssi_hw->dr0;
-#ifdef VERBOSE
+// #ifdef VERBOSE
+if (print) {
 			printf("rx_level: %d, junk: %08x\n", rx_level, junk);
-#endif
+}
+// #endif
 		}
 	} while (rx_level > 0);
 }
@@ -238,7 +242,7 @@ static void __noinline qspi_put_get(uint8_t chip, const uint8_t * tx, uint8_t * 
 	uint8_t rxbyte;
 
 	empty_tx_fifo(0);
-	empty_rx_fifo();
+	empty_rx_fifo(false);
 
 	while (count > 0) {
 		ssi->dr0 = (uint32_t) (tx ? *tx++ : 0);
@@ -259,6 +263,33 @@ static void __noinline qspi_put_get(uint8_t chip, const uint8_t * tx, uint8_t * 
 	psram_set_cs(0);
 }
 
+static void __noinline qspi_put_get_read(uint8_t chip, const uint8_t * tx, uint8_t * rx, size_t count)
+{
+	uint8_t rxbyte;
+
+	// empty_tx_fifo(0);
+	// empty_rx_fifo(true);
+
+	while (count > 0) {
+		--count;
+		printf("QQ[%d]\n", count);
+		// Wait until there is 1 byte in the RX fifo
+		while (ssi_hw->rxflr == 0) {
+		}
+
+		io_rw_32 v = ssi->dr0;
+		printf("0x%08x ", v);
+		rxbyte = v;
+		if (rx) {
+			*rx++ = rxbyte;
+		}
+		// TODO: Could have something > 0 here, but why risk it.
+		empty_tx_fifo(0);
+	}
+
+	psram_set_cs(0);
+}
+
 static void __noinline qspi_put_get_qspi(uint8_t chip, const uint8_t * tx, uint8_t * rx, size_t count)
 {
 	uint8_t rxbyte;
@@ -266,7 +297,7 @@ static void __noinline qspi_put_get_qspi(uint8_t chip, const uint8_t * tx, uint8
 	uint32_t *rx32 = (uint32_t *) rx;
 
 	empty_tx_fifo(0);
-	empty_rx_fifo();
+	empty_rx_fifo(false);
 
 	if (count % 4 != 0) {
 		printf("Uhhhhhhhh\n");
@@ -300,7 +331,7 @@ void qspi_do_cmd(uint8_t chip, uint8_t cmd, const uint8_t * tx, uint8_t * rx, si
 	psram_set_cs(chip);
 	ssi->dr0 = cmd;
 	empty_tx_fifo(0);
-	empty_rx_fifo();
+	empty_rx_fifo(false);
 	qspi_put_get(chip, tx, rx, count);
 }
 
@@ -317,7 +348,7 @@ static inline void qspi_wait_ready(uint8_t chip)
 static inline void qspi_put_cmd_addr(uint8_t chip, uint8_t cmd, uint32_t addr, uint8_t dummy)
 {
 	empty_tx_fifo(0);
-	empty_rx_fifo();
+	empty_rx_fifo(false);
 
 	psram_set_cs(chip);
 
@@ -331,7 +362,7 @@ static inline void qspi_put_cmd_addr(uint8_t chip, uint8_t cmd, uint32_t addr, u
 		}
 
 		empty_tx_fifo(0);
-		empty_rx_fifo();
+		empty_rx_fifo(false);
 	}
 
 	for (int i = 0; i < dummy; i++) {
@@ -342,14 +373,14 @@ static inline void qspi_put_cmd_addr(uint8_t chip, uint8_t cmd, uint32_t addr, u
 		}
 
 		empty_tx_fifo(0);
-		empty_rx_fifo();
+		empty_rx_fifo(false);
 	}
 }
 
 static inline void qspi_put_cmd_addr_qspi(uint8_t chip, uint8_t cmd, uint32_t addr, uint8_t dummy)
 {
 	empty_tx_fifo(0);
-	empty_rx_fifo();
+	empty_rx_fifo(false);
 
 	psram_set_cs(chip);
 
@@ -397,7 +428,7 @@ static inline void qspi_put_cmd_addr_qspi(uint8_t chip, uint8_t cmd, uint32_t ad
 	}
 
 	empty_tx_fifo(0);
-	empty_rx_fifo();
+	empty_rx_fifo(false);
 
 	printf("*** halt ***\n");
 	while (1) {
@@ -412,7 +443,7 @@ static inline void qspi_put_cmd_addr_qspi(uint8_t chip, uint8_t cmd, uint32_t ad
 	}
 
 	empty_tx_fifo(0);
-	empty_rx_fifo();
+	empty_rx_fifo(false);
 
 	/////////////////////////////
 	// Write dummy
@@ -424,7 +455,7 @@ static inline void qspi_put_cmd_addr_qspi(uint8_t chip, uint8_t cmd, uint32_t ad
 		}
 
 		empty_tx_fifo(0);
-		empty_rx_fifo();
+		empty_rx_fifo(false);
 	}
 }
 
@@ -535,6 +566,7 @@ void qspi_disable(void)
 	qspi_oeover_disable();
 }
 
+int lastChipUsed = 0;
 void qspi_write(uint32_t address, const uint8_t * data, uint32_t length)
 {
 	uint32_t offset = 0;
@@ -542,6 +574,10 @@ void qspi_write(uint32_t address, const uint8_t * data, uint32_t length)
 		uint32_t count = length > 64 ? 64 : length;
 		uint32_t address_masked = address & 0xFFFFFF;
 		uint8_t chip = psram_addr_to_chip(address);
+		if (lastChipUsed != chip) {
+			printf("CHIP[%d]", chip);
+			lastChipUsed = chip;
+		}
 #ifdef VERBOSE
 		printf("PP[%d] @%08lX: %d bytes\n", chip, address_masked, count);
 		printf("  ");
@@ -572,10 +608,11 @@ void qspi_read(uint32_t address, uint8_t * data, uint32_t length)
 		printf("RD[%d] @%08lX: %d bytes\n", chip, address_masked, count);
 #endif
 		// qspi_put_cmd_addr(chip, FLASHCMD_FAST_READ, address_masked, 1);
+		qspi_put_cmd_addr(chip, FLASHCMD_READ_DATA, address_masked, 0);
 		// qspi_put_cmd_addr(chip, FLASHCMD_READ_DATA, address_masked, 0);
-		// qspi_put_cmd_addr(chip, FLASHCMD_READ_DATA, address_masked, 0);
-		qspi_put_cmd_addr_qspi(chip, FLASHCMD_FAST_QUAD_READ, address_masked, 0);
-		qspi_put_get_qspi(chip, NULL, &data[offset], count);
+		// qspi_put_cmd_addr_qspi(chip, FLASHCMD_FAST_QUAD_READ, address_masked, 0);
+		// qspi_put_get(chip, NULL, &data[offset], count);
+		qspi_put_get_read(chip, NULL, &data[offset], count);
 #ifdef VERBOSE
 		printf("  ");
 		for (int i = 0; i < count; i++) {
@@ -590,52 +627,52 @@ void qspi_read(uint32_t address, uint8_t * data, uint32_t length)
 }
 
 // #define DATA_LEN 1024*8
-#define DATA_LEN 256
-uint32_t data[DATA_LEN];
-void qspi_test(void)
-{
+// #define DATA_LEN 256
+// uint32_t data[DATA_LEN];
+// void qspi_test(void)
+// {
 
-	printf("\n1. ------------\n\n");
-	for (int i = 0; i < DATA_LEN; i++) {
-		// data[i] = i;
-		// data[i] = 0x41;
-		// data[i] = 0x00410000 + i;
-		// data[i] = 0x004100ff - i;
-		// data[i] = 0x0;
-		// data[i] = 0xaabbccdd;
-		data[i] = 0xaabbcc00 + i;
-		// data[i] = 0xa0b0c0d0 + (i << 0) + (i << 8) + (i << 16) + (i << 24);
-	}
+// 	printf("\n1. ------------\n\n");
+// 	for (int i = 0; i < DATA_LEN; i++) {
+// 		// data[i] = i;
+// 		// data[i] = 0x41;
+// 		// data[i] = 0x00410000 + i;
+// 		// data[i] = 0x004100ff - i;
+// 		// data[i] = 0x0;
+// 		// data[i] = 0xaabbccdd;
+// 		data[i] = 0xaabbcc00 + i;
+// 		// data[i] = 0xa0b0c0d0 + (i << 0) + (i << 8) + (i << 16) + (i << 24);
+// 	}
 
-	printf("\n2. ------------\n\n");
-	qspi_enable();
-	printf("\n3. ------------\n\n");
-	qspi_write(0, data, DATA_LEN * 4);
-	for (int i = 0; i < DATA_LEN; i++) {
-		data[i] = 0x11223344;
-	}
+// 	printf("\n2. ------------\n\n");
+// 	qspi_enable();
+// 	printf("\n3. ------------\n\n");
+// 	qspi_write(0, data, DATA_LEN * 4);
+// 	for (int i = 0; i < DATA_LEN; i++) {
+// 		data[i] = 0x11223344;
+// 	}
 
-	vTaskDelay(5 * 1000);
-	printf("\n4. ------------\n\n");
-	qspi_init_qspi();
-	qspi_read(0, data, DATA_LEN * 4);
-	for (int i = 0; i < DATA_LEN; i++) {
-		if (data[i] != i) {
-			printf("ERROR %08X != %08X\n", data[i], i);
-		}
-	}
+// 	vTaskDelay(5 * 1000);
+// 	printf("\n4. ------------\n\n");
+// 	qspi_init_qspi();
+// 	qspi_read(0, data, DATA_LEN * 4);
+// 	for (int i = 0; i < DATA_LEN; i++) {
+// 		if (data[i] != i) {
+// 			printf("ERROR %08X != %08X\n", data[i], i);
+// 		}
+// 	}
 
-	// for (int i = 0; i < DATA_LEN; i++) {
-	for (int i = 0; i < 8; i++) {
-		printf("%d: %08X\n", i, data[i]);
-	}
+// 	// for (int i = 0; i < DATA_LEN; i++) {
+// 	for (int i = 0; i < 8; i++) {
+// 		printf("%d: %08X\n", i, data[i]);
+// 	}
 
-	while (1) {
-		printf("\n\n**** HALTuuu \n");
-		vTaskDelay(5 * 1000);
-	}
+// 	while (1) {
+// 		printf("\n\n**** HALTuuu \n");
+// 		vTaskDelay(5 * 1000);
+// 	}
 
-	printf("\n5. ------------\n\n");
-	qspi_disable();
-	printf("\n6. ------------\n\n");
-}
+// 	printf("\n5. ------------\n\n");
+// 	qspi_disable();
+// 	printf("\n6. ------------\n\n");
+// }

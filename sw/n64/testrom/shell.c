@@ -13,6 +13,12 @@
 #include "git_info.h"
 #include "shell.h"
 
+// picocart64_shared
+#include "pc64_regs.h"
+#include "pc64_rand.h"
+#include "n64_defs.h"
+#include "pc64_utils.h"
+
 /*
 TODO
 Make the more files above/below indicator a sprite or something besides '...'
@@ -23,8 +29,12 @@ Load selected rom into memory and start
 
 #define SCREEN_WIDTH 512
 #define SCREEN_HEIGHT 240
-char *entries[256];
+
+ // TODO: It is likely a directory may contain thousands of files
+ // Modify the ls function to only buffer a portion of files (up to some MAX)
+char g_fileEntries[256][256];
 int NUM_ENTRIES = 21;
+bool g_sendingSelectedRom = false;
 
 /* Layout */
 const int ROW_HEIGHT = 12;
@@ -42,6 +52,22 @@ sprite_t *a_button_icon;
 color_t MENU_BAR_COLOR = { .r = 0x82, .g = 0x00, .b = 0x2E, .a = 0x00 }; // 0x82002E, Berry
 color_t BOTTOM_BAR_COLOR = { .r = 0x00, .g = 0x67, .b = 0xC7, .a = 0x55 }; // 0x82002E, Berry
 color_t SELECTION_COLOR = { .r = 0x00, .g = 0x67, .b = 0xC7, .a = 0x00 }; // 0x0067C7, Bright Blue
+
+void loadRomAtSelection(int selection) {
+    g_sendingSelectedRom = true;
+
+    char fileToLoad[256];
+    strcpy(fileToLoad, g_fileEntries[selection]);
+    int strIndex = 0;
+    uint8_t valueToSend;
+    do {
+        valueToSend = fileToLoad[strIndex++];
+        data_cache_hit_writeback_invalidate(&valueToSend, sizeof(valueToSend));
+	    pi_write_raw(&valueToSend, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_SELECT_ROM, sizeof(valueToSend));
+    } while (valueToSend != NULL)
+
+    g_sendingSelectedRom = false;
+}
 
 void waitForStart() {
     printf("Start to continue...\n");
@@ -76,7 +102,7 @@ static int calculate_num_rows_per_page(void) {
 /*
  * Render a list of strings and show a caret on the currently selected row
  */
-static void render_list(display_context_t display, char *list[], int currently_selected, int first_visible, int max_on_screen)
+static void render_list(display_context_t display, char **list, int currently_selected, int first_visible, int max_on_screen)
 {
 
 	/* If we aren't starting at the first row, draw an indicator to show more files above */
@@ -132,24 +158,7 @@ static void draw_bottom_bar(display_context_t display) {
     graphics_draw_text(display, MARGIN_PADDING + 32, BOTTOM_BAR_Y + BOTTOM_BAR_HEIGHT/2 - 4, "Load ROM");
 }
 
-// int ls2(char** file_list, const char *dir) {
-
-//     int numFiles = 0;
-//     char filenameBuffer[255];
-//     int type = dfs_dir_findfirst("/", filenameBuffer);
-//     do {
-//         printf("%s [%d]\n", filenameBuffer, type);
-//         sprintf(file_list[numFiles++], "%s [size=%llu]\n", filenameBuffer, 1);
-//         type = dfs_dir_findnext(filenameBuffer);
-//     } while (type != FLAGS_EOF);
-
-//     printf("Found %d files.\n", numFiles);
-//     waitForStart();
-//     return numFiles;
-// }
-
 int ls(const char *dir) {
-    // char cwdbuf[FF_LFN_BUF] = {0};
     FRESULT fr; /* Return value */
     char const *p_dir = dir;
 
@@ -184,65 +193,28 @@ int ls(const char *dir) {
          attributes string. */
 
         printf("%s [%s] [size=%llu]\n", fno.fname, pcAttrib, fno.fsize);
-		sprintf(entries[num_entries++], "%s [size=%llu]\n", fno.fname, fno.fsize);
+		sprintf(g_fileEntries[num_entries++], "%s [size=%llu]\n", fno.fname, fno.fsize);
 
         fr = f_findnext(&dj, &fno); /* Search for next item */
     }
     f_closedir(&dj);
 
     printf("num_entries %d\n", num_entries);
-    waitForStart();
 
 	return num_entries;
-}
-
-// Pass in a reference to an array of strings
-void fetch_rom_list(char** entries) {
-
 }
 
 /*
  * Init display and controller input then render a list of strings, showing currently selected
  */
-static void show_list(void)
-{
-	// For now, hard code some strings in so we can have something to test with
-	// char *entries[21] = {
-	// 	"Goldeneye 007 (USA).n64",
-	// 	"Mario 64 (USA).n64",
-	// 	"Star Wars Rouge Squadron (USA).n64",
-	// 	"Star Wars Shadows of the Empire (USA).n64",
-	// 	"The Legend of Zelda, Ocarina of Time (USA).n64",
-	// 	"Perfect Dark (USA).n64",
-	// 	"Mario Kart 64 (USA).n64",
-	// 	"Killer Instinct 64 (USA).n64",
-	// 	"Star Wars Podracer (USA).n64",
-	// 	"007 Tomorrow Never Dies (USA).n64",
-	// 	"Donkey Kong 64 (USA).n64",
-	// 	"testrom.n64",
-	// 	/*"お母さん３(JPN).n64", */// I don't think it likes this entry too much, will need a font that supports UTF8
-	// 	"Harvest Moon 64 (JPN).n64",
-	// 	"Crusin' USA (USA).n64",
-	// 	"Metriod 64 (USA).n64",
-	// 	"Super Secret Menu Rom.n64",
-	// 	"Winback (USA).n64",
-	// 	"Resident Evil 2 (USA).n64",
-	// 	"Best Game You Have Never Hear Of (USA).n64",
-	// 	"testrom2.n64",
-	// 	"Final Fight 64 (JPN).n64",
-	// };
+static void show_list(void) {    
 
-    printf("Reading SD card...\n");
-    for(int i = 0; i < 256; i++) {
-        entries[i] = "000000000100000000020000000003000000000400000000050000000006000A";
-    }
-    
+    // Fetch the root contents
 	NUM_ENTRIES = ls("/");
-    printf("ls - done\n");
-    waitForStart();
 
     display_init(RESOLUTION_512x240, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE);
 
+    char debugTextBuffer[100];
 	int currently_selected = 0;
 	int first_visible = 0;
 	int max_on_screen = calculate_num_rows_per_page();
@@ -259,7 +231,7 @@ static void show_list(void)
 		draw_header_bar(display, NUM_ENTRIES);
 
 		/* Render the list of file */
-		render_list(display, entries, currently_selected, first_visible, max_on_screen);
+		render_list(display, g_fileEntries, currently_selected, first_visible, max_on_screen);
 
 		/* Grab controller input and move the selection up or down */
 		controller_scan();
@@ -269,7 +241,10 @@ static void show_list(void)
 			mag = 1;
 		} else if (keys.c[0].up) {
 			mag = -1;
-		}
+		} else if (keys.c[0].A) {
+            // Load the selected from
+            loadRomAtSelection(currently_selected);
+        }
 
 		if ((mag > 0 && currently_selected + mag < NUM_ENTRIES) || (mag < 0 && currently_selected > 0)) {
 			currently_selected += mag;
@@ -281,9 +256,8 @@ static void show_list(void)
         }
 
         /* A little debug text at the bottom of the screen */
-        // char debugTextBuffer[100];
-        // snprintf(debugTextBuffer, 100, "currently_selected=%d, first_visible=%d, max_per_page=%d", currently_selected, first_visible, max_on_screen);
-        // graphics_draw_text(display, 5, 230, debugTextBuffer);
+        snprintf(debugTextBuffer, 100, "currently_selected=%d, first_visible=%d, max_per_page=%d", currently_selected, first_visible, max_on_screen);
+        graphics_draw_text(display, 5, 230, debugTextBuffer);
 
         draw_bottom_bar(display);
 

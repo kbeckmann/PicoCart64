@@ -17,8 +17,10 @@
 #include "hw_config.h"
 
 #include "psram_inline.h"
+#include "qspi_helper.h"
 #include "internal_sd_card.h"
 #include "ringbuf.h"
+
 
 #define SD_CARD_RX_READ_DEBUG 0
 
@@ -324,4 +326,217 @@ void mount_sd(void) {
         printf("Error getting sd card by name: %s\n", arg1);
     }
     pSD->mounted = true;
+}
+
+char buf[1024 / 2 / 2 / 2 / 2];
+// void __no_inline_not_in_flash_func(load_rom)(const char *filename)
+// {
+//     // pio_sm_set_enabled(pio1, 0, false);
+
+//     qspi_enable();
+//     // sleep_ms(10); // Apparently this kills the interrupts or everything,not really sure
+//     qspi_enter_cmd_xip();
+//     qspi_disable();
+
+//     // pio_sm_set_enabled(pio1, 0, true);
+// }
+
+void __no_inline_not_in_flash_func(load_rom)(const char *filename)
+{
+    const uint CS_PIN_INDEX = 1;
+    bool chipSelectEnabled = !(sio_hw->gpio_hi_in & (1u << CS_PIN_INDEX));
+
+    printf("Chip select enabled? %d\n", chipSelectEnabled);
+
+	// Set output enable (OE) to normal mode on all QSPI IO pins except SS
+	qspi_enable();
+
+	// See FatFs - Generic FAT Filesystem Module, "Application Interface",
+	// http://elm-chan.org/fsw/ff/00index_e.html
+	sd_card_t *pSD = sd_get_by_num(0);
+	FRESULT fr = f_mount(&pSD->fatfs, pSD->pcName, 1);
+	if (FR_OK != fr) {
+		panic("f_mount error: %s (%d)\n", FRESULT_str(fr), fr);
+	}
+
+	FIL fil;
+
+	printf("\n\n---- read /%s -----\n", filename);
+
+	fr = f_open(&fil, filename, FA_OPEN_EXISTING | FA_READ);
+	if (FR_OK != fr && FR_EXIST != fr) {
+		panic("f_open(%s) error: %s (%d)\n", filename, FRESULT_str(fr), fr);
+	}
+
+	FILINFO filinfo;
+	fr = f_stat(filename, &filinfo);
+	printf("%s [size=%llu]\n", filinfo.fname, filinfo.fsize);
+
+	int len = 0;
+	int total = 0;
+	uint64_t t0 = to_us_since_boot(get_absolute_time());
+	do {
+		fr = f_read(&fil, buf, sizeof(buf), &len);
+		qspi_write(total, buf, len);
+		total += len;
+	} while (len > 0);
+	uint64_t t1 = to_us_since_boot(get_absolute_time());
+	uint32_t delta = (t1 - t0) / 1000;
+	uint32_t kBps = (uint32_t) ((float)(total / 1024.0f) / (float)(delta / 1000.0f));
+
+	printf("Read %d bytes and programmed PSRAM in %d ms (%d kB/s)\n\n\n", total, delta, kBps);
+
+	fr = f_close(&fil);
+	if (FR_OK != fr) {
+		printf("f_close error: %s (%d)\n", FRESULT_str(fr), fr);
+	}
+	printf("---- read file done -----\n\n\n");
+
+	// printf("---- Verify file with PSRAM -----\n\n\n");
+
+	//qspi_enter_cmd_xip();
+
+    qspi_enter_cmd_xip();
+    printf("WITH qspi_enter_cmd_xip\n");
+    volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+    for (int i = 0; i < 8; i++) {
+        uint32_t modifiedAddress = i;
+        psram_set_cs(1);
+        uint32_t word = ptr[modifiedAddress];
+        psram_set_cs(0);
+        printf("PSRAM-MCU2[%d]: %08x\n",i, word);
+    }
+
+    printf("Read from PSRAM via qspi_read\n");
+    char buf2[64];
+    qspi_read(0, buf2, 64);
+    for(int i = 0; i < 64; i++) {
+        printf("%02x ", buf2[i]);
+    }
+
+	// fr = f_open(&fil, filename, FA_OPEN_EXISTING | FA_READ);
+	// if (FR_OK != fr && FR_EXIST != fr) {
+	// 	panic("f_open(%s) error: %s (%d)\n", filename, FRESULT_str(fr), fr);
+	// }
+
+	// fr = f_stat(filename, &filinfo);
+	// printf("%s [size=%llu]\n", filinfo.fname, filinfo.fsize);
+
+	// // {
+	//  uint32_t *ptr = (uint32_t *) 0x10000000;
+
+	//  for (int i = 0; i < 8 * 1024 / 4 * 2; i++) {
+	//      psram_set_cs(1);
+	//      uint32_t word = ptr[i];
+	//      psram_set_cs(0);
+	//      // printf("%08X ", word);
+	//      if (word != i) {
+	//          printf("ERR: %08X != %08X\n", word, i);
+	//      }
+	//  }
+
+	// //  printf("----- halt ----\n");
+
+	// //  while (1) {
+
+	// //  }
+	// // }
+
+	// len = 0;
+	// total = 0;
+	// t0 = to_us_since_boot(get_absolute_time());
+    // int numAddressesPrinted = 0;
+	// do {
+	// 	fr = f_read(&fil, buf, sizeof(buf), &len);
+
+	// 	volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+	// 	uint32_t *buf32 = (uint32_t *) buf;
+	// 	for (int i = 0; i < 8; i++) {
+	// 		uint32_t address_32 = total / 4 + i;
+	// 		uint32_t address = address_32 * 4;
+	// 		psram_set_cs(psram_addr_to_chip(address));
+	// 		uint32_t word = ptr[address_32];
+	// 		uint32_t facit = buf32[i];
+	// 		psram_set_cs(0);
+	// 		// if (word != facit) {
+	// 		// 	printf("diff @%08X + %d: %08X %08X\n", total, i * 4, word, facit);
+	// 		// }
+
+    //         if (numAddressesPrinted < 16) {
+    //             numAddressesPrinted++;
+    //             printf("%d, %08x | %08x -- addr=%d, addr32=%d\n", i, word, facit, address, address_32);
+                
+    //         }
+	// 	}
+	// 	total += len;
+	// 	// printf("@%08X [len=%d]\n", total, len);
+
+	// 	// if (total > 128) {
+	// 	//  printf("Halting\n");
+	// 	//  while (1) {
+	// 	//  }
+	// 	// }
+
+    //     if (numAddressesPrinted >= 16) {
+    //         break;
+    //     }
+
+	// } while (len > 0);
+	// t1 = to_us_since_boot(get_absolute_time());
+	// delta = (t1 - t0) / 1000;
+	// kBps = (uint32_t) ((float)(total / 1024.0f) / (float)(delta / 1000.0f));
+
+	// printf("Verified %d bytes with PSRAM in %d ms (%d kB/s)\n\n\n", total, delta, kBps);
+
+	// //////////////////////////////
+	// t0 = to_us_since_boot(get_absolute_time());
+	// len = 64;
+	// uint32_t totalRead = 0;
+	// do {
+	// 	volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+	// 	for (int i = 0; i < len / 4; i++) {
+	// 		uint32_t address_32 = totalRead / 4 + i;
+	// 		uint32_t address = address_32 * 4;
+	// 		psram_set_cs(psram_addr_to_chip(address));
+	// 		uint32_t word = ptr[address_32];
+	// 		// uint32_t facit = buf32[i];
+	// 		psram_set_cs(0);
+	// 	}
+	// 	totalRead += len;
+	// } while (totalRead <= total);
+	// t1 = to_us_since_boot(get_absolute_time());
+	// delta = (t1 - t0) / 1000;
+	// kBps = (uint32_t) ((float)(total / 1024.0f) / (float)(delta / 1000.0f));
+
+	// printf("Reread %d bytes from PSRAM in %d ms (%d kB/s)\n\n\n", totalRead, delta, kBps);
+	// //////////////////////////////
+
+	// fr = f_close(&fil);
+	// if (FR_OK != fr) {
+	// 	printf("f_close error: %s (%d)\n", FRESULT_str(fr), fr);
+	// }
+
+	// printf("---- Verify file with PSRAM Done -----\n\n\n");
+
+	// f_unmount(pSD->pcName);
+
+	// Release the qspi control
+    qspi_disable();
+}
+
+void test_read_from_psram() {
+    printf("PSRAM test read\n");
+    qspi_enable();
+    qspi_enter_cmd_xip();
+
+    volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+    for(int i = 0; i < 4; i++) {
+        uint32_t address_32 = i;
+        psram_set_cs(1);
+        uint32_t word = ptr[address_32];
+        psram_set_cs(0);
+
+        printf("PSRAM-MCU2[%d] = %08x\n", address_32, word);
+    }
+    qspi_disable();
 }

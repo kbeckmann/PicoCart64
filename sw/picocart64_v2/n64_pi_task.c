@@ -9,8 +9,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "pico/stdlib.h"
-#include "pico/stdio.h"
+// #include "pico/stdlib.h"
+// #include "pico/stdio.h"
 #include "pico/multicore.h"
 #include "hardware/irq.h"
 
@@ -27,20 +27,59 @@
 #include "sdcard/internal_sd_card.h"
 
 // The rom to load in normal .z64, big endian, format
-#include "rom_vars.h"
-#include "rom.h"
+// #include "rom_vars.h"
+// #include "rom.h"
 
-uint16_t rom_mapping[MAPPING_TABLE_LEN];
+static inline uint8_t psram_addr_to_chip(uint32_t address)
+{
+	return ((address >> 23) & 0x7) + 1;
+}
+
+//   0: Deassert all CS
+// 1-8: Assert the specific PSRAM CS (1 indexed, matches U1, U2 ... U8)
+static inline void psram_set_cs(uint8_t chip)
+{
+	uint32_t mask = (1 << PIN_DEMUX_IE) | (1 << PIN_DEMUX_A0) | (1 << PIN_DEMUX_A1) | (1 << PIN_DEMUX_A2);
+	uint32_t new_mask;
+
+	// printf("qspi_set_cs(%d)\n", chip);
+
+	if (chip >= 1 && chip <= 8) {
+		chip--;					// convert to 0-indexed
+		new_mask = (1 << PIN_DEMUX_IE) | (chip << PIN_DEMUX_A0);
+	} else {
+		// Set PIN_DEMUX_IE = 0 to pull all PSRAM CS-lines high
+		new_mask = 0;
+	}
+
+	uint32_t old_gpio_out = sio_hw->gpio_out;
+	sio_hw->gpio_out = (old_gpio_out & (~mask)) | new_mask;
+}
+
+// uint16_t rom_mapping[MAPPING_TABLE_LEN];
 
 #if COMPRESSED_ROM
 // do something
 #else
-static const uint16_t *rom_file_16 = (uint16_t *) rom_chunks;
+// static const uint16_t *rom_file_16 = (uint16_t *) rom_chunks;
 #endif
 
 RINGBUF_CREATE(ringbuf, 64, uint32_t);
-// UART TX buffer
-//static uint16_t pc64_uart_tx_buf[PC64_BASE_ADDRESS_LENGTH];
+
+int addressesSent = 0;
+static inline uint32_t read_from_psram(uint32_t address) {
+	volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+	uint32_t modifiedAddress = address / 2;
+	psram_set_cs(psram_addr_to_chip(modifiedAddress));
+	uint32_t word = ptr[modifiedAddress];
+	psram_set_cs(0);
+
+	if (addressesSent++ < 32) {
+		printf("%x ", address);
+	}
+
+	return address % 2 == 0 ? word : swap16(word);
+}
 
 static inline uint32_t resolve_sram_address(uint32_t address)
 {	
@@ -76,8 +115,9 @@ static inline uint32_t n64_pi_get_value(PIO pio)
 	return value;
 }
 
-void n64_pi_run(void)
+void __no_inline_not_in_flash_func(n64_pi_run)(void)
 {
+	printf("n64_pi_run start...\n");
 	// Init PIO
 	PIO pio = pio0;
 	uint offset = pio_add_program(pio, &n64_pi_program);
@@ -104,7 +144,14 @@ void n64_pi_run(void)
 	//  }
 	// }
 
+	uint32_t lastUpdate = 0;
 	while (1) {
+
+		if (time_us_32() - lastUpdate > 10000000){
+			addressesSent = 0;
+			lastUpdate = time_us_32();
+			printf("a ");
+		}
 		// addr must not be a WRITE or READ request here,
 		// it should contain a 16-bit aligned address.
 		// Assert drains performance, uncomment when debugging.
@@ -117,7 +164,7 @@ void n64_pi_run(void)
 		// Note that the if-cases are ordered in priority from
 		// most timing critical to least.
 		if (last_addr == 0x10000000) {
-			//printf("lesgo\n");
+			addressesSent = 0;
 
 			// Print bus state
 			// uint32_t last_gpios = 0;
@@ -157,12 +204,15 @@ void n64_pi_run(void)
 
 			// Pre-fetch
 #if COMPRESSED_ROM
-			uint32_t chunk_index = rom_mapping[(last_addr & 0xFFFFFF) >> COMPRESSION_SHIFT_AMOUNT];
-			const uint16_t *chunk_16 = (const uint16_t *)rom_chunks[chunk_index];
-			next_word = chunk_16[(last_addr & COMPRESSION_MASK) >> 1];
+			// uint32_t chunk_index = rom_mapping[(last_addr & 0xFFFFFF) >> COMPRESSION_SHIFT_AMOUNT];
+			// const uint16_t *chunk_16 = (const uint16_t *)rom_chunks[chunk_index];
+			// next_word = chunk_16[(last_addr & COMPRESSION_MASK) >> 1];
+
+			next_word = read_from_psram((last_addr & 0xFFFFFF) >> 1);
 			
 #else
-			next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
+			// next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
+			next_word = read_from_psram((last_addr & 0xFFFFFF) >> 1);
 #endif
 
 			// ROM patching done
@@ -204,11 +254,14 @@ void n64_pi_run(void)
 			do {
 				// Pre-fetch from the address
 #if COMPRESSED_ROM
-				uint32_t chunk_index = rom_mapping[(last_addr & 0xFFFFFF) >> COMPRESSION_SHIFT_AMOUNT];
-				const uint16_t *chunk_16 = (const uint16_t *)rom_chunks[chunk_index];
-				next_word = chunk_16[(last_addr & COMPRESSION_MASK) >> 1];
+				// uint32_t chunk_index = rom_mapping[(last_addr & 0xFFFFFF) >> COMPRESSION_SHIFT_AMOUNT];
+				// const uint16_t *chunk_16 = (const uint16_t *)rom_chunks[chunk_index];
+				// next_word = chunk_16[(last_addr & COMPRESSION_MASK) >> 1];
+				
+				next_word = read_from_psram((last_addr & 0xFFFFFF) >> 1);
 #else
-				next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
+				// next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
+				next_word = read_from_psram((last_addr & 0xFFFFFF) >> 1);
 #endif
 
 				// Read command/address
@@ -402,6 +455,17 @@ void n64_pi_run(void)
 						pc64_set_sd_read_sector_count(write_word);
 						break;
 
+					case PC64_REGISTER_SD_SELECT_ROM:
+						// Rom is requesting we load rom
+						// it will send the title of the rom
+						// and we should load it
+						// TODO: This should probably be turned into a CMD+Register thing
+						// where n64 writes to a picocart register and 
+						// then sends the command, so we can do things like open directories
+						// and traverse the filesystem
+
+						break;
+
 					default:
 						break;
 					}
@@ -409,12 +473,6 @@ void n64_pi_run(void)
 					last_addr += addr_advance;
 				} else {
 					// New address
-					// uart_tx_program_putc(0xEF);
-					// uart_tx_program_putc(addr >> 24);
-					// uart_tx_program_putc(addr >> 16);
-					// uart_tx_program_putc(addr >> 8);
-					// uart_tx_program_putc(addr);
-					// uart_tx_program_putc(0xAA);
 					break;
 				}
 			} while (1);

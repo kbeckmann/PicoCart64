@@ -69,16 +69,85 @@ static const gpio_config_t mcu1_gpio_config[] = {
 	{PIN_MCU2_DIO, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO1},
 };
 
-void mcu1_core1_entry() {
-	pio_uart_init(PIN_MCU2_DIO, PIN_MCU2_CS);
+static inline uint8_t psram_addr_to_chip2(uint32_t address)
+{
+	return ((address >> 23) & 0x7) + 1;
+}
+
+//   0: Deassert all CS
+// 1-8: Assert the specific PSRAM CS (1 indexed, matches U1, U2 ... U8)
+static inline void psram_set_cs2(uint8_t chip)
+{
+	uint32_t mask = (1 << PIN_DEMUX_IE) | (1 << PIN_DEMUX_A0) | (1 << PIN_DEMUX_A1) | (1 << PIN_DEMUX_A2);
+	uint32_t new_mask;
+
+	// printf("qspi_set_cs(%d)\n", chip);
+
+	if (chip >= 1 && chip <= 8) {
+		chip--;					// convert to 0-indexed
+		new_mask = (1 << PIN_DEMUX_IE) | (chip << PIN_DEMUX_A0);
+	} else {
+		// Set PIN_DEMUX_IE = 0 to pull all PSRAM CS-lines high
+		new_mask = 0;
+	}
+
+	uint32_t old_gpio_out = sio_hw->gpio_out;
+	sio_hw->gpio_out = (old_gpio_out & (~mask)) | new_mask;
+}
+
+static inline uint32_t read_from_psram2(uint32_t address) {
+	volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+	uint32_t modifiedAddress = address / 2;
+	psram_set_cs2(psram_addr_to_chip2(modifiedAddress));
+	uint32_t word = ptr[modifiedAddress];
+	psram_set_cs2(0);
+	return address % 2 == 0 ? word : swap16(word);
+}
+
+void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
+	// pio_uart_init(PIN_MCU2_DIO, PIN_MCU2_CS);
+
+	printf("MCU1 core1 booted!\n");
 	
 	bool readingData = false;
-	uint8_t i = 0;
+	uint32_t t = 0;
+	uint32_t it = 0;
 	while (1) {
 		tight_loop_contents();
+		
+		if(time_us_32() - t > 5000000) {
+			t = time_us_32();
+			it++;
 
-		// uart_tx_program_putc(i++);
-		// sleep_ms(500);
+			if (it == 10) {
+				qspi_enable();
+				qspi_enter_cmd_xip();
+
+				volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+				printf("Access at [0x10000000]\n");
+				for(int i = 0; i < 4; i++) {
+					uint32_t address_32 = i;
+					psram_set_cs2(1);
+					uint32_t word = ptr[address_32];
+					psram_set_cs2(0);
+
+					printf("PSRAM-MCU1[%d] = %08x\n", address_32, word);
+				}
+
+				qspi_disable();
+			} 
+			// else if (it > 10) {
+			// 	volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+			// 	for(int i = 0; i < 4; i++) {
+			// 		uint32_t address_32 = i;
+			// 		psram_set_cs2(1);
+			// 		uint32_t word = ptr[address_32];
+			// 		psram_set_cs2(0);
+
+			// 		printf("PSRAM[%d] = %08x\n", address_32, word);
+			// 	}
+			// }
+		}
 
 		if (readingData) {
 			// Process anything that might be on the uart buffer
@@ -112,7 +181,7 @@ void mcu1_core1_entry() {
 	}
 }
 
-void mcu1_main(void)
+void __no_inline_not_in_flash_func(mcu1_main)(void)
 {
 	int count = 0;
 	const int freq_khz = 133000;
@@ -126,11 +195,12 @@ void mcu1_main(void)
 
 	set_sys_clock_khz(freq_khz, true);
 
+	gpio_configure(mcu1_gpio_config, ARRAY_SIZE(mcu1_gpio_config));
+
 	// Enable STDIO over USB
 	// stdio_usb_init();
 	// stdio_async_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
-
-	gpio_configure(mcu1_gpio_config, ARRAY_SIZE(mcu1_gpio_config));
+	stdio_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
 	
 	// uint32_t BUFFER_SIZE = 6;
 	// uint8_t writeBuffer[BUFFER_SIZE];
@@ -183,8 +253,9 @@ void mcu1_main(void)
 
 #else
 
-	qspi_oeover_normal(true);
-	ssi_hw->ssienr = 1;
+	// This can't be enabled when mcu2 is accessing psram
+	// qspi_oeover_normal(true);
+	// ssi_hw->ssienr = 1;
 
 	// sleep_ms(10);
 
@@ -243,62 +314,26 @@ void mcu1_main(void)
 
 #endif
 
-	// Set up ROM mapping table
-	if (memcmp(picocart_header, "picocartcompress", 16) == 0) {
-		// Copy rom compressed map from flash into RAM
-		// uart_tx_program_puts("Found a compressed ROM\n");
-		memcpy(rom_mapping, flash_rom_mapping, MAPPING_TABLE_LEN * sizeof(uint16_t));
-	} else {
-		for (int i = 0; i < MAPPING_TABLE_LEN; i++) {
-			rom_mapping[i] = i;
-		}
-	}
+	// // Set up ROM mapping table
+	// if (memcmp(picocart_header, "picocartcompress", 16) == 0) {
+	// 	// Copy rom compressed map from flash into RAM
+	// 	// uart_tx_program_puts("Found a compressed ROM\n");
+	// 	memcpy(rom_mapping, flash_rom_mapping, MAPPING_TABLE_LEN * sizeof(uint16_t));
+	// } else {
+	// 	for (int i = 0; i < MAPPING_TABLE_LEN; i++) {
+	// 		rom_mapping[i] = i;
+	// 	}
+	// }
 
 	// Put something in this array for sanity testing
 	for(int i = 0; i < 256; i++) {
 		pc64_uart_tx_buf[i] = 0xFFFF - i;
 	}
 
-	// THIS COMMENTED OUT CODE WILL ECHO BACK DATA SENT FROM MCU2
-	// busy_wait_ms(2000);
-	// uint64_t s = 0;
-	// pc64_set_sd_read_sector(s);
-	// pc64_send_sd_read_command();
-	// bool hasPrinted = false;
-	// while(1) {
-	// 	tight_loop_contents();
-
-	// 	if (!sd_is_busy) {
-	// 		if (!hasPrinted) {
-	// 			hasPrinted = true;
-	// 			uart_tx_program_putc(0xBA);
-	// 			uart_tx_program_putc(bufferIndex >> 24);
-	// 			uart_tx_program_putc(bufferIndex >> 16);
-	// 			uart_tx_program_putc(bufferIndex >> 8);
-	// 			uart_tx_program_putc(bufferIndex);
-	// 			uart_tx_program_putc(0xAA);
-
-	// 			uart_tx_program_putc(0xBC);
-	// 			uart_tx_program_putc(rx_character_index >> 24);
-	// 			uart_tx_program_putc(rx_character_index >> 16);
-	// 			uart_tx_program_putc(rx_character_index >> 8);
-	// 			uart_tx_program_putc(rx_character_index);
-	// 			uart_tx_program_putc(0xAA);
-	// 			busy_wait_ms(100);
-	// 			for(int i = 0; i < 256; i++) {
-	// 				uint16_t value = pc64_uart_tx_buf[i];
-	// 				uart_tx_program_putc(value >> 8);
-	// 				uart_tx_program_putc(value);
-					
-	// 				busy_wait_ms(10);
-	// 			}
-	// 		}
-	// 	}
-	// }
-
 	multicore_launch_core1(mcu1_core1_entry);
 
-	n64_pi_run();
+	// printf("launching n64_pi_run...\n");
+	// n64_pi_run();
 
 #endif
 

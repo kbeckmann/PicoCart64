@@ -46,3 +46,7 @@ void send_sd_card_data();
 
 // SD Card functions
 void mount_sd(void);
+
+// sd/rom/psram stuff
+void load_rom(const char *filename);
+void test_read_from_psram();

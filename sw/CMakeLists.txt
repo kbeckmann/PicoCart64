@@ -40,8 +40,8 @@ add_subdirectory(picocart64_v1)
 add_subdirectory(picocart64_v2)
 add_subdirectory(dualpico)
 
-add_compile_options(-Wall
-        
+add_compile_options(
+        -Wall
         -Wno-unused-function # we have some for the docs that aren't called
         -Wno-maybe-uninitialized
 )
