@@ -14,7 +14,7 @@
 
 #include "hardware/regs/pads_qspi.h"
 
-#include "pins_mcu2.h"
+// #include "pins_mcu2.h"
 
 // TODO: For now, pins_mcu1.h or pins_mcu2.h must be included before
 //       this file.

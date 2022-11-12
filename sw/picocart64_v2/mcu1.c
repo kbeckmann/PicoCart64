@@ -69,6 +69,25 @@ static const gpio_config_t mcu1_gpio_config[] = {
 	{PIN_MCU2_DIO, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO1},
 };
 
+// DEMUX enable
+static const gpio_config_t mcu1_demux_enabled_config[] = {
+	// Demux should be configured as inputs without pulls until we lock the bus
+	{PIN_DEMUX_A0, GPIO_OUT, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+	{PIN_DEMUX_A1, GPIO_OUT, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+	{PIN_DEMUX_A2, GPIO_OUT, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+	{PIN_DEMUX_IE, GPIO_OUT, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+};
+
+// DEMUX disable
+static const gpio_config_t mcu1_demux_disabled_config[] = {
+	// Demux should be configured as inputs without pulls until we lock the bus
+	{PIN_DEMUX_A0, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+	{PIN_DEMUX_A1, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+	{PIN_DEMUX_A2, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+	{PIN_DEMUX_IE, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+};
+
+
 static inline uint8_t psram_addr_to_chip2(uint32_t address)
 {
 	return ((address >> 23) & 0x7) + 1;
@@ -120,9 +139,19 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 			it++;
 
 			if (it == 10) {
-				qspi_enable();
-				qspi_enter_cmd_xip();
 
+				qspi_enable(mcu1_demux_enabled_config);
+				printf("MCU1 PSRAM via qspi_read1\n");
+				char buf2[64];
+				qspi_read(0, buf2, 64);
+				for(int i = 0; i < 64; i++) {
+					printf("%02x ", buf2[i]);
+				}
+				printf("\n");
+
+				printf("MCU1 try to read with ptr\n");
+				qspi_enable(mcu1_demux_enabled_config);
+				qspi_enter_cmd_xip();
 				volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
 				printf("Access at [0x10000000]\n");
 				for(int i = 0; i < 4; i++) {
@@ -134,7 +163,7 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 					printf("PSRAM-MCU1[%d] = %08x\n", address_32, word);
 				}
 
-				qspi_disable();
+				qspi_disable(mcu1_demux_disabled_config);
 			} 
 			// else if (it > 10) {
 			// 	volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;

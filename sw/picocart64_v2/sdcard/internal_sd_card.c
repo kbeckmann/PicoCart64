@@ -16,7 +16,6 @@
 #include "rtc.h"
 #include "hw_config.h"
 
-#include "psram_inline.h"
 #include "qspi_helper.h"
 #include "internal_sd_card.h"
 #include "ringbuf.h"
@@ -329,22 +328,59 @@ void mount_sd(void) {
 }
 
 char buf[1024 / 2 / 2 / 2 / 2];
-// void __no_inline_not_in_flash_func(load_rom)(const char *filename)
-// {
-//     // pio_sm_set_enabled(pio1, 0, false);
 
-//     qspi_enable();
-//     // sleep_ms(10); // Apparently this kills the interrupts or everything,not really sure
-//     qspi_enter_cmd_xip();
-//     qspi_disable();
+// DEMUX enable
+static const gpio_config_t mcu2_demux_enabled_config[] = {
+	// Demux should be configured as inputs without pulls until we lock the bus
+	{15, GPIO_OUT, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+	{16, GPIO_OUT, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+	{17, GPIO_OUT, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+	{18, GPIO_OUT, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+};
 
-//     // pio_sm_set_enabled(pio1, 0, true);
-// }
+// DEMUX disable
+static const gpio_config_t mcu2_demux_disabled_config[] = {
+	// Demux should be configured as inputs without pulls until we lock the bus
+	{15, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+	{16, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+	{17, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+	{18, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+};
+#define PIN_DEMUX_A0          (15)
+#define PIN_DEMUX_A1          (16)
+#define PIN_DEMUX_A2          (17)
+#define PIN_DEMUX_IE          (18)
+
+static inline uint8_t psram_addr_to_chip(uint32_t address)
+{
+	return ((address >> 23) & 0x7) + 1;
+}
+
+//   0: Deassert all CS
+// 1-8: Assert the specific PSRAM CS (1 indexed, matches U1, U2 ... U8)
+static inline void psram_set_cs(uint8_t chip)
+{
+	uint32_t mask = (1 << PIN_DEMUX_IE) | (1 << PIN_DEMUX_A0) | (1 << PIN_DEMUX_A1) | (1 << PIN_DEMUX_A2);
+	uint32_t new_mask;
+
+	// printf("qspi_set_cs(%d)\n", chip);
+
+	if (chip >= 1 && chip <= 8) {
+		chip--;					// convert to 0-indexed
+		new_mask = (1 << PIN_DEMUX_IE) | (chip << PIN_DEMUX_A0);
+	} else {
+		// Set PIN_DEMUX_IE = 0 to pull all PSRAM CS-lines high
+		new_mask = 0;
+	}
+
+	uint32_t old_gpio_out = sio_hw->gpio_out;
+	sio_hw->gpio_out = (old_gpio_out & (~mask)) | new_mask;
+}
 
 void __no_inline_not_in_flash_func(load_rom)(const char *filename)
 {
 	// Set output enable (OE) to normal mode on all QSPI IO pins except SS
-	qspi_enable();
+	qspi_enable(mcu2_demux_enabled_config);
 
 	// See FatFs - Generic FAT Filesystem Module, "Application Interface",
 	// http://elm-chan.org/fsw/ff/00index_e.html
@@ -391,14 +427,24 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
 
 	//qspi_enter_cmd_xip();
 
-    /* THIS WILL HANG FOREVER, maybe because it was called before calling qspi_enter_cmd_xip
-    printf("Read from PSRAM via qspi_read\n");
+    qspi_enable(mcu2_demux_enabled_config);
+    printf("Read from PSRAM via qspi_read1\n");
     char buf2[64];
     qspi_read(0, buf2, 64);
     for(int i = 0; i < 64; i++) {
         printf("%02x ", buf2[i]);
     }
-    */
+    printf("\n");
+    
+    qspi_enable(mcu2_demux_enabled_config);
+    qspi_enter_cmd_xip();
+    printf("Read from PSRAM via qspi_read2\n");
+    qspi_read(0, buf2, 64);
+    for(int i = 0; i < 64; i++) {
+        printf("%02x ", buf2[i]);
+    }
+    printf("\n");
+    
 
     qspi_enter_cmd_xip();
     printf("WITH qspi_enter_cmd_xip\n");
@@ -518,22 +564,5 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
 	// f_unmount(pSD->pcName);
 
 	// Release the qspi control
-    qspi_disable();
-}
-
-void test_read_from_psram() {
-    printf("PSRAM test read\n");
-    qspi_enable();
-    qspi_enter_cmd_xip();
-
-    volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
-    for(int i = 0; i < 4; i++) {
-        uint32_t address_32 = i;
-        psram_set_cs(1);
-        uint32_t word = ptr[address_32];
-        psram_set_cs(0);
-
-        printf("PSRAM-MCU2[%d] = %08x\n", address_32, word);
-    }
-    qspi_disable();
+    qspi_disable(mcu2_demux_disabled_config);
 }

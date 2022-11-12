@@ -14,6 +14,8 @@
 
 #include "hardware/regs/pads_qspi.h"
 
+#include "gpio_helper.h"
+
 #define QSPI_SCLK_PIN  (0)
 #define QSPI_SS_PIN    (1)
 #define QSPI_SD0_PIN   (2)
@@ -34,12 +36,12 @@ void qspi_set_pull(bool disabled, bool pullup, bool pulldown);
 void qspi_oeover_normal(bool enable_ss);
 void qspi_oeover_disable(void);
 
-void qspi_demux_enable(bool enabled);
+void qspi_demux_enable(bool enabled, const gpio_config_t *demuxConfig);
 
 void qspi_enter_cmd_xip(void);
 void qspi_init_spi(void);
-void qspi_enable(void);
-void qspi_disable(void);
+void qspi_enable(const gpio_config_t *demuxConfig);
+void qspi_disable(const gpio_config_t *demuxConfig);
 void qspi_write(uint32_t address, const uint8_t * data, uint32_t length);
 void qspi_read(uint32_t address, uint8_t * data, uint32_t length);
 

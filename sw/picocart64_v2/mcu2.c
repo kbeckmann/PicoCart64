@@ -25,7 +25,6 @@
 #include "qspi_helper.h"
 #include "stdio_async_uart.h"
 #include "gpio_helper.h"
-#include "psram_inline.h"
 
 #include "sdcard/internal_sd_card.h"
 #include "pio_uart/pio_uart.h"
@@ -101,39 +100,23 @@ static const gpio_config_t mcu2_gpio_config[] = {
 	{PIN_SPI1_CS, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO1},
 };
 
-static void psram_test(void)
-{
-	vTaskDelay(500);
+// DEMUX enable
+static const gpio_config_t mcu2_demux_enabled_config[] = {
+	// Demux should be configured as inputs without pulls until we lock the bus
+	{PIN_DEMUX_A0, GPIO_OUT, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+	{PIN_DEMUX_A1, GPIO_OUT, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+	{PIN_DEMUX_A2, GPIO_OUT, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+	{PIN_DEMUX_IE, GPIO_OUT, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+};
 
-	printf("qspi_test();\n");
-	qspi_test();
-
-	// Turn off the XIP cache
-	xip_ctrl_hw->ctrl = (xip_ctrl_hw->ctrl & (~XIP_CTRL_EN_BITS));
-	xip_ctrl_hw->flush = 1;
-
-	qspi_enable();
-	qspi_enter_cmd_xip();
-
-	printf("Read:\n");
-	uint32_t *ptr = (uint32_t *) 0x10000000;
-	// for (int i = 0; i < 8 * 1024 / 4 * 2; i++) {
-	for (int i = 0; i < 256; i++) {
-		uint32_t address_32 = i;
-		uint32_t address = address_32 * 4;
-		psram_set_cs(psram_addr_to_chip(address));
-		uint32_t word1 = ptr[address_32];
-		psram_set_cs(0);
-		// printf("%08X ", word);
-		if (word1 != i) {
-			printf("ERR: %08X != %08X\n", word1, i);
-		}
-	}
-
-	printf("------ Read done\n");
-
-	qspi_disable();
-}
+// DEMUX disable
+static const gpio_config_t mcu2_demux_disabled_config[] = {
+	// Demux should be configured as inputs without pulls until we lock the bus
+	{PIN_DEMUX_A0, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+	{PIN_DEMUX_A1, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+	{PIN_DEMUX_A2, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+	{PIN_DEMUX_IE, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+};
 
 void main_task_entry(__unused void *params)
 {
