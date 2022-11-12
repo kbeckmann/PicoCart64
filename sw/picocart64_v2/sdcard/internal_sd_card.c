@@ -343,11 +343,6 @@ char buf[1024 / 2 / 2 / 2 / 2];
 
 void __no_inline_not_in_flash_func(load_rom)(const char *filename)
 {
-    const uint CS_PIN_INDEX = 1;
-    bool chipSelectEnabled = !(sio_hw->gpio_hi_in & (1u << CS_PIN_INDEX));
-
-    printf("Chip select enabled? %d\n", chipSelectEnabled);
-
 	// Set output enable (OE) to normal mode on all QSPI IO pins except SS
 	qspi_enable();
 
@@ -396,6 +391,15 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
 
 	//qspi_enter_cmd_xip();
 
+    /* THIS WILL HANG FOREVER, maybe because it was called before calling qspi_enter_cmd_xip
+    printf("Read from PSRAM via qspi_read\n");
+    char buf2[64];
+    qspi_read(0, buf2, 64);
+    for(int i = 0; i < 64; i++) {
+        printf("%02x ", buf2[i]);
+    }
+    */
+
     qspi_enter_cmd_xip();
     printf("WITH qspi_enter_cmd_xip\n");
     volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
@@ -405,13 +409,6 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
         uint32_t word = ptr[modifiedAddress];
         psram_set_cs(0);
         printf("PSRAM-MCU2[%d]: %08x\n",i, word);
-    }
-
-    printf("Read from PSRAM via qspi_read\n");
-    char buf2[64];
-    qspi_read(0, buf2, 64);
-    for(int i = 0; i < 64; i++) {
-        printf("%02x ", buf2[i]);
     }
 
 	// fr = f_open(&fil, filename, FA_OPEN_EXISTING | FA_READ);
