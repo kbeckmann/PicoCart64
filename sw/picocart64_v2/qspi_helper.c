@@ -308,13 +308,8 @@ void qspi_init_qspi(void)
 
 	// qspi_put_cmd_addr(1, PSRAM_ENTER_QUAD_MODE, 0, 0);
 	// First enable quad mode, spi should be working before this
+	// probably want regular xip mode before we enter into this mode
 	printf("Sending ENTER QUAD MODE command\n");
-	// psram_set_cs(1);
-	// ssi_hw->dr0 = PSRAM_ENTER_QUAD_MODE;
-	// empty_tx_fifo(0);
-	// empty_rx_fifo(false);
-	// psram_set_cs(0);
-
 	qspi_put_cmd_addr(1, PSRAM_ENTER_QUAD_MODE, 0, 0);
 	psram_set_cs(0);
 
@@ -327,11 +322,6 @@ void qspi_init_qspi(void)
 	// ssi->baudr = 2;
 	// ssi->baudr = 6;
 	ssi->baudr = 20;
-
-	// ssi->ctrlr0 = (SSI_CTRLR0_SPI_FRF_VALUE_QUAD << SSI_CTRLR0_SPI_FRF_LSB) |    // ...
-	//  (7 << SSI_CTRLR0_DFS_32_LSB) |  // 8 clocks per data frame, i.e. 4 bytes
-	//  (0 << SSI_CTRLR0_CFS_LSB) | //
-	//  (SSI_CTRLR0_TMOD_VALUE_TX_AND_RX << SSI_CTRLR0_TMOD_LSB);   // TX and RX FIFOs are both used for every byte
 
 	// This value doesn't make sense. Some places say clocks per data frame and other are bits per data frame
 	//SSI_CTRLR0_DFS_32_LSB
@@ -353,7 +343,7 @@ void qspi_init_qspi(void)
 					   (4 << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |	/* Hi-Z dummy clocks following address + mode */
 					   (8 << SSI_SPI_CTRLR0_ADDR_L_LSB) |	/* Total number of address + mode bits */
 					   (SSI_SPI_CTRLR0_INST_L_VALUE_8B << SSI_SPI_CTRLR0_INST_L_LSB) |	/*  */
-					   (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C2A << SSI_SPI_CTRLR0_TRANS_TYPE_LSB)	/* Send Address in Quad I/O mode (and Command but that is zero bits long) */
+					   (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_2C2A << SSI_SPI_CTRLR0_TRANS_TYPE_LSB)	/* Send Address and data in Quad I/O mode */
 		);
 
 	// Slave selected when transfers in progress
