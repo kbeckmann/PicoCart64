@@ -331,7 +331,7 @@ void qspi_init_qspi(void)
 	// 31 (i.e. 32) doesn't make sense unless that means we just want to transfer in and our 32 bits values
 
 	ssi_hw->ctrlr0 = ((SSI_CTRLR0_SPI_FRF_VALUE_QUAD << SSI_CTRLR0_SPI_FRF_LSB) |	// 
-				   (31 << SSI_CTRLR0_DFS_32_LSB) |	
+				   (7 << SSI_CTRLR0_DFS_32_LSB) |	
 				   (SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB)
 		);
 
