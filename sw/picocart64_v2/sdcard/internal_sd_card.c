@@ -333,6 +333,9 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
 	// Set output enable (OE) to normal mode on all QSPI IO pins except SS
 	qspi_enable();
 
+    // printf("MCU2 QSPI_ENABLED... DUMPING CONFIG\n");
+    // dump_current_ssi_config();
+
 	// See FatFs - Generic FAT Filesystem Module, "Application Interface",
 	// http://elm-chan.org/fsw/ff/00index_e.html
 	sd_card_t *pSD = sd_get_by_num(0);
@@ -387,9 +390,28 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
     }
     printf("\n");
 
+    // Try to do qspi reads
     qspi_enter_cmd_xip();
-    printf("WITH qspi_enter_cmd_xip\n");
+    qspi_init_qspi();
+    printf("MCU2 QSPI_XIP ENABLED... DUMPING CONFIG\n");
+    dump_current_ssi_config();
+
+    printf("Read with XIP in QSPI(real quad) mode\n");
     volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+    for (int i = 0; i < 16; i++) {
+        uint32_t modifiedAddress = i;
+        psram_set_cs(1);
+        uint32_t word = ptr[modifiedAddress];
+        psram_set_cs(0);
+        printf("PSRAM-MCU2[%d]: %08x\n",i, word);
+    }
+
+
+    // Now see if regular reads work
+    qspi_enter_cmd_xip();
+    printf("MCU2 XIP ENABLED... DUMPING CONFIG\n");
+    dump_current_ssi_config();
+    printf("WITH qspi_enter_cmd_xip\n");
     for (int i = 0; i < 16; i++) {
         uint32_t modifiedAddress = i;
         psram_set_cs(1);

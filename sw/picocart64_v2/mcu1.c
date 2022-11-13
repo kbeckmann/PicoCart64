@@ -9,14 +9,16 @@
 
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
+#include "hardware/structs/ssi.h"
 
 #include "pins_mcu1.h"
 #include "qspi_helper.h"
 #include "n64_pi_task.h"
-#include "stdio_async_uart.h"
 #include "reset_reason.h"
 #include "sha256.h"
-#include "rom_vars.h"
+// #include "rom_vars.h"
+
+#include "stdio_async_uart.h"
 
 #include "gpio_helper.h"
 #include "utils.h"
@@ -70,40 +72,40 @@ static const gpio_config_t mcu1_gpio_config[] = {
 	{PIN_MCU2_DIO, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO1},
 };
 
-// static inline uint8_t psram_addr_to_chip2(uint32_t address)
-// {
-// 	return ((address >> 23) & 0x7) + 1;
-// }
+static inline uint8_t psram_addr_to_chip2(uint32_t address)
+{
+	return ((address >> 23) & 0x7) + 1;
+}
 
-// //   0: Deassert all CS
-// // 1-8: Assert the specific PSRAM CS (1 indexed, matches U1, U2 ... U8)
-// static inline void psram_set_cs2(uint8_t chip)
-// {
-// 	uint32_t mask = (1 << PIN_DEMUX_IE) | (1 << PIN_DEMUX_A0) | (1 << PIN_DEMUX_A1) | (1 << PIN_DEMUX_A2);
-// 	uint32_t new_mask;
+//   0: Deassert all CS
+// 1-8: Assert the specific PSRAM CS (1 indexed, matches U1, U2 ... U8)
+static inline void psram_set_cs2(uint8_t chip)
+{
+	uint32_t mask = (1 << PIN_DEMUX_IE) | (1 << PIN_DEMUX_A0) | (1 << PIN_DEMUX_A1) | (1 << PIN_DEMUX_A2);
+	uint32_t new_mask;
 
-// 	// printf("qspi_set_cs(%d)\n", chip);
+	// printf("qspi_set_cs(%d)\n", chip);
 
-// 	if (chip >= 1 && chip <= 8) {
-// 		chip--;					// convert to 0-indexed
-// 		new_mask = (1 << PIN_DEMUX_IE) | (chip << PIN_DEMUX_A0);
-// 	} else {
-// 		// Set PIN_DEMUX_IE = 0 to pull all PSRAM CS-lines high
-// 		new_mask = 0;
-// 	}
+	if (chip >= 1 && chip <= 8) {
+		chip--;					// convert to 0-indexed
+		new_mask = (1 << PIN_DEMUX_IE) | (chip << PIN_DEMUX_A0);
+	} else {
+		// Set PIN_DEMUX_IE = 0 to pull all PSRAM CS-lines high
+		new_mask = 0;
+	}
 
-// 	uint32_t old_gpio_out = sio_hw->gpio_out;
-// 	sio_hw->gpio_out = (old_gpio_out & (~mask)) | new_mask;
-// }
+	uint32_t old_gpio_out = sio_hw->gpio_out;
+	sio_hw->gpio_out = (old_gpio_out & (~mask)) | new_mask;
+}
 
-// static inline uint32_t read_from_psram2(uint32_t address) {
-// 	volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
-// 	uint32_t modifiedAddress = address / 2;
-// 	psram_set_cs2(psram_addr_to_chip2(modifiedAddress));
-// 	uint32_t word = ptr[modifiedAddress];
-// 	psram_set_cs2(0);
-// 	return address % 2 == 0 ? word : swap16(word);
-// }
+static inline uint32_t read_from_psram2(uint32_t address) {
+	volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+	uint32_t modifiedAddress = address / 2;
+	psram_set_cs2(psram_addr_to_chip2(modifiedAddress));
+	uint32_t word = ptr[modifiedAddress];
+	psram_set_cs2(0);
+	return address % 2 == 0 ? word : swap16(word);
+}
 
 void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 	// pio_uart_init(PIN_MCU2_DIO, PIN_MCU2_CS);
@@ -120,33 +122,50 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 			t = time_us_32();
 			it++;
 
-			// if (it == 10) {
+			if (it == 10) {
 
-			// 	qspi_enable();
-			// 	printf("MCU1 PSRAM via qspi_read1\n");
-			// 	char buf2[64];
-			// 	qspi_read(0, buf2, 64);
-			// 	for(int i = 0; i < 64; i++) {
-			// 		printf("%02x ", buf2[i]);
-			// 	}
-			// 	printf("\n");
+				// printf("MCU1 SSI CONFIG\n");
+				// dump_current_ssi_config();
 
-			// 	printf("MCU1 try to read with ptr\n");
-			// 	qspi_enable();
-			// 	qspi_enter_cmd_xip();
-			// 	volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
-			// 	printf("Access at [0x10000000]\n");
-			// 	for(int i = 0; i < 4; i++) {
-			// 		uint32_t address_32 = i;
-			// 		psram_set_cs2(1);
-			// 		uint32_t word = ptr[address_32];
-			// 		psram_set_cs2(0);
+				qspi_enable();
+				printf("MCU1 PSRAM via qspi_read1\n");
+				char buf2[64];
+				uint32_t now = time_us_32();
+				qspi_read(0, buf2, 64);
+				uint32_t diff = time_us_32() - now;
+				printf("Read 64bytes in %d us\n", diff);
+				for(int i = 0; i < 64; i++) {
+					printf("[%x]%02x ", i, buf2[i]);
+				}
 
-			// 		printf("PSRAM-MCU1[%d] = %08x\n", address_32, word);
-			// 	}
+				printf("\n");
 
-			// // 	qspi_disable();
-			// } 
+				// now = time_us_32();
+				// qspi_read(0, buf2, 1);
+				// uint32_t next_word = buf2[0];
+				// diff = time_us_32() - now;
+				// printf("Read 1bytes in %d us\n", diff);
+
+				printf("\nMCU1 try to read with ptr\n");
+				qspi_enable();
+				qspi_enter_cmd_xip();
+				volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+				printf("Access at [0x10000000]\n");
+				uint32_t totalTime = 0;
+				for(int i = 0; i < 64 / 4; i++) {
+					now = time_us_32();
+					uint32_t address_32 = i;
+					psram_set_cs2(1);
+					uint32_t word = ptr[address_32];
+					psram_set_cs2(0);
+					totalTime += time_us_32() - now;
+
+					printf("PSRAM-MCU1[%d] = %08x\n", address_32, word);
+				}
+				printf("xip access took %d us\n", totalTime);
+
+			// 	qspi_disable();
+			} 
 		}
 
 		if (readingData) {
@@ -196,26 +215,27 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 	set_sys_clock_khz(freq_khz, true);
 
 	gpio_configure(mcu1_gpio_config, ARRAY_SIZE(mcu1_gpio_config));
-	//set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
+	set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
 
 	// Enable STDIO over USB
 	// stdio_usb_init();
 	// stdio_async_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
 	stdio_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
 
-	qspi_oeover_normal(true);
-	ssi_hw->ssienr = 1;
+	// IF READING FROM FROM FLASH... (works for compressed roms)
+	// qspi_oeover_normal(true);
+	// ssi_hw->ssienr = 1;
+	// // Set up ROM mapping table
+	// if (memcmp(picocart_header, "picocartcompress", 16) == 0) {
+	// 	// Copy rom compressed map from flash into RAM
+	// 	// uart_tx_program_puts("Found a compressed ROM\n");
+	// 	memcpy(rom_mapping, flash_rom_mapping, MAPPING_TABLE_LEN * sizeof(uint16_t));
+	// } else {
+	// 	for (int i = 0; i < MAPPING_TABLE_LEN; i++) {
+	// 		rom_mapping[i] = i;
+	// 	}
+	// }
 
-	// Set up ROM mapping table
-	if (memcmp(picocart_header, "picocartcompress", 16) == 0) {
-		// Copy rom compressed map from flash into RAM
-		// uart_tx_program_puts("Found a compressed ROM\n");
-		memcpy(rom_mapping, flash_rom_mapping, MAPPING_TABLE_LEN * sizeof(uint16_t));
-	} else {
-		for (int i = 0; i < MAPPING_TABLE_LEN; i++) {
-			rom_mapping[i] = i;
-		}
-	}
 
 	// Put something in this array for sanity testing
 	for(int i = 0; i < 256; i++) {

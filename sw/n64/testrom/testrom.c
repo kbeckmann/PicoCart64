@@ -334,15 +334,15 @@ int main(void)
 		printf("       PicoCart64 might stall now and require a power cycle.\n");
 	}
 
-	console_clear();
-	test_tx_buffer_read(read_buf, 2048, 512);
-	while (true) {
-        controller_scan();
-        struct controller_data keys = get_keys_pressed();
-        if (keys.c[0].start) {
-            break;
-        }
-    }
+	// console_clear();
+	// test_tx_buffer_read(read_buf, 2048, 512);
+	// while (true) {
+    //     controller_scan();
+    //     struct controller_data keys = get_keys_pressed();
+    //     if (keys.c[0].start) {
+    //         break;
+    //     }
+    // }
     
     /* Start the shell if the user presses start */
     printf("\n\nPress START to continue to the shell...\n");

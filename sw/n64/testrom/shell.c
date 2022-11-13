@@ -64,7 +64,7 @@ void loadRomAtSelection(int selection) {
         valueToSend = fileToLoad[strIndex++];
         data_cache_hit_writeback_invalidate(&valueToSend, sizeof(valueToSend));
 	    pi_write_raw(&valueToSend, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_SELECT_ROM, sizeof(valueToSend));
-    } while (valueToSend != NULL)
+    } while (valueToSend != NULL);
 
     g_sendingSelectedRom = false;
 }

@@ -25,41 +25,36 @@
 #include "utils.h"
 
 #include "sdcard/internal_sd_card.h"
+#include "qspi_helper.h"
 #include "psram.h"
 
 // The rom to load in normal .z64, big endian, format
-#include "rom_vars.h"
-#include "rom.h"
+// #include "rom_vars.h"
+// #include "rom.h"
 
-uint16_t rom_mapping[MAPPING_TABLE_LEN];
+// uint16_t rom_mapping[MAPPING_TABLE_LEN];
 
 #if COMPRESSED_ROM
 // do something
 #else
-static const uint16_t *rom_file_16 = (uint16_t *) rom_chunks;
+// static const uint16_t *rom_file_16 = (uint16_t *) rom_chunks;
 #endif
 
 RINGBUF_CREATE(ringbuf, 64, uint32_t);
 
 // int addressesSent = 0;
-// static inline uint32_t read_from_psram(uint32_t last_addr) {
-// 	// volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
-// 	// uint32_t modifiedAddress = address / 2;
-// 	// psram_set_cs(psram_addr_to_chip(modifiedAddress));
-// 	// uint32_t word = ptr[modifiedAddress];
-// 	// psram_set_cs(0);
+// static inline uint32_t read_from_psram(uint32_t address) {
+// 	//XIP_NOCACHE_NOALLOC_BASE
+// 	volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+// 	uint32_t modifiedAddress = address / 2;
+// 	psram_set_cs(psram_addr_to_chip(modifiedAddress));
+// 	uint32_t word = ptr[modifiedAddress];
+// 	psram_set_cs(0);
 
-// 	// uint32_t modifiedWord = address % 2 == 0 ? word : swap16(word);
+// 	uint32_t modifiedWord = address % 2 == 0 ? word : swap16(word);
+// 	//printf("[%d]%08x ", address, modifiedWord);
 
-// 	// printf("[%d]%08x ", address, modifiedWord);
-// 	// return modifiedWord;
-
-// 	uint32_t chunk_index = rom_mapping[(last_addr & 0xFFFFFF) >> COMPRESSION_SHIFT_AMOUNT];
-// 	const uint16_t *chunk_16 = (const uint16_t *)rom_chunks[chunk_index];
-// 	uint32_t compressed_address = (last_addr & COMPRESSION_MASK) >> 1;
-// 	uint32_t next_word = chunk_16[compressed_address];
-// 	printf("[%d]%08x ", (last_addr & 0xFFFFFF) >> 1, next_word);
-// 	return next_word;
+// 	return modifiedWord;
 // }
 
 static inline uint32_t resolve_sram_address(uint32_t address)
@@ -96,6 +91,7 @@ static inline uint32_t n64_pi_get_value(PIO pio)
 	return value;
 }
 
+char buf2[64];
 void __no_inline_not_in_flash_func(n64_pi_run)(void)
 {
 	// Init PIO
@@ -187,6 +183,8 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 #else
 			// next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
 			// next_word = read_from_psram((last_addr & 0xFFFFFF) >> 1);
+			qspi_read((last_addr & 0xFFFFFF) >> 1, buf2, 1);
+			next_word = buf2[0];
 #endif
 
 			// ROM patching done
@@ -237,6 +235,8 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 #else
 				// next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
 				// next_word = read_from_psram((last_addr & 0xFFFFFF) >> 1);
+				qspi_read((last_addr & 0xFFFFFF) >> 1, buf2, 1);
+				next_word = buf2[0];
 #endif
 
 				// Read command/address

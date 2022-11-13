@@ -11,7 +11,7 @@
 #include "hardware/structs/sio.h"
 #include "hardware/structs/ssi.h"
 #include "hardware/structs/xip_ctrl.h"
-
+#include "hardware/dma.h"
 #include "hardware/regs/pads_qspi.h"
 
 #include "gpio_helper.h"
@@ -31,6 +31,8 @@
 #define QSPI_SD3_PAD   (4)
 #define QSPI_SS_PAD    (5)
 
+void dump_current_ssi_config();
+
 void qspi_print_pull(void);
 void qspi_set_pull(bool disabled, bool pullup, bool pulldown);
 void qspi_oeover_normal(bool enable_ss);
@@ -40,6 +42,7 @@ void qspi_demux_enable(bool enabled);
 
 void qspi_enter_cmd_xip(void);
 void qspi_init_spi(void);
+void qspi_init_qspi(void);
 void qspi_enable();
 void qspi_disable();
 void qspi_write(uint32_t address, const uint8_t * data, uint32_t length);
