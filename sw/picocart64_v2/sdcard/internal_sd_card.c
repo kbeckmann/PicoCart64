@@ -390,6 +390,7 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
     }
     printf("\n");
 
+    // QSPI(actual quad spi) READS DON'T WORK
     // Try to do qspi reads
     qspi_enter_cmd_xip();
     qspi_init_qspi();
@@ -412,6 +413,7 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
     printf("MCU2 XIP ENABLED... DUMPING CONFIG\n");
     dump_current_ssi_config();
     printf("WITH qspi_enter_cmd_xip\n");
+    //volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
     for (int i = 0; i < 16; i++) {
         uint32_t modifiedAddress = i;
         psram_set_cs(1);

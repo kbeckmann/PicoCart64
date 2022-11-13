@@ -309,9 +309,9 @@ void qspi_init_qspi(void)
 	// qspi_put_cmd_addr(1, PSRAM_ENTER_QUAD_MODE, 0, 0);
 	// First enable quad mode, spi should be working before this
 	// probably want regular xip mode before we enter into this mode
-	printf("Sending ENTER QUAD MODE command\n");
-	qspi_put_cmd_addr(1, PSRAM_ENTER_QUAD_MODE, 0, 0);
-	psram_set_cs(0);
+	// printf("Sending ENTER QUAD MODE command\n");
+	// qspi_put_cmd_addr(1, PSRAM_ENTER_QUAD_MODE, 0, 0);
+	// psram_set_cs(0);
 
 	// Disable SSI for further config
 	ssi_hw->ssienr = 0;
@@ -331,19 +331,29 @@ void qspi_init_qspi(void)
 	// 31 (i.e. 32) doesn't make sense unless that means we just want to transfer in and our 32 bits values
 
 	ssi_hw->ctrlr0 = ((SSI_CTRLR0_SPI_FRF_VALUE_QUAD << SSI_CTRLR0_SPI_FRF_LSB) |	// 
-				   (1 << SSI_CTRLR0_DFS_32_LSB) |	
+				   (31 << SSI_CTRLR0_DFS_32_LSB) |	
 				   (SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB)
 		);
 
 	ssi_hw->ctrlr1 = 0;			// NDF=0 (single 32b read)
 
+	/*
+	FROM THE BOOT LOADER ASSEMBLY
+	// Note that the INST_L field is used to select what XIP data gets pushed into
+	// the TX FIFO:
+	//      INST_L_0_BITS   {ADDR[23:0],XIP_CMD[7:0]}       Load "mode bits" into XIP_CMD
+	//      Anything else   {XIP_CMD[7:0],ADDR[23:0]}       Load SPI command into XIP_CMD
+	// So in this case SSI_SPI_CTRLR0_ADDR_L_LSB should be 8 = (8 bit command + 24 bit address)/4
+	*/
+
 	// 4 wait cycles for "fast read" 0x0B when in quad mode
+	// 8 wait cycles for "fast read" 0x0B when in spi mode / quad read
 	// 6 wait cycles for "fast read quad" 0xEB when in quad mode
 	ssi_hw->spi_ctrlr0 = ((FLASHCMD_FAST_READ << SSI_SPI_CTRLR0_XIP_CMD_LSB) |	//
-					   (4 << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |	/* Hi-Z dummy clocks following address + mode */
-					   (8 << SSI_SPI_CTRLR0_ADDR_L_LSB) |	/* Total number of address + mode bits */
-					   (SSI_SPI_CTRLR0_INST_L_VALUE_8B << SSI_SPI_CTRLR0_INST_L_LSB) |	/*  */
-					   (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_2C2A << SSI_SPI_CTRLR0_TRANS_TYPE_LSB)	/* Send Address and data in Quad I/O mode */
+					   (8 << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |	/* Hi-Z dummy clocks following address + mode */
+					   (8 << SSI_SPI_CTRLR0_ADDR_L_LSB) |	/* Total number of address + mode bits, this is also supposed to include the instruction if you aren't using mode bits? So it's either 6 (24bit address) or 8 (24bit address + 8bit command)*/
+					   (SSI_SPI_CTRLR0_INST_L_VALUE_8B << SSI_SPI_CTRLR0_INST_L_LSB) |	/* Instruction is 8 bits  */
+					   (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C2A << SSI_SPI_CTRLR0_TRANS_TYPE_LSB)	/* Send Address in serial and data in Quad I/O mode */
 		);
 
 	// Slave selected when transfers in progress
