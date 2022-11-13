@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include "pico/stdlib.h"
+#include "hardware/structs/systick.h"
 
 #include "ff.h" /* Obtains integer types */
 #include "diskio.h" /* Declarations of disk functions */
@@ -381,14 +382,20 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
 
 	//qspi_enter_cmd_xip();
 
+    systick_hw->csr = 0x5;
+    systick_hw->rvr = 0x00FFFFFF;
+
     qspi_enable();
     printf("Read from PSRAM via qspi_read1\n");
-    char buf2[64];
-    qspi_read(0, buf2, 64);
-    for(int i = 0; i < 64; i++) {
+    char buf2[4096];
+    uint32_t totalTime = 0;
+    uint32_t startTimeReadFunction = time_us_32();
+    qspi_read(0, buf2, 4096);
+    totalTime = time_us_32() - startTimeReadFunction;
+    for(int i = 0; i < 32; i++) {
         printf("%02x ", buf2[i]);
     }
-    printf("\n");
+    printf("\n128 32bit (4096 bytes) reads with qspi_read took %dus\n", totalTime);
 
     // QSPI(actual quad spi) READS DON'T WORK
     // Try to do qspi reads
@@ -410,17 +417,52 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
 
     // Now see if regular reads work
     qspi_enter_cmd_xip();
-    printf("MCU2 XIP ENABLED... DUMPING CONFIG\n");
-    dump_current_ssi_config();
+    // printf("MCU2 XIP ENABLED... DUMPING CONFIG\n");
+    // dump_current_ssi_config();
     printf("WITH qspi_enter_cmd_xip\n");
-    //volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
-    for (int i = 0; i < 16; i++) {
+    ptr = (volatile uint32_t *)0x10000000;
+    totalTime = 0;
+    for (int i = 0; i < 128; i++) {
+        uint32_t startTime_us = time_us_32();
         uint32_t modifiedAddress = i;
         psram_set_cs(1);
         uint32_t word = ptr[modifiedAddress];
         psram_set_cs(0);
-        printf("PSRAM-MCU2[%d]: %08x\n",i, word);
+        totalTime += time_us_32() - startTime_us;
+        if (i < 16) { // only print the first 16 words
+            printf("PSRAM-MCU2[%d]: %08x\n",i, word);
+        }
     }
+
+    printf("128 32bit reads @ 0x10000000 reads took %dus\n", totalTime);
+    totalTime = 0;
+
+    printf("WITH from non cached xip\n");
+    ptr = (volatile uint32_t *)0x13000000;
+    for (int i = 0; i < 128; i++) {
+        uint32_t startTime_us = time_us_32();
+        uint32_t modifiedAddress = i;
+        psram_set_cs(1);
+        uint32_t word = ptr[modifiedAddress];
+        psram_set_cs(0);
+        totalTime += time_us_32() - startTime_us;
+        if (i < 16) { // only print the first 16 words
+            printf("PSRAM-MCU2[%d]: %08x\n",i, word);
+        }
+    }
+
+    printf("128 32bit reads @ 0x13000000 reads took %dus\n", totalTime);
+    totalTime = 0;
+
+    // Try a DMA read
+    // printf("\nDMA TRANSFER\n");
+    // uint32_t dmaBuffer[16];
+    // psram_set_cs(1);
+    // flash_bulk_read(dmaBuffer, 0, 16, 0);
+    // psram_set_cs(0);
+    // for(int i = 0; i < 16; i++) {
+    //     printf("DMA[%d]: %08x\n",i, dmaBuffer[i]);
+    // }
 
 	// fr = f_open(&fil, filename, FA_OPEN_EXISTING | FA_READ);
 	// if (FR_OK != fr && FR_EXIST != fr) {

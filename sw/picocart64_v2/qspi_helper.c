@@ -250,6 +250,17 @@ static void __noinline qspi_put_get_qspi(uint8_t chip, const uint8_t * tx, uint8
 	psram_set_cs(0);
 }
 
+static uint32_t wait_and_read(uint8_t count) {
+    while ((ssi_hw->sr & SSI_SR_TFE_BITS) == 0) {}
+    while ((ssi_hw->sr & SSI_SR_BUSY_BITS) != 0) {}
+    uint32_t result = 0;
+    while (count > 0) {
+        result = ssi_hw->dr0;
+        count--;
+    }
+    return result;
+}
+
 void qspi_do_cmd(uint8_t chip, uint8_t cmd, const uint8_t * tx, uint8_t * rx, size_t count)
 {
 	psram_set_cs(chip);
@@ -351,9 +362,9 @@ void qspi_init_qspi(void)
 	// 6 wait cycles for "fast read quad" 0xEB when in quad mode
 	ssi_hw->spi_ctrlr0 = ((FLASHCMD_FAST_READ << SSI_SPI_CTRLR0_XIP_CMD_LSB) |	//
 					   (8 << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |	/* Hi-Z dummy clocks following address + mode */
-					   (8 << SSI_SPI_CTRLR0_ADDR_L_LSB) |	/* Total number of address + mode bits, this is also supposed to include the instruction if you aren't using mode bits? So it's either 6 (24bit address) or 8 (24bit address + 8bit command)*/
+					   (6 << SSI_SPI_CTRLR0_ADDR_L_LSB) |	/* Total number of address + mode bits, this is also supposed to include the instruction if you aren't using mode bits? So it's either 6 (24bit address) or 8 (24bit address + 8bit command)*/
 					   (SSI_SPI_CTRLR0_INST_L_VALUE_8B << SSI_SPI_CTRLR0_INST_L_LSB) |	/* Instruction is 8 bits  */
-					   (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C2A << SSI_SPI_CTRLR0_TRANS_TYPE_LSB)	/* Send Address in serial and data in Quad I/O mode */
+					   (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C1A << SSI_SPI_CTRLR0_TRANS_TYPE_LSB)	/* Command and address both in standard SPI mode */
 		);
 
 	// Slave selected when transfers in progress
@@ -651,7 +662,7 @@ void __no_inline_not_in_flash_func(flash_bulk_read)(uint32_t *rxbuf, uint32_t fl
             DMA_CH0_CTRL_TRIG_EN_BITS;
 
     // Now DMA is waiting, kick off the SSI transfer (mode continuation bits in LSBs)
-    ssi_hw->dr0 = (flash_offs << 8u);//| 0xa0u;
+    ssi_hw->dr0 = 0x0e | (flash_offs << 8u);//| 0xa0u;
 
     // Wait for DMA finish
     while (dma_hw->ch[dma_chan].ctrl_trig & DMA_CH0_CTRL_TRIG_BUSY_BITS);

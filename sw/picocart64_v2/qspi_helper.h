@@ -49,3 +49,5 @@ void qspi_write(uint32_t address, const uint8_t * data, uint32_t length);
 void qspi_read(uint32_t address, uint8_t * data, uint32_t length);
 
 void qspi_test(void);
+
+void __no_inline_not_in_flash_func(flash_bulk_read)(uint32_t *rxbuf, uint32_t flash_offs, size_t len, uint dma_chan);
