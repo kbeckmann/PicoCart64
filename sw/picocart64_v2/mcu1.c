@@ -81,21 +81,29 @@ static inline uint8_t psram_addr_to_chip2(uint32_t address)
 // 1-8: Assert the specific PSRAM CS (1 indexed, matches U1, U2 ... U8)
 static inline void psram_set_cs2(uint8_t chip)
 {
-	uint32_t mask = (1 << PIN_DEMUX_IE) | (1 << PIN_DEMUX_A0) | (1 << PIN_DEMUX_A1) | (1 << PIN_DEMUX_A2);
-	uint32_t new_mask;
+	// uint32_t mask = (1 << PIN_DEMUX_IE) | (1 << PIN_DEMUX_A0) | (1 << PIN_DEMUX_A1) | (1 << PIN_DEMUX_A2);
+	// uint32_t new_mask;
 
-	// printf("qspi_set_cs(%d)\n", chip);
+	// // printf("qspi_set_cs(%d)\n", chip);
 
-	if (chip >= 1 && chip <= 8) {
-		chip--;					// convert to 0-indexed
-		new_mask = (1 << PIN_DEMUX_IE) | (chip << PIN_DEMUX_A0);
+	// printf("set_cs for chip %d,", chip);
+
+	// if (chip >= 1 && chip <= 8) {
+	// 	chip--;					// convert to 0-indexed
+	// 	new_mask = (1 << PIN_DEMUX_IE) | (chip << PIN_DEMUX_A0);
+	// } else {
+	// 	// Set PIN_DEMUX_IE = 0 to pull all PSRAM CS-lines high
+	// 	new_mask = 0;
+	// }
+
+	// uint32_t old_gpio_out = sio_hw->gpio_out;
+	// printf(" mask %x\n", (old_gpio_out & (~mask)) | new_mask);
+	// sio_hw->gpio_out = (old_gpio_out & (~mask)) | new_mask;
+	if (chip == 1) {
+		sio_hw->gpio_out = 0x4000000;
 	} else {
-		// Set PIN_DEMUX_IE = 0 to pull all PSRAM CS-lines high
-		new_mask = 0;
+		sio_hw->gpio_out = 0x0;
 	}
-
-	uint32_t old_gpio_out = sio_hw->gpio_out;
-	sio_hw->gpio_out = (old_gpio_out & (~mask)) | new_mask;
 }
 
 static inline uint32_t read_from_psram2(uint32_t address) {
@@ -108,12 +116,13 @@ static inline uint32_t read_from_psram2(uint32_t address) {
 }
 
 uint32_t log_buffer[128]; // store addresses
-int log_head = 0;
-int log_tail = 0;
+volatile int log_head = 0;
+volatile int log_tail = 0;
 
+volatile int lastLoggedValue = -1;
+volatile int compactedSequensialValues = 0;
 void add_log_to_buffer(uint32_t value) {
 	log_buffer[log_head++] = value;
-
 	if (log_head >= 128) {
 		log_head = 128;
 	}
@@ -125,7 +134,19 @@ void process_log_buffer() {
 		return;
 	}
 
-	printf(".%08x ", log_buffer[log_tail++]);
+	uint32_t value = log_buffer[log_tail++];
+
+	if (lastLoggedValue+1 == value) {
+		lastLoggedValue = value;
+		compactedSequensialValues++;
+	} else {
+		printf("!%08x ", lastLoggedValue);
+		printf("!%d ||", compactedSequensialValues);
+		lastLoggedValue = -1;
+		compactedSequensialValues = 0;
+	}
+
+	printf(".%08x ", value);
 	if (log_tail >= 128) {
 		log_tail = 0;
 		printf("\n");
@@ -187,7 +208,7 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 
 					printf("PSRAM-MCU1[%d] = %08x\n", address_32, word);
 				}
-				printf("xip access took %d us\n", totalTime);
+				printf("xip access for 64(32bit values) took %d us\n", totalTime);
 
 				load_cache(0);
 

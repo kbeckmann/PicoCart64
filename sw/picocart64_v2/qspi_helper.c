@@ -175,7 +175,7 @@ void qspi_init_spi(void)
 
 	// ssi->baudr = 2;
 	// ssi->baudr = 6;
-	ssi->baudr = 20;
+	ssi->baudr = 4;
 
 	ssi->ctrlr0 = (SSI_CTRLR0_SPI_FRF_VALUE_STD << SSI_CTRLR0_SPI_FRF_LSB) |	// Standard 1-bit SPI serial frames
 		(7 << SSI_CTRLR0_DFS_32_LSB) |	// 8 clocks per data frame
@@ -332,7 +332,7 @@ void qspi_init_qspi(void)
 
 	// ssi->baudr = 2;
 	// ssi->baudr = 6;
-	ssi->baudr = 20;
+	ssi->baudr = 4;
 
 	// This value doesn't make sense. Some places say clocks per data frame and other are bits per data frame
 	//SSI_CTRLR0_DFS_32_LSB
@@ -362,7 +362,7 @@ void qspi_init_qspi(void)
 	// 6 wait cycles for "fast read quad" 0xEB when in quad mode
 	ssi_hw->spi_ctrlr0 = ((FLASHCMD_FAST_READ << SSI_SPI_CTRLR0_XIP_CMD_LSB) |	//
 					   (8 << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |	/* Hi-Z dummy clocks following address + mode */
-					   (6 << SSI_SPI_CTRLR0_ADDR_L_LSB) |	/* Total number of address + mode bits, this is also supposed to include the instruction if you aren't using mode bits? So it's either 6 (24bit address) or 8 (24bit address + 8bit command)*/
+					   (8 << SSI_SPI_CTRLR0_ADDR_L_LSB) |	/* Total number of address + mode bits, this is also supposed to include the instruction if you aren't using mode bits? So it's either 6 (24bit address) or 8 (24bit address + 8bit command)*/
 					   (SSI_SPI_CTRLR0_INST_L_VALUE_8B << SSI_SPI_CTRLR0_INST_L_LSB) |	/* Instruction is 8 bits  */
 					   (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C1A << SSI_SPI_CTRLR0_TRANS_TYPE_LSB)	/* Command and address both in standard SPI mode */
 		);
@@ -674,7 +674,7 @@ void qspi_write(uint32_t address, const uint8_t * data, uint32_t length)
 	}
 }
 
-void __no_inline_not_in_flash_func(flash_bulk_read)(uint32_t *rxbuf, uint32_t flash_offs, size_t len,
+void __no_inline_not_in_flash_func(flash_bulk_read)(uint32_t cmd, uint32_t *rxbuf, uint32_t flash_offs, size_t len,
                                                  uint dma_chan) {
     // SSI must be disabled to set transfer size. If software is executing
     // from flash right now then it's about to have a bad time
@@ -700,7 +700,7 @@ void __no_inline_not_in_flash_func(flash_bulk_read)(uint32_t *rxbuf, uint32_t fl
             DMA_CH0_CTRL_TRIG_EN_BITS;
 
     // Now DMA is waiting, kick off the SSI transfer (mode continuation bits in LSBs)
-    ssi_hw->dr0 = 0x0e | (flash_offs << 8u);//| 0xa0u;
+    ssi_hw->dr0 = (cmd << 24) | flash_offs;//| 0xa0u;
 
     // Wait for DMA finish
     while (dma_hw->ch[dma_chan].ctrl_trig & DMA_CH0_CTRL_TRIG_BUSY_BITS);

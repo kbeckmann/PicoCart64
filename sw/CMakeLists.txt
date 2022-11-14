@@ -42,6 +42,7 @@ add_subdirectory(picocart64_v2)
 
 add_compile_options(
         -Wall
+        -save-temps
         -Wno-unused-function # we have some for the docs that aren't called
         -Wno-maybe-uninitialized
 )

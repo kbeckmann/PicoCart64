@@ -40,8 +40,8 @@
 // static const uint16_t *rom_file_16 = (uint16_t *) rom_chunks;
 #endif
 
-#define ROM_CACHE_SIZE 1024 * 32 // in 16bit values
-static uint16_t rom_cache[ROM_CACHE_SIZE];
+#define ROM_CACHE_SIZE 1024 * 16 // in 32bit values
+static uint32_t rom_cache[ROM_CACHE_SIZE];
 static uint32_t cache_startingAddress = 0;
 static uint32_t cache_endingAddress = 0;
 volatile uint16_t *ptr = (volatile uint16_t *)0x10000000;
@@ -60,17 +60,20 @@ static inline void psram_set_cs2(uint8_t chip)
 	uint32_t old_gpio_out = sio_hw->gpio_out;
 	sio_hw->gpio_out = (old_gpio_out & 0xf87fffff) | new_mask;
 }
+
 static inline uint16_t read_from_psram(uint32_t address) {
 	if (address >= cache_startingAddress && address <= cache_endingAddress) {
-		return rom_cache[address];
-	} else {
+		return address % 2 ? swap16(rom_cache[address]) : rom_cache[address];
+	} 
+	else {
 		add_log_to_buffer(address);
 	}
-
-	psram_set_cs2(1);
-	uint16_t word = ptr[address];
-	psram_set_cs2(0);
-	return word;
+	
+	sio_hw->gpio_out = 0x4000000;
+	uint32_t word = ptr[address];
+	sio_hw->gpio_out = 0x0;
+	uint32_t swapped = address % 2 ? swap16(word) : word;
+	return swapped;
 }
 
 void load_cache(uint32_t startingAt) {
@@ -78,16 +81,22 @@ void load_cache(uint32_t startingAt) {
 	cache_endingAddress = startingAt + ROM_CACHE_SIZE;
 
 	uint32_t totalTime = 0;
-	for(int i = 0; i < ROM_CACHE_SIZE; i++) {
-		uint32_t now = time_us_32();
-		psram_set_cs2(1);
-		rom_cache[i] = ptr[i];
-		psram_set_cs2(0);
-		totalTime += time_us_32() - now;
-	}
+	uint32_t now = time_us_32();
+	psram_set_cs2(1);
+	flash_bulk_read(0x03, rom_cache, startingAt, ROM_CACHE_SIZE, 0);
+	psram_set_cs2(0);
+	totalTime += time_us_32() - now;
+	for(int i = 0; i < 16; i++) {
+        printf("ROM_CACHE[%d]: %08x\n",i, rom_cache[i]);
+    }
 
-	printf("Loaded 4096 bytes of data in %d us.\n", totalTime);
+	printf("Loaded %d (32-bit values) of data in %d us.\n", ROM_CACHE_SIZE, totalTime);
 }
+
+// Update the cache by essentially creating a ring buffer style cache
+// void update_cache(uint32_t address, uint32_t numAddressesToUpdate) {
+
+// }
 
 static inline uint32_t resolve_sram_address(uint32_t address)
 {	
@@ -143,14 +152,8 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 
 	// Read addr manually before the loop
 	addr = n64_pi_get_value(pio);
-	// // Print bus state
-	// {
-	//  uint32_t gpios = gpio_get_all();
-	//  printf("%08x\n", gpios);
-	//  for (int i = 0; i < 20; i++) {
-	//      printf("%d: %d\n", i, (gpios >> i) & 1);
-	//  }
-	// }
+
+	add_log_to_buffer(0xAAAABBBB);
 
 	uint32_t lastUpdate = 0;
 	while (1) {
@@ -166,17 +169,6 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 		// Note that the if-cases are ordered in priority from
 		// most timing critical to least.
 		if (last_addr == 0x10000000) {
-
-			// Print bus state
-			// uint32_t last_gpios = 0;
-			// uint32_t gpios = gpio_get_all();
-			// while (gpios != last_gpios) {
-			//  uart_print_hex_u32(gpios);
-
-			//  last_gpios = gpios;
-			//  gpios = gpio_get_all();
-			// }
-
 			// Configure bus to run slowly.
 			// This is better patched in the rom, so we won't need a branch here.
 			// But let's keep it here so it's easy to import roms.
