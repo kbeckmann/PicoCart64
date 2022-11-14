@@ -40,11 +40,11 @@
 // static const uint16_t *rom_file_16 = (uint16_t *) rom_chunks;
 #endif
 
-#define ROM_CACHE_SIZE 1024 // in 32bit values
+#define ROM_CACHE_SIZE 1024 * 32 // in 16bit values
 static uint16_t rom_cache[ROM_CACHE_SIZE];
 static uint32_t cache_startingAddress = 0;
 static uint32_t cache_endingAddress = 0;
-volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+volatile uint16_t *ptr = (volatile uint16_t *)0x10000000;
 
 static inline void psram_set_cs2(uint8_t chip)
 {
@@ -60,7 +60,7 @@ static inline void psram_set_cs2(uint8_t chip)
 	uint32_t old_gpio_out = sio_hw->gpio_out;
 	sio_hw->gpio_out = (old_gpio_out & 0xf87fffff) | new_mask;
 }
-static inline uint32_t read_from_psram(uint32_t address) {
+static inline uint16_t read_from_psram(uint32_t address) {
 	if (address >= cache_startingAddress && address <= cache_endingAddress) {
 		return rom_cache[address];
 	} else {
@@ -68,9 +68,9 @@ static inline uint32_t read_from_psram(uint32_t address) {
 	}
 
 	psram_set_cs2(1);
-	uint32_t word = ptr[address / 2];
+	uint16_t word = ptr[address];
 	psram_set_cs2(0);
-	return address & 1 ? swap16(word) : word;
+	return word;
 }
 
 void load_cache(uint32_t startingAt) {
