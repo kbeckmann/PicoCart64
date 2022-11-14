@@ -473,7 +473,7 @@ void qspi_enter_cmd_xip(void)
 
 	// ssi_hw->baudr = 2;
 	// ssi_hw->baudr = 4;
-	ssi_hw->baudr = 20;
+	ssi_hw->baudr = 4;
 
 	ssi_hw->ctrlr0 = ((0 << SSI_CTRLR0_SSTE_LSB) |	// 
 					  (SSI_CTRLR0_SPI_FRF_VALUE_STD << SSI_CTRLR0_SPI_FRF_LSB) |	// 
@@ -498,20 +498,58 @@ void qspi_enter_cmd_xip(void)
 						  (8 << SSI_SPI_CTRLR0_ADDR_L_LSB) |	/* Total number of address + mode bits */
 						  (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C2A << SSI_SPI_CTRLR0_TRANS_TYPE_LSB)	/* Send Address in Quad I/O mode (and Command but that is zero bits long) */
 		);
-	// ssi_hw->rx_sample_dly = 8;
+	
 	ssi_hw->ssienr = 1;
-	// ssi->ctrlr0 = (SSI_CTRLR0_SPI_FRF_VALUE_QUAD << SSI_CTRLR0_SPI_FRF_LSB) |    // Standard 4-bit SPI serial frames
-	//  (31 << SSI_CTRLR0_DFS_32_LSB) | // 32 clocks per data frame
-	//  (SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB); // Send instr + addr, receive data
-	// ssi->spi_ctrlr0 = 
-	//  (8u << SSI_SPI_CTRLR0_ADDR_L_LSB) | // 24-bit addressing for 03h commands
-	//  (6u << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |
-	//  (SSI_SPI_CTRLR0_INST_L_VALUE_8B << SSI_SPI_CTRLR0_INST_L_LSB) |
-	//  (0xEB << SSI_SPI_CTRLR0_XIP_CMD_LSB) |
-	//  (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C2A << SSI_SPI_CTRLR0_TRANS_TYPE_LSB)
-	// ;
-	// ssi_hw->ctrlr1 = 0; // NDF=0 (single 32b read)
-	// ssi->ssienr = 1;
+}
+
+void qspi_enter_cmd_xip_with_params(uint8_t cmd, bool quad_addr, bool quad_data, int dfs, int addr_l, int waitCycles, int baudDivider) {
+	ssi->ssienr = 0;
+
+	// Clear sticky errors (clear-on-read)
+	(void)ssi_hw->sr;
+	(void)ssi_hw->icr;
+
+	// ssi_hw->baudr = 2;
+	// ssi_hw->baudr = 4;
+	ssi_hw->baudr = baudDivider;
+
+	int frf = quad_data ? SSI_CTRLR0_SPI_FRF_VALUE_QUAD : SSI_CTRLR0_SPI_FRF_VALUE_STD;
+
+	// Field       : SSI_SPI_CTRLR0_TRANS_TYPE
+	// Description : Address and instruction transfer format
+	//               0x0 -> Command and address both in standard SPI frame format
+	//               0x1 -> Command in standard SPI format, address in format
+	//               specified by FRF
+	//               0x2 -> Command and address both in format specified by FRF
+	//               (e.g. Dual-SPI)
+	// if quad_addr then send command in standard spi format and address in format specifed by frf 
+	// else command and address are both standard spi
+	int trans_type = quad_addr ? SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C2A : SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C1A;
+	
+	ssi_hw->ctrlr0 = ((0 << SSI_CTRLR0_SSTE_LSB) |	// 
+					  (frf << SSI_CTRLR0_SPI_FRF_LSB) |	// 
+					  (dfs << SSI_CTRLR0_DFS_32_LSB) |	// 
+					  (0 << SSI_CTRLR0_CFS_LSB) |	// 
+					  (0 << SSI_CTRLR0_SRL_LSB) |	// 
+					  (0 << SSI_CTRLR0_SLV_OE_LSB) |	// 
+					  (SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB) |	// 
+					  (0 << SSI_CTRLR0_SCPOL_LSB) |	//
+					  (0 << SSI_CTRLR0_SCPH_LSB) |	// 
+					  (0 << SSI_CTRLR0_FRF_LSB) |	// 
+					  (0 << SSI_CTRLR0_DFS_LSB)	// 
+		);
+	ssi_hw->ctrlr1 = 0;			// NDF=0 (single 32b read)
+
+	ssi_hw->spi_ctrlr0 = ((cmd << SSI_SPI_CTRLR0_XIP_CMD_LSB) |	// (0 << SSI_SPI_CTRLR0_SPI_RXDS_EN_LSB) | /**/(0 << SSI_SPI_CTRLR0_INST_DDR_EN_LSB) | /**/(0 << SSI_SPI_CTRLR0_SPI_DDR_EN_LSB) | /**/(0 << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |    /* Hi-Z dummy clocks following address + mode */
+						  (waitCycles << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |
+						  (SSI_SPI_CTRLR0_INST_L_VALUE_8B << SSI_SPI_CTRLR0_INST_L_LSB) |	/*  */
+						  (addr_l << SSI_SPI_CTRLR0_ADDR_L_LSB) |	/* Total number of address + mode bits */
+						  (trans_type << SSI_SPI_CTRLR0_TRANS_TYPE_LSB)	/* Send Address in Quad I/O mode (and Command but that is zero bits long) */
+		);
+	
+	ssi_hw->ssienr = 1;
+
+	printf("cmd:%02x, frf:%02x, trans_type:%02x, dfs:%d, addr_l:%d, waitCycles: %d, baudDivider:%d\n", cmd, frf, trans_type, dfs, addr_l, waitCycles, baudDivider);
 }
 
 void print_bits(uint32_t value, uint32_t start, uint32_t end) {

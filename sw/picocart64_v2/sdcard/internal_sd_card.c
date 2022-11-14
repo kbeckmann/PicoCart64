@@ -399,20 +399,20 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
 
     // QSPI(actual quad spi) READS DON'T WORK
     // Try to do qspi reads
-    qspi_enter_cmd_xip();
-    qspi_init_qspi();
-    printf("MCU2 QSPI_XIP ENABLED... DUMPING CONFIG\n");
-    dump_current_ssi_config();
+    // qspi_enter_cmd_xip();
+    // qspi_init_qspi();
+    // printf("MCU2 QSPI_XIP ENABLED... DUMPING CONFIG\n");
+    // dump_current_ssi_config();
 
-    printf("Read with XIP in QSPI(real quad) mode\n");
-    volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
-    for (int i = 0; i < 16; i++) {
-        uint32_t modifiedAddress = i;
-        psram_set_cs(1);
-        uint32_t word = ptr[modifiedAddress];
-        psram_set_cs(0);
-        printf("PSRAM-MCU2[%d]: %08x\n",i, word);
-    }
+    // printf("Read with XIP in QSPI(real quad) mode\n");
+    // volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+    // for (int i = 0; i < 16; i++) {
+    //     uint32_t modifiedAddress = i;
+    //     psram_set_cs(1);
+    //     uint32_t word = ptr[modifiedAddress];
+    //     psram_set_cs(0);
+    //     printf("PSRAM-MCU2[%d]: %08x\n",i, word);
+    // }
 
 
     // Now see if regular reads work
@@ -420,7 +420,7 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
     // printf("MCU2 XIP ENABLED... DUMPING CONFIG\n");
     // dump_current_ssi_config();
     printf("WITH qspi_enter_cmd_xip\n");
-    ptr = (volatile uint32_t *)0x10000000;
+    volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
     totalTime = 0;
     for (int i = 0; i < 128; i++) {
         uint32_t startTime_us = time_us_32();
@@ -437,22 +437,86 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
     printf("128 32bit reads @ 0x10000000 reads took %dus\n", totalTime);
     totalTime = 0;
 
-    printf("WITH from non cached xip\n");
-    ptr = (volatile uint32_t *)0x13000000;
-    for (int i = 0; i < 128; i++) {
-        uint32_t startTime_us = time_us_32();
-        uint32_t modifiedAddress = i;
-        psram_set_cs(1);
-        uint32_t word = ptr[modifiedAddress];
-        psram_set_cs(0);
-        totalTime += time_us_32() - startTime_us;
-        if (i < 16) { // only print the first 16 words
-            printf("PSRAM-MCU2[%d]: %08x\n",i, word);
+    // read commands: read, fast read, fast read quad
+    // uint8_t cmds[] = { 0x03, 0x0B, 0xEB };
+    uint8_t cmds[] = { /*0x0B,*/ 0xEB };
+    // int waitCycles[] = {0, 8, 6};
+    int waitCycles[] = {/*8,*/ 6};
+    int baudDividers[] = {2/*, 4*/};
+    int dataFrameSizes[] = { 7/*31*/ };// 3, 7, 15,... 31 is the only on that returns sensible data
+    int addr_ls[] = { 8 };
+
+    int cmdSize = 1;
+    int waitCycleSize = 1;
+    int baudDividerSize = 1;
+    int addr_lSize = 3;
+
+
+    /* Of the fast read quad, this was the closest
+    // It's consistenly off and returns this data everytime. The data is RIGHT but it's not in the right positions
+    // so 00040080 is actually at index 2 and the next value 54203436 doesn't show up until index 10
+    cmd:eb, frf:02, trans_type:01, dfs:31, waitCycles: 6, baudDivider:2
+    00040080 54203436 00588040 0400b4af 30a40c3c 00000000 fdff2016 000089ad FAILED -- Finished in 190us
+
+
+    And of the 0b reads, these are missing the first byte at each index
+    cmd:0b, frf:00, trans_type:01, waitCycles: 6, baudDivider:2
+    12378000 00000000 04008000 14000000 8f45d700 b3455200 FAILED -- Finished in 254us
+    */
+
+    uint32_t correct_data[] = { 0x40123780, 0x0f000000, 0x00040080, 0x44140000, 0x248f45d7, 0x5fb34552, 0x00000000, 0x00000000 };
+
+    // loop through each command
+    for(int c_i = 0; c_i < cmdSize; c_i++) {
+        uint8_t cmd = cmds[c_i];
+
+        // And each wait cycle
+        for(int wc_i = 0; wc_i < waitCycleSize; wc_i++) {
+            int numWaitCycles = waitCycles[wc_i];
+            
+            // And finally each baud divider
+            for(int bd_i = 0; bd_i < baudDividerSize; bd_i++) {
+                int baudDivider = baudDividers[bd_i];
+
+                for(int dfs_i = 0; dfs_i < 1; dfs_i++) {
+                    int dfs = dataFrameSizes[dfs_i];
+
+                    // for(int qa = 0; qa < 2; qa++) {
+                    //     for(int qd = 0; qd < 2; qd++) {
+                            bool quad_address = true;
+                            bool quad_data = true;
+                            for(int addrl_i = 0; addrl_i < addr_lSize; addrl_i++) {
+                                int addr_l = addr_ls[addrl_i];
+                                qspi_enter_cmd_xip_with_params(cmd, quad_address, quad_data, dfs, addr_l, numWaitCycles, baudDivider);
+                                
+                                // actually do the reads now
+                                volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+                                totalTime = 0;
+                                bool errors = false;
+                                for (int i = 0; i < 128; i++) {
+                                    uint32_t startTime_us = time_us_32();
+                                    uint32_t modifiedAddress = i;
+                                    psram_set_cs(1);
+                                    uint32_t word = ptr[modifiedAddress];
+                                    psram_set_cs(0);
+                                    totalTime += time_us_32() - startTime_us;
+                                    if (i < 16) { // only check the first 8 words
+                                        printf("%08x ", word);
+                                        if(correct_data[i] != word) {
+                                            //printf("|| Found: %08x, Expected: %08x, ", word, correct_data[i]);
+                                            errors = true;
+                                        }
+                                    }
+                                }
+
+                                printf("%s -- Finished in %dus\n\n", !errors ? "SUCCESS!" : "FAILED", totalTime);
+                            }
+                    //     }
+                    // }
+                }
+            }
         }
     }
-
-    printf("128 32bit reads @ 0x13000000 reads took %dus\n", totalTime);
-    totalTime = 0;
 
     // Try a DMA read
     // printf("\nDMA TRANSFER\n");
