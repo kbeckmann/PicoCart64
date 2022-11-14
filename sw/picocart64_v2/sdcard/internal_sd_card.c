@@ -328,6 +328,8 @@ void mount_sd(void) {
     pSD->mounted = true;
 }
 
+#define RUN_QSPI_PERMUTATION_TESTS 0
+
 char buf[1024 / 2 / 2 / 2 / 2];
 void __no_inline_not_in_flash_func(load_rom)(const char *filename)
 {
@@ -434,22 +436,41 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
         }
     }
 
-    printf("128 32bit reads @ 0x10000000 reads took %dus\n", totalTime);
+    printf("\n128 32bit reads @ 0x10000000 reads took %dus\n", totalTime);
     totalTime = 0;
+
+    volatile uint16_t *ptr_16 = (volatile uint16_t *)0x10000000;
+    for (int i = 0; i < 256;) {
+        uint32_t startTime_us = time_us_32();
+        psram_set_cs(1);
+        uint32_t word1 = ptr_16[i];
+        uint32_t word2 = ptr_16[i+1];
+        psram_set_cs(0);
+        totalTime += time_us_32() - startTime_us;
+        if (i < 32) { // only print the first 32 words
+            printf("PSRAM-MCU2[%d]: %04x %04x\n",i, word1, word2);
+        }
+        i += 2;
+    }
+
+    printf("\n256 16bit reads @ 0x10000000 reads took %dus\n", totalTime);
+    totalTime = 0;
+
+    #if RUN_QSPI_PERMUTATION_TESTS == 1
 
     // read commands: read, fast read, fast read quad
     // uint8_t cmds[] = { 0x03, 0x0B, 0xEB };
     uint8_t cmds[] = { /*0x0B,*/ 0xEB };
     // int waitCycles[] = {0, 8, 6};
     int waitCycles[] = {/*8,*/ 6};
-    int baudDividers[] = {2/*, 4*/};
+    int baudDividers[] = {20, 40, /*2, 4*/};
     int dataFrameSizes[] = { 7/*31*/ };// 3, 7, 15,... 31 is the only on that returns sensible data
     int addr_ls[] = { 8 };
 
     int cmdSize = 1;
     int waitCycleSize = 1;
-    int baudDividerSize = 1;
-    int addr_lSize = 3;
+    int baudDividerSize = 2;
+    int addr_lSize = 1;
 
 
     /* Of the fast read quad, this was the closest
@@ -517,6 +538,8 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
             }
         }
     }
+
+    #endif
 
     // Try a DMA read
     // printf("\nDMA TRANSFER\n");

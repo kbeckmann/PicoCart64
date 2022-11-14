@@ -107,6 +107,31 @@ static inline uint32_t read_from_psram2(uint32_t address) {
 	return address % 2 == 0 ? word : swap16(word);
 }
 
+uint32_t log_buffer[128]; // store addresses
+int log_head = 0;
+int log_tail = 0;
+
+void add_log_to_buffer(uint32_t value) {
+	log_buffer[log_head++] = value;
+
+	if (log_head >= 128) {
+		log_head = 128;
+	}
+}
+
+void process_log_buffer() {
+	if (log_tail == log_head) {
+		// noting to pring
+		return;
+	}
+
+	printf(".%08x ", log_buffer[log_tail++]);
+	if (log_tail >= 128) {
+		log_tail = 0;
+		printf("\n");
+	}
+}
+
 void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 	// pio_uart_init(PIN_MCU2_DIO, PIN_MCU2_CS);
 
@@ -127,18 +152,18 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 				// printf("MCU1 SSI CONFIG\n");
 				// dump_current_ssi_config();
 
-				qspi_enable();
-				printf("MCU1 PSRAM via qspi_read1\n");
-				char buf2[64];
+				// qspi_enable();
+				// printf("MCU1 PSRAM via qspi_read1\n");
+				// char buf2[64];
 				uint32_t now = time_us_32();
-				qspi_read(0, buf2, 64);
-				uint32_t diff = time_us_32() - now;
-				printf("Read 64bytes in %d us\n", diff);
-				for(int i = 0; i < 64; i++) {
-					printf("[%x]%02x ", i, buf2[i]);
-				}
+				// qspi_read(0, buf2, 64);
+				// uint32_t diff = time_us_32() - now;
+				// printf("Read 64bytes in %d us\n", diff);
+				// for(int i = 0; i < 64; i++) {
+				// 	printf("[%x]%02x ", i, buf2[i]);
+				// }
 
-				printf("\n");
+				// printf("\n");
 
 				// now = time_us_32();
 				// qspi_read(0, buf2, 1);
@@ -164,9 +189,13 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 				}
 				printf("xip access took %d us\n", totalTime);
 
+				load_cache(0);
+
 			// 	qspi_disable();
 			} 
 		}
+
+		process_log_buffer();
 
 		if (readingData) {
 			// Process anything that might be on the uart buffer

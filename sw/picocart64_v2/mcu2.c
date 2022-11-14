@@ -111,8 +111,8 @@ void main_task_entry(__unused void *params)
 	// mount_sd();
 
 	// Boot MCU1
-	// printf("Booting MCU1...\n");
-	// gpio_put(PIN_MCU1_RUN, 1);
+	printf("Booting MCU1...\n");
+	gpio_put(PIN_MCU1_RUN, 1);
 
 	// printf("MCU2 SSI CONFIG\n");
 	// dump_current_ssi_config();
@@ -126,8 +126,8 @@ void main_task_entry(__unused void *params)
 
 	// load_rom("Doom 64 (USA) (Rev 1).z64");
 	load_rom("testrom.z64");
-	// printf("\nfinished loading rom.\n");
-	printf("No rom to load this time\n");
+	printf("\nfinished loading rom.\n");
+	// printf("No rom to load this time\n");
 
 	// Setup PIO UART
 	// pio_uart_init(PIN_SPI1_CS, PIN_SPI1_RX);

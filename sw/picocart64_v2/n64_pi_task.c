@@ -40,22 +40,54 @@
 // static const uint16_t *rom_file_16 = (uint16_t *) rom_chunks;
 #endif
 
-RINGBUF_CREATE(ringbuf, 64, uint32_t);
+#define ROM_CACHE_SIZE 1024 // in 32bit values
+static uint16_t rom_cache[ROM_CACHE_SIZE];
+static uint32_t cache_startingAddress = 0;
+static uint32_t cache_endingAddress = 0;
+volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
 
-// int addressesSent = 0;
-// static inline uint32_t read_from_psram(uint32_t address) {
-// 	//XIP_NOCACHE_NOALLOC_BASE
-// 	volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
-// 	uint32_t modifiedAddress = address / 2;
-// 	psram_set_cs(psram_addr_to_chip(modifiedAddress));
-// 	uint32_t word = ptr[modifiedAddress];
-// 	psram_set_cs(0);
+static inline void psram_set_cs2(uint8_t chip)
+{
+	uint32_t new_mask;
+	if (chip >= 1 && chip <= 8) {
+		chip--;					// convert to 0-indexed
+		new_mask = (1 << 26) | (chip << 23);
+	} else {
+		// Set PIN_DEMUX_IE = 0 to pull all PSRAM CS-lines high
+		new_mask = 0;
+	}
 
-// 	uint32_t modifiedWord = address % 2 == 0 ? word : swap16(word);
-// 	//printf("[%d]%08x ", address, modifiedWord);
+	uint32_t old_gpio_out = sio_hw->gpio_out;
+	sio_hw->gpio_out = (old_gpio_out & 0xf87fffff) | new_mask;
+}
+static inline uint32_t read_from_psram(uint32_t address) {
+	if (address >= cache_startingAddress && address <= cache_endingAddress) {
+		return rom_cache[address];
+	} else {
+		add_log_to_buffer(address);
+	}
 
-// 	return modifiedWord;
-// }
+	psram_set_cs2(1);
+	uint32_t word = ptr[address / 2];
+	psram_set_cs2(0);
+	return address & 1 ? swap16(word) : word;
+}
+
+void load_cache(uint32_t startingAt) {
+	cache_startingAddress = startingAt;
+	cache_endingAddress = startingAt + ROM_CACHE_SIZE;
+
+	uint32_t totalTime = 0;
+	for(int i = 0; i < ROM_CACHE_SIZE; i++) {
+		uint32_t now = time_us_32();
+		psram_set_cs2(1);
+		rom_cache[i] = ptr[i];
+		psram_set_cs2(0);
+		totalTime += time_us_32() - now;
+	}
+
+	printf("Loaded 4096 bytes of data in %d us.\n", totalTime);
+}
 
 static inline uint32_t resolve_sram_address(uint32_t address)
 {	
@@ -182,9 +214,7 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 			
 #else
 			// next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
-			// next_word = read_from_psram((last_addr & 0xFFFFFF) >> 1);
-			qspi_read((last_addr & 0xFFFFFF) >> 1, buf2, 1);
-			next_word = buf2[0];
+			next_word = read_from_psram((last_addr & 0xFFFFFF) >> 1);
 #endif
 
 			// ROM patching done
@@ -234,9 +264,7 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 				// next_word = read_from_psram(last_addr);
 #else
 				// next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
-				// next_word = read_from_psram((last_addr & 0xFFFFFF) >> 1);
-				qspi_read((last_addr & 0xFFFFFF) >> 1, buf2, 1);
-				next_word = buf2[0];
+				next_word = read_from_psram((last_addr & 0xFFFFFF) >> 1);
 #endif
 
 				// Read command/address

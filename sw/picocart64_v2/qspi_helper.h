@@ -31,6 +31,11 @@
 #define QSPI_SD3_PAD   (4)
 #define QSPI_SS_PAD    (5)
 
+extern uint32_t log_buffer[128]; // store addresses
+void add_log_to_buffer(uint32_t value);
+
+void load_cache(uint32_t startingAt);
+
 void dump_current_ssi_config();
 
 void qspi_print_pull(void);
