@@ -40,9 +40,9 @@
 // static const uint16_t *rom_file_16 = (uint16_t *) rom_chunks;
 #endif
 
-#define ROM_CACHE_SIZE 512 // in 32bit values
-static uint32_t rom_cache0[ROM_CACHE_SIZE];
-static uint32_t rom_cache1[ROM_CACHE_SIZE];
+#define ROM_CACHE_SIZE 1024 // in 32bit values
+static volatile uint32_t rom_cache0[ROM_CACHE_SIZE];
+static volatile uint32_t rom_cache1[ROM_CACHE_SIZE];
 static volatile uint32_t *rom_cache; // pointer to current cache
 static int rom_cache_index = 0;
 
@@ -96,11 +96,11 @@ void update_rom_cache(uint32_t address) {
 	// Load the values into other rom cache, so if current index is 0, load in 1, and if 1 load into 0
 	if (rom_cache_index == 0) {
 		psram_set_cs2(1);
-		flash_bulk_read(0x03, rom_cache1, address, ROM_CACHE_SIZE, 0);
+		flash_bulk_read(0x03, (uint32_t*)rom_cache1, address, ROM_CACHE_SIZE, 0);
 		psram_set_cs2(0);
 	} else {
 		psram_set_cs2(1);
-		flash_bulk_read(0x03, rom_cache0, 0, ROM_CACHE_SIZE, 0);
+		flash_bulk_read(0x03, (uint32_t*)rom_cache0, 0, ROM_CACHE_SIZE, 0);
 		psram_set_cs2(0);
 	}
 }
@@ -119,9 +119,11 @@ static inline void swap_rom_cache() {
 
 static inline uint16_t read_from_psram(uint32_t address) {
 	/* If we are already have way through the current cache, start updating for the next set of values */
-	if (address >= cache_startingAddress && address <= cache_endingAddress && address >= cache_endingAddress >> 1) {
-		update_rom_cache_for_address = cache_endingAddress;
-		multicore_fifo_push_blocking(CORE1_UPDATE_ROM_CACHE);
+	if (address >= cache_startingAddress && address <= cache_endingAddress && address >= cache_endingAddress >> 2) {
+		if (update_rom_cache_for_address != cache_endingAddress) {
+			update_rom_cache_for_address = cache_endingAddress;
+			multicore_fifo_push_blocking(CORE1_UPDATE_ROM_CACHE);
+		}
 
 		// Calculate the index into the cache
 		uint32_t cache_index = address - cache_startingAddress;
