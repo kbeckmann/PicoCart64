@@ -34,7 +34,9 @@
 extern uint32_t log_buffer[128]; // store addresses
 void add_log_to_buffer(uint32_t value);
 
-void load_cache(uint32_t startingAt);
+extern volatile uint32_t update_rom_cache_for_address;
+void load_rom_cache(uint32_t startingAt);
+void update_rom_cache(uint32_t address);
 
 void dump_current_ssi_config();
 

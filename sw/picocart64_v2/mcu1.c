@@ -119,7 +119,7 @@ uint32_t log_buffer[128]; // store addresses
 volatile int log_head = 0;
 volatile int log_tail = 0;
 
-volatile int lastLoggedValue = -1;
+volatile uint32_t lastLoggedValue = 0;
 volatile int compactedSequensialValues = 0;
 void add_log_to_buffer(uint32_t value) {
 	log_buffer[log_head++] = value;
@@ -137,14 +137,13 @@ void process_log_buffer() {
 	uint32_t value = log_buffer[log_tail++];
 
 	if (lastLoggedValue+1 == value) {
-		lastLoggedValue = value;
 		compactedSequensialValues++;
 	} else {
 		printf("!%08x ", lastLoggedValue);
 		printf("!%d ||", compactedSequensialValues);
-		lastLoggedValue = -1;
 		compactedSequensialValues = 0;
 	}
+	lastLoggedValue = value;
 
 	printf(".%08x ", value);
 	if (log_tail >= 128) {
@@ -210,7 +209,7 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 				}
 				printf("xip access for 64(32bit values) took %d us\n", totalTime);
 
-				load_cache(0);
+				load_rom_cache(0);
 
 			// 	qspi_disable();
 			} 
@@ -241,7 +240,8 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 					rx_uart_buffer_reset();
 					
 					pc64_send_sd_read_command();
-					
+				case CORE1_UPDATE_ROM_CACHE:
+					update_rom_cache(update_rom_cache_for_address);
 					break;
 				default:
 					break;
