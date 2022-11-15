@@ -152,6 +152,7 @@ void process_log_buffer() {
 	}
 }
 
+uint32_t last_rom_cache_update_address = 0;
 void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 	// pio_uart_init(PIN_MCU2_DIO, PIN_MCU2_CS);
 
@@ -241,7 +242,11 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 					
 					pc64_send_sd_read_command();
 				case CORE1_UPDATE_ROM_CACHE:
-					update_rom_cache(update_rom_cache_for_address);
+					if (last_rom_cache_update_address != update_rom_cache_for_address) {
+						update_rom_cache(update_rom_cache_for_address);
+						last_rom_cache_update_address = update_rom_cache_for_address;
+						printf("Cache update %08x\n", update_rom_cache_for_address);
+					}
 					break;
 				default:
 					break;

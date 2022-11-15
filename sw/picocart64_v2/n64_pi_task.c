@@ -120,7 +120,7 @@ static inline void swap_rom_cache() {
 static inline uint16_t read_from_psram(uint32_t address) {
 	/* If we are already have way through the current cache, start updating for the next set of values */
 	if (address >= cache_startingAddress && address <= cache_endingAddress && address >= cache_endingAddress >> 1) {
-		update_rom_cache_for_address = address;
+		update_rom_cache_for_address = cache_endingAddress;
 		multicore_fifo_push_blocking(CORE1_UPDATE_ROM_CACHE);
 
 		// Calculate the index into the cache
@@ -146,7 +146,7 @@ static inline uint16_t read_from_psram(uint32_t address) {
 
 	} else {
 		// A total cache miss, update
-		add_log_to_buffer(address);
+		// add_log_to_buffer(address);
 		update_rom_cache_for_address = address;
 		multicore_fifo_push_blocking(CORE1_UPDATE_ROM_CACHE);
 	}
