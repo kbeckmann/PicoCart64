@@ -615,7 +615,7 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
     // printf("\n256 16bit reads @ 0x10000000 reads took %dus\n", totalTime);
     totalTime = 0;
 
-    #if RUN_QSPI_PERMUTATION_TESTS == 0
+    #if RUN_QSPI_PERMUTATION_TESTS == 1
 
     // read commands: read, fast read, fast read quad
     // uint8_t cmds[] = { 0x03, 0x0B, 0xEB };

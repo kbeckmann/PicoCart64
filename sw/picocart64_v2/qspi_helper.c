@@ -809,7 +809,7 @@ void __no_inline_not_in_flash_func(flash_bulk_read)(uint32_t cmd, uint32_t *rxbu
             DMA_CH0_CTRL_TRIG_EN_BITS;
 
     // Now DMA is waiting, kick off the SSI transfer (mode continuation bits in LSBs)
-    ssi_hw->dr0 = (flash_offs << 8u) | 0xa0u; //(cmd << 24) | flash_offs;//| 0xa0u;
+    ssi_hw->dr0 = (cmd << 24) | flash_offs;// -- when reading from flash -> (flash_offs << 8u) | 0xa0u;
 
     // Wait for DMA finish
     while (dma_hw->ch[dma_chan].ctrl_trig & DMA_CH0_CTRL_TRIG_BUSY_BITS);
