@@ -77,7 +77,7 @@ void load_rom_cache(uint32_t startingAt) {
 
 	uint32_t totalTime = 0;
 	uint32_t now = time_us_32();
-	psram_set_cs2(1);
+	psram_set_cs2(2);
 	flash_bulk_read(0x03, (uint32_t*)rom_cache, startingAt, ROM_CACHE_SIZE, 0);
 	psram_set_cs2(0);
 	totalTime += time_us_32() - now;
@@ -95,11 +95,11 @@ void update_rom_cache(uint32_t address) {
 
 	// Load the values into other rom cache, so if current index is 0, load in 1, and if 1 load into 0
 	if (rom_cache_index == 0) {
-		psram_set_cs2(1);
+		psram_set_cs2(2);
 		flash_bulk_read(0x03, (uint32_t*)rom_cache1, address, ROM_CACHE_SIZE, 0);
 		psram_set_cs2(0);
 	} else {
-		psram_set_cs2(1);
+		psram_set_cs2(2);
 		flash_bulk_read(0x03, (uint32_t*)rom_cache0, 0, ROM_CACHE_SIZE, 0);
 		psram_set_cs2(0);
 	}

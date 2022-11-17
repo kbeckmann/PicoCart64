@@ -9,6 +9,7 @@
 
 #include "pico/stdlib.h"
 #include "hardware/structs/systick.h"
+#include "hardware/flash.h"
 
 #include "ff.h" /* Obtains integer types */
 #include "diskio.h" /* Declarations of disk functions */
@@ -330,7 +331,124 @@ void mount_sd(void) {
 
 #define RUN_QSPI_PERMUTATION_TESTS 0
 
+#define FLASH_TARGET_OFFSET 256 * 1024
 char buf[1024 / 2 / 2 / 2 / 2];
+// uint8_t buf[FLASH_PAGE_SIZE];
+// uint8_t flash_buf[FLASH_PAGE_SIZE];
+
+void __no_inline_not_in_flash_func(load_rom2)(const char* filename) {
+    // Renable normal flash stuff?
+    // printf("--------------------\n");
+    // qspi_print_pull();
+    // qspi_oeover_normal(true);
+    // printf("--------------------\n");
+    // qspi_print_pull();
+    // printf("--------------------\n");
+    // dump_current_ssi_config();
+    // qspi_restore_to_startup_config();
+	// ssi_hw->ssienr = 1;
+
+    // qspi_init_spi();
+    qspi_enable();
+    // qspi_enter_cmd_xip();
+
+    // qspi_oeover_normal(true); // disable CS
+
+    // hw_write_masked(&ioqspi_hw->io[1].ctrl,
+    //                 GPIO_OVERRIDE_LOW << IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_LSB,
+    //                 IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_BITS);
+
+    sd_card_t *pSD = sd_get_by_num(0);
+	FRESULT fr = f_mount(&pSD->fatfs, pSD->pcName, 1);
+	if (FR_OK != fr) {
+		panic("f_mount error: %s (%d)\n", FRESULT_str(fr), fr);
+	}
+
+	FIL fil;
+
+	printf("\n\n---- read /%s -----\n", filename);
+
+	fr = f_open(&fil, filename, FA_OPEN_EXISTING | FA_READ);
+	if (FR_OK != fr && FR_EXIST != fr) {
+		panic("f_open(%s) error: %s (%d)\n", filename, FRESULT_str(fr), fr);
+	}
+
+	FILINFO filinfo;
+	fr = f_stat(filename, &filinfo);
+	printf("%s [size=%llu]\n", filinfo.fname, filinfo.fsize);
+
+	int len = 0;
+	int total = 0;
+    
+    
+    printf("DONE!\nLoading rom into flash\n");
+
+    uint8_t txbuf[64] = { 0x05 };
+    uint8_t rxbuf[64];
+    flash_do_cmd(txbuf, rxbuf, 1);
+
+    printf("register status %x\n", rxbuf[0]);
+    qspi_print_pull();
+
+    // printf("Erasing flash...\n");
+    // psram_set_cs(1);
+    // flash_range_erase(total, FLASH_PAGE_SIZE*385);
+    // psram_set_cs(0);
+    // printf("DONE!\nProgramming flash...\n");
+
+	uint64_t t0 = to_us_since_boot(get_absolute_time());
+	do {        
+        fr = f_read(&fil, buf, sizeof(buf), &len);
+        psram_set_cs(1);
+        // flash_range_program(total, buf, len);
+        qspi_write(total, buf, len);
+        psram_set_cs(0);
+		total += len;
+	} while (len > 0);
+	uint64_t t1 = to_us_since_boot(get_absolute_time());
+	uint32_t delta = (t1 - t0) / 1000;
+	uint32_t kBps = (uint32_t) ((float)(total / 1024.0f) / (float)(delta / 1000.0f));
+
+	printf("Read %d bytes and programmed FLASH in %d ms (%d kB/s)\n\n\n", total, delta, kBps);
+
+	fr = f_close(&fil);
+	if (FR_OK != fr) {
+		printf("f_close error: %s (%d)\n", FRESULT_str(fr), fr);
+	}
+	printf("---- read file done -----\n\n\n");
+
+    volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+    uint32_t cycleCountStart = 0;
+    int totalReadTime = 0;
+    for (int i = 0; i < 128; i++) {
+        uint32_t modifiedAddress = i;
+        
+        uint32_t startTime_us = time_us_32();
+        psram_set_cs(1);
+        uint32_t word = ptr[modifiedAddress];
+        psram_set_cs(0);
+
+        totalReadTime += time_us_32() - startTime_us;
+        if (i < 16) { // only print the first 16 words
+            printf("FLASH-MCU2[%d]: %08x\n",i, word);
+        }
+    }
+
+    printf("\n128 32bit reads @ 0x10000000 reads took %d us\n", totalReadTime);
+
+    uint32_t rom_buf[128];
+    uint32_t startTime_us = time_us_32();
+    psram_set_cs(1);
+    flash_bulk_read(0, rom_buf, 0, sizeof(rom_buf), 0);
+    psram_set_cs(0);
+
+    uint32_t dma_totalTime = time_us_32() - startTime_us;
+    for(int i = 0; i < 16; i++) {
+        printf("DMA[%d]: %08x\n",i, rom_buf[i]);
+    }
+    printf("DMA read %d 32bit value reads in %d us\n", 128, dma_totalTime);
+}
+
 void __no_inline_not_in_flash_func(load_rom)(const char *filename)
 {
 	// Set output enable (OE) to normal mode on all QSPI IO pins except SS
@@ -364,7 +482,35 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
 	int total = 0;
 	uint64_t t0 = to_us_since_boot(get_absolute_time());
 	do {
-		fr = f_read(&fil, buf, sizeof(buf), &len);
+        // Some dumb hack to offset the values so reads would work in fast read mode
+        // But it seems to keep the extra zeros when I thought they would be chopped off
+        // 64 / 4 = 16
+        // pad each one empty before every 3 bytes
+        // 64 - 16 = 48, so each qspi write will write 48 bytes of actual data
+        // char offset_buf[64];
+		// fr = f_read(&fil, buf, sizeof(buf)-16, &len);
+        // int index = 0;
+        // int bufIndex = 0;
+        // do {
+        //     if (index % 4 == 3) {
+        //         offset_buf[index] = 0;
+        //     } else {
+        //         offset_buf[index] = buf[bufIndex];
+        //         bufIndex++;
+        //     }
+            
+        //     index++;
+        // } while (index < 64);
+
+        // if (len == 0) {
+        //     printf("\n");
+        //     for(int i = 0; i < 64; i++) {
+        //         printf("%08x ", offset_buf[i]);
+        //     }
+        // }
+        // qspi_write(total, offset_buf, len);
+        
+        fr = f_read(&fil, buf, sizeof(buf), &len);
 		qspi_write(total, buf, len);
 		total += len;
 	} while (len > 0);
@@ -401,28 +547,27 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
 
     // QSPI(actual quad spi) READS DON'T WORK
     // Try to do qspi reads
-    // qspi_enter_cmd_xip();
-    // qspi_init_qspi();
+    qspi_enter_cmd_xip();
+    qspi_init_qspi();
     // printf("MCU2 QSPI_XIP ENABLED... DUMPING CONFIG\n");
     // dump_current_ssi_config();
 
-    // printf("Read with XIP in QSPI(real quad) mode\n");
-    // volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
-    // for (int i = 0; i < 16; i++) {
-    //     uint32_t modifiedAddress = i;
-    //     psram_set_cs(1);
-    //     uint32_t word = ptr[modifiedAddress];
-    //     psram_set_cs(0);
-    //     printf("PSRAM-MCU2[%d]: %08x\n",i, word);
-    // }
-
+    printf("\n\nRead with XIP in QSPI(real quad) mode\n");
+    volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+    for (int i = 0; i < 16; i++) {
+        uint32_t modifiedAddress = i;
+        psram_set_cs(2);
+        uint32_t word = ptr[modifiedAddress];
+        psram_set_cs(0);
+        printf("PSRAM-MCU2[%d]: %08x\n",i, word);
+    }
 
     // Now see if regular reads work
     qspi_enter_cmd_xip();
     // printf("MCU2 XIP ENABLED... DUMPING CONFIG\n");
     // dump_current_ssi_config();
-    printf("WITH qspi_enter_cmd_xip\n");
-    volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+    printf("\n\nWITH qspi_enter_cmd_xip\n");
+    // volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
     uint32_t cycleCountStart = 0;//systick_hw->cvr
     int psram_csToggleTime = 0;
     int total_memoryAccessTime = 0;
@@ -432,7 +577,7 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
         
         uint32_t startTime_us = time_us_32();
         // uint32_t n = systick_hw->cvr;
-        psram_set_cs(1);
+        psram_set_cs(2);
         // psram_csToggleTime += systick_hw->cvr - n;
         
         // uint32_t startTime_ticks = systick_hw->cvr;
@@ -452,38 +597,40 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
     printf("\n128 32bit reads @ 0x10000000 reads took %d us\n", totalReadTime);
     totalTime = 0;
 
-    volatile uint16_t *ptr_16 = (volatile uint16_t *)0x10000000;
-    for (int i = 0; i < 256;) {
-        uint32_t startTime_us = time_us_32();
-        psram_set_cs(1);
-        uint32_t word1 = ptr_16[i];
-        uint32_t word2 = ptr_16[i+1];
-        psram_set_cs(0);
-        totalTime += time_us_32() - startTime_us;
-        if (i < 32) { // only print the first 32 words
-            printf("PSRAM-MCU2[%d]: %04x %04x\n",i, word1, word2);
-        }
-        i += 2;
-    }
+    // This test doesn't quite work right, the data isn't all right
+    // volatile uint16_t *ptr_16 = (volatile uint16_t *)0x10000000;
+    // for (int i = 0; i < 256;) {
+    //     uint32_t startTime_us = time_us_32();
+    //     psram_set_cs(2));
+    //     uint32_t word1 = ptr_16[i];
+    //     uint32_t word2 = ptr_16[i+1];
+    //     psram_set_cs(0);
+    //     totalTime += time_us_32() - startTime_us;
+    //     if (i < 32) { // only print the first 32 words
+    //         printf("PSRAM-MCU2[%d]: %04x %04x\n",i, word1, word2);
+    //     }
+    //     i += 2;
+    // }
 
-    printf("\n256 16bit reads @ 0x10000000 reads took %dus\n", totalTime);
+    // printf("\n256 16bit reads @ 0x10000000 reads took %dus\n", totalTime);
     totalTime = 0;
 
-    #if RUN_QSPI_PERMUTATION_TESTS == 1
+    #if RUN_QSPI_PERMUTATION_TESTS == 0
 
     // read commands: read, fast read, fast read quad
     // uint8_t cmds[] = { 0x03, 0x0B, 0xEB };
-    uint8_t cmds[] = { /*0x0B,*/ 0xEB };
     // int waitCycles[] = {0, 8, 6};
-    int waitCycles[] = {/*8,*/ 6};
-    int baudDividers[] = {20, 40, /*2, 4*/};
-    int dataFrameSizes[] = { 7/*31*/ };// 3, 7, 15,... 31 is the only on that returns sensible data
-    int addr_ls[] = { 8 };
 
-    int cmdSize = 1;
-    int waitCycleSize = 1;
-    int baudDividerSize = 2;
-    int addr_lSize = 1;
+    uint8_t cmds[] = { 0x0B, 0xEB };
+    int waitCycles[] = {0, 4, 6, 8};
+    int baudDividers[] = {2};
+    int dataFrameSizes[] = { 31 };// 3, 7, 15,... 31 is the only on that returns sensible data
+    int addr_ls[] = { 6, 8 };
+
+    int cmdSize = 2;
+    int waitCycleSize = 4;
+    int baudDividerSize = 1;
+    int addr_lSize = 2;
 
 
     /* Of the fast read quad, this was the closest
@@ -515,22 +662,40 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
                 for(int dfs_i = 0; dfs_i < 1; dfs_i++) {
                     int dfs = dataFrameSizes[dfs_i];
 
-                    // for(int qa = 0; qa < 2; qa++) {
-                    //     for(int qd = 0; qd < 2; qd++) {
-                            bool quad_address = true;
-                            bool quad_data = true;
+                    for(int qa = 0; qa < 2; qa++) {
+                        for(int qd = 0; qd < 2; qd++) {
+                            bool quad_address = qa;
+                            bool quad_data = qd;
                             for(int addrl_i = 0; addrl_i < addr_lSize; addrl_i++) {
                                 int addr_l = addr_ls[addrl_i];
                                 qspi_enter_cmd_xip_with_params(cmd, quad_address, quad_data, dfs, addr_l, numWaitCycles, baudDivider);
                                 
-                                // actually do the reads now
-                                volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
                                 totalTime = 0;
                                 bool errors = false;
+                                // The DMA reads will stall out if there is a configuration error
+                                // uint32_t p_buffer[128];
+                                // uint32_t startTime_us = time_us_32();
+                                // psram_set_cs(2));
+                                // flash_bulk_read(cmd, p_buffer, 0, 128, 0);
+                                // psram_set_cs(0);
+                                // totalTime += time_us_32() - startTime_us;
+
+                                // for (int i = 0; i < 128; i++) {
+                                //     uint32_t word = p_buffer[i];
+                                //     if (i < 16) {
+                                //         printf("%08x ", word);
+                                //         if (correct_data[i] != word) {
+                                //             errors = true;
+                                //         }
+                                //     }
+                                // }
+
+                                // actually do the reads now
+                                volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
                                 for (int i = 0; i < 128; i++) {
                                     uint32_t startTime_us = time_us_32();
                                     uint32_t modifiedAddress = i;
-                                    psram_set_cs(1);
+                                    psram_set_cs(2);
                                     uint32_t word = ptr[modifiedAddress];
                                     psram_set_cs(0);
                                     totalTime += time_us_32() - startTime_us;
@@ -545,8 +710,8 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
 
                                 printf("%s -- Finished in %dus\n\n", !errors ? "SUCCESS!" : "FAILED", totalTime);
                             }
-                    //     }
-                    // }
+                        }
+                    }
                 }
             }
         }
@@ -556,9 +721,10 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
 
     // Try a DMA read
     printf("\nDMA TRANSFER\n");
+    qspi_enter_cmd_xip();
     uint32_t dmaBuffer[128];
     uint32_t startTime_us = time_us_32();
-    psram_set_cs(1);
+    psram_set_cs(2);
     flash_bulk_read(0x03, dmaBuffer, 0, 128, 0);
     psram_set_cs(0);
     uint32_t dma_totalTime = time_us_32() - startTime_us;
@@ -567,27 +733,27 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
     }
     printf("DMA read 128 32bit reads in %d us\n", dma_totalTime);
 
-    startTime_us = time_us_32();
-    psram_set_cs(1);
-    flash_bulk_read(0x03, dmaBuffer, 0, 1, 0);
-    psram_set_cs(0);
-    dma_totalTime = time_us_32() - startTime_us;
-    for(int i = 0; i < 16; i++) {
-        printf("DMA[%d]: %08x\n",i, dmaBuffer[i]);
-    }
-    printf("DMA read 1 32bit value in %d us\n", dma_totalTime);
+    // startTime_us = time_us_32();
+    // psram_set_cs(1);
+    // flash_bulk_read(0x03, dmaBuffer, 0, 1, 0);
+    // psram_set_cs(0);
+    // dma_totalTime = time_us_32() - startTime_us;
+    // for(int i = 0; i < 16; i++) {
+    //     printf("DMA[%d]: %08x\n",i, dmaBuffer[i]);
+    // }
+    // printf("DMA read 1 32bit value in %d us\n", dma_totalTime);
 
-    uint32_t oneWordReadStartTime = time_us_32();
-    psram_set_cs(1);
-    uint32_t word = ptr[0];
-    psram_set_cs(0);
-    uint32_t oneWordReadTotalTime = time_us_32() - oneWordReadStartTime;
-    printf("PTR read 1 32bit value in %d us\n", oneWordReadTotalTime);
+    // uint32_t oneWordReadStartTime = time_us_32();
+    // psram_set_cs(1);
+    // uint32_t word = ptr[0];
+    // psram_set_cs(0);
+    // uint32_t oneWordReadTotalTime = time_us_32() - oneWordReadStartTime;
+    // printf("PTR read 1 32bit value in %d us\n", oneWordReadTotalTime);
 
-    oneWordReadStartTime = time_us_32();
-    word = dmaBuffer[0];
-    oneWordReadTotalTime = time_us_32() - oneWordReadStartTime;
-    printf("1 32bit read from an array in %d us\n", oneWordReadTotalTime);
+    // oneWordReadStartTime = time_us_32();
+    // word = dmaBuffer[0];
+    // oneWordReadTotalTime = time_us_32() - oneWordReadStartTime;
+    // printf("1 32bit read from an array in %d us\n", oneWordReadTotalTime);
 
 
     // QSPI fast read and fast read quad just don't work :(

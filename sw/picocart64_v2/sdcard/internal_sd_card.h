@@ -49,4 +49,5 @@ void mount_sd(void);
 
 // sd/rom/psram stuff
 void load_rom(const char *filename);
+void load_rom2(const char *filename);
 void test_read_from_psram();

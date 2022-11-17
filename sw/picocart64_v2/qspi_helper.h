@@ -42,6 +42,7 @@ void dump_current_ssi_config();
 
 void qspi_print_pull(void);
 void qspi_set_pull(bool disabled, bool pullup, bool pulldown);
+void qspi_restore_to_startup_config();
 void qspi_oeover_normal(bool enable_ss);
 void qspi_oeover_disable(void);
 

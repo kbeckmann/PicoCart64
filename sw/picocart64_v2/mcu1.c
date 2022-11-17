@@ -191,17 +191,19 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 				// uint32_t next_word = buf2[0];
 				// diff = time_us_32() - now;
 				// printf("Read 1bytes in %d us\n", diff);
+				qspi_restore_to_startup_config();
+				ssi_hw->ssienr = 1;
 
 				printf("\nMCU1 try to read with ptr\n");
-				qspi_enable();
-				qspi_enter_cmd_xip();
+				// qspi_enable();
+				// qspi_enter_cmd_xip();
 				volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
 				printf("Access at [0x10000000]\n");
 				uint32_t totalTime = 0;
 				for(int i = 0; i < 64 / 4; i++) {
 					now = time_us_32();
 					uint32_t address_32 = i;
-					psram_set_cs2(1);
+					psram_set_cs2(2);
 					uint32_t word = ptr[address_32];
 					psram_set_cs2(0);
 					totalTime += time_us_32() - now;

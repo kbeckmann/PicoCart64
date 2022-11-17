@@ -10,10 +10,21 @@
 // #include "gpio_helper.h"
 // #define VERBOSE
 
+bool hasSavedValues = false;
+uint32_t pad_values[NUM_QSPI_GPIOS];
+uint32_t pad_pull_values[NUM_QSPI_GPIOS];
 void qspi_print_pull(void)
 {
 	for (int i = 0; i < NUM_QSPI_GPIOS; i++) {
-		printf("%d %08X\n", i, pads_qspi_hw->io[i]);
+		printf("%d ORIG:%08x NOW:%08X\n", i, pad_values[i], pads_qspi_hw->io[i]);
+	}
+
+	printf("SS %08x ... %08x\n", sio_hw->gpio_hi_out, sio_hw->gpio_hi_out & (1u << 1u));
+}
+
+void qspi_restore_to_startup_config() {
+	for (int i = 0; i < NUM_QSPI_GPIOS; i++) {
+		pads_qspi_hw->io[i] = pad_values[i];
 	}
 }
 
@@ -100,6 +111,13 @@ void qspi_oeover_normal(bool enable_ss)
 
 void qspi_oeover_disable(void)
 {
+
+	if (!hasSavedValues) {
+		for (int i = 0; i < NUM_QSPI_GPIOS; i++) {
+			pad_values[i] = pads_qspi_hw->io[i];
+		}
+		hasSavedValues = true;
+	}
 	ioqspi_hw->io[QSPI_SCLK_PIN].ctrl = (ioqspi_hw->io[QSPI_SCLK_PIN].ctrl & (~IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_BITS) |
 										 (IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_VALUE_DISABLE << IO_QSPI_GPIO_QSPI_SCLK_CTRL_OEOVER_LSB));
 
@@ -185,6 +203,94 @@ void qspi_init_spi(void)
 	// Re-enable
 	ssi->ssienr = 1;
 }
+/*
+static void __noinline qspi_put_get(uint8_t chip, const uint8_t * tx, uint8_t * rx, size_t count)
+{
+	uint8_t rxbyte;
+
+	empty_tx_fifo(0);
+	empty_rx_fifo(false);
+
+	int paddedBytesNeeded = count / 4;
+	int currentCount = 0;
+
+	// pad the empty bytes in
+	if (tx != NULL) {
+		count += paddedBytesNeeded;
+	}
+	bool allRemainders = false;
+	uint8_t remainder0 = 0;
+	uint8_t remainder1 = 0;
+	uint8_t remainder2 = 0;
+	uint8_t remainder3 = 0;
+	while (count > 0) {
+		if (tx != NULL) {
+			uint32_t word = tx;
+			
+			// Set the remainder byte to probably w3, since we will be evicting it
+			// every write
+			uint8_t w0 = (word & 0xFF000000) >> 24;
+			uint8_t w1 = (word & 0x00FF0000) >> 16;
+			uint8_t w2 = (word & 0x0000FF00) >> 8;
+			uint8_t w3 = word & 0x000000FF;
+
+			if (allRemainders) {
+				allRemainders = false;
+			}
+
+			if (currentCount % 4 == 0 && currentCount == 0) {
+				word = 0 << 24 | w0 << 16 | w1 << 8 | w2;
+				remainder0 = w3;
+
+			} else if (currentCount % 4 == 1) {
+				word = 0 << 24 | remainder0 << 16 | w0 << 8 | w1;
+				remainder0 = w2;
+				remainder1 = w3;
+
+			} else if (currentCount % 4 == 2) {
+				word = 0 << 24 | remainder0 << 16 | remainder1 << 8 | w0;
+				remainder0 = w1;
+				remainder1 = w2;
+				remainder2 = w3;
+
+			} else if (currentCount % 4 == 3) {
+				word = 0 << 24 | remainder0 << 16 | remainder1 << 8 | remainder2;
+				remainder0 = w0;
+				remainder1 = w1;
+				remainder2 = w2;
+				remainder3 = w3;
+				allRemainders = true;
+			}
+
+			// then make a new 32bit value with a 0 pad at front
+			// and w0-w2
+			// once original count is reached, make sure to finish writing out remainder byte
+			
+			
+			ssi->dr0 = word;
+		} else {
+			ssi->dr0 = 0;
+		}
+
+		if (!allRemainders) {
+			--count;
+		}
+
+		// Wait until there is 1 byte in the RX fifo
+		while (ssi_hw->rxflr == 0) {
+		}
+
+		rxbyte = ssi->dr0;
+		if (rx) {
+			*rx++ = rxbyte;
+		}
+		// TODO: Could have something > 0 here, but why risk it.
+		empty_tx_fifo(0);
+	}
+
+	psram_set_cs(0);
+}
+*/
 
 // Put bytes from one buffer, and get bytes into another buffer.
 // These can be the same buffer.
@@ -317,6 +423,7 @@ void qspi_init_qspi(void)
 
 	printf("Setting up SSI_QSPI\n");
 
+	// This is only something to worry about if putting it in QPI mode vs SPI mode
 	// qspi_put_cmd_addr(1, PSRAM_ENTER_QUAD_MODE, 0, 0);
 	// First enable quad mode, spi should be working before this
 	// probably want regular xip mode before we enter into this mode
@@ -332,7 +439,7 @@ void qspi_init_qspi(void)
 
 	// ssi->baudr = 2;
 	// ssi->baudr = 6;
-	ssi->baudr = 4;
+	ssi->baudr = 2;
 
 	// This value doesn't make sense. Some places say clocks per data frame and other are bits per data frame
 	//SSI_CTRLR0_DFS_32_LSB
@@ -360,9 +467,10 @@ void qspi_init_qspi(void)
 	// 4 wait cycles for "fast read" 0x0B when in quad mode
 	// 8 wait cycles for "fast read" 0x0B when in spi mode / quad read
 	// 6 wait cycles for "fast read quad" 0xEB when in quad mode
-	ssi_hw->spi_ctrlr0 = ((FLASHCMD_FAST_READ << SSI_SPI_CTRLR0_XIP_CMD_LSB) |	//
-					   (8 << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |	/* Hi-Z dummy clocks following address + mode */
+	ssi_hw->spi_ctrlr0 = ((0x0B << SSI_SPI_CTRLR0_XIP_CMD_LSB) |	//
+						(8 << SSI_RX_SAMPLE_DLY_RSD_LSB) |
 					   (8 << SSI_SPI_CTRLR0_ADDR_L_LSB) |	/* Total number of address + mode bits, this is also supposed to include the instruction if you aren't using mode bits? So it's either 6 (24bit address) or 8 (24bit address + 8bit command)*/
+					   (8 << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |	/* Hi-Z dummy clocks following address + mode */
 					   (SSI_SPI_CTRLR0_INST_L_VALUE_8B << SSI_SPI_CTRLR0_INST_L_LSB) |	/* Instruction is 8 bits  */
 					   (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C1A << SSI_SPI_CTRLR0_TRANS_TYPE_LSB)	/* Command and address both in standard SPI mode */
 		);
@@ -465,41 +573,42 @@ static inline void qspi_put_cmd_addr_qspi(uint8_t chip, uint8_t cmd, uint32_t ad
 // state, so will still respond to other commands.
 void qspi_enter_cmd_xip(void)
 {
-	ssi->ssienr = 0;
+ssi->ssienr = 0;
 
-	// Clear sticky errors (clear-on-read)
-	(void)ssi_hw->sr;
-	(void)ssi_hw->icr;
+// Clear sticky errors (clear-on-read)
+(void)ssi_hw->sr;
+(void)ssi_hw->icr;
 
-	// ssi_hw->baudr = 2;
-	// ssi_hw->baudr = 4;
-	ssi_hw->baudr = 4;
+// ssi_hw->baudr = 2;
+// ssi_hw->baudr = 4;
+ssi_hw->baudr = 4;
 
-	ssi_hw->ctrlr0 = ((0 << SSI_CTRLR0_SSTE_LSB) |	// 
-					  (SSI_CTRLR0_SPI_FRF_VALUE_STD << SSI_CTRLR0_SPI_FRF_LSB) |	// 
-					  (31 << SSI_CTRLR0_DFS_32_LSB) |	// 
-					  (0 << SSI_CTRLR0_CFS_LSB) |	// 
-					  (0 << SSI_CTRLR0_SRL_LSB) |	// 
-					  (0 << SSI_CTRLR0_SLV_OE_LSB) |	// 
-					  (SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB) |	// 
-					  (0 << SSI_CTRLR0_SCPOL_LSB) |	//
-					  (0 << SSI_CTRLR0_SCPH_LSB) |	// 
-					  (0 << SSI_CTRLR0_FRF_LSB) |	// 
-					  (0 << SSI_CTRLR0_DFS_LSB)	// 
-		);
-	ssi_hw->ctrlr1 = 0;			// NDF=0 (single 32b read)
-	/* 
-	   This peripheral seems to be buggy!
-	   It seems that SSI_SPI_CTRLR0_ADDR_L_LSB and SSI_SPI_CTRLR0_WAIT_CYCLES_LSB
-	   only has an effect when not in SSI_CTRLR0_SPI_FRF_VALUE_STD mode. Weird.
-	 */
-	ssi_hw->spi_ctrlr0 = ((FLASHCMD_READ_DATA << SSI_SPI_CTRLR0_XIP_CMD_LSB) |	// (0 << SSI_SPI_CTRLR0_SPI_RXDS_EN_LSB) | /**/(0 << SSI_SPI_CTRLR0_INST_DDR_EN_LSB) | /**/(0 << SSI_SPI_CTRLR0_SPI_DDR_EN_LSB) | /**/(0 << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |    /* Hi-Z dummy clocks following address + mode */
-						  (SSI_SPI_CTRLR0_INST_L_VALUE_8B << SSI_SPI_CTRLR0_INST_L_LSB) |	/*  */
-						  (8 << SSI_SPI_CTRLR0_ADDR_L_LSB) |	/* Total number of address + mode bits */
-						  (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C2A << SSI_SPI_CTRLR0_TRANS_TYPE_LSB)	/* Send Address in Quad I/O mode (and Command but that is zero bits long) */
-		);
-	
-	ssi_hw->ssienr = 1;
+ssi_hw->ctrlr0 = ((0 << SSI_CTRLR0_SSTE_LSB) |	// 
+					(SSI_CTRLR0_SPI_FRF_VALUE_STD << SSI_CTRLR0_SPI_FRF_LSB) |	// 
+					(31 << SSI_CTRLR0_DFS_32_LSB) |	// 
+					(0 << SSI_CTRLR0_CFS_LSB) |	// 
+					(0 << SSI_CTRLR0_SRL_LSB) |	// 
+					(0 << SSI_CTRLR0_SLV_OE_LSB) |	// 
+					(SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB) |	// 
+					(0 << SSI_CTRLR0_SCPOL_LSB) |	//
+					(0 << SSI_CTRLR0_SCPH_LSB) |	// 
+					(0 << SSI_CTRLR0_FRF_LSB) |	// 
+					(0 << SSI_CTRLR0_DFS_LSB)	// 
+	);
+ssi_hw->ctrlr1 = 0;			// NDF=0 (single 32b read)
+/* 
+	This peripheral seems to be buggy!
+	It seems that SSI_SPI_CTRLR0_ADDR_L_LSB and SSI_SPI_CTRLR0_WAIT_CYCLES_LSB
+	only has an effect when not in SSI_CTRLR0_SPI_FRF_VALUE_STD mode. Weird.
+	*/
+ssi_hw->spi_ctrlr0 = ((FLASHCMD_READ_DATA << SSI_SPI_CTRLR0_XIP_CMD_LSB) |	// (0 << SSI_SPI_CTRLR0_SPI_RXDS_EN_LSB) | /**/(0 << SSI_SPI_CTRLR0_INST_DDR_EN_LSB) | /**/(0 << SSI_SPI_CTRLR0_SPI_DDR_EN_LSB) | /**/(0 << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |    /* Hi-Z dummy clocks following address + mode */
+						(0 << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |
+						(SSI_SPI_CTRLR0_INST_L_VALUE_8B << SSI_SPI_CTRLR0_INST_L_LSB) |	/*  */
+						(8 << SSI_SPI_CTRLR0_ADDR_L_LSB) |	/* Total number of address + mode bits */
+						(SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C2A << SSI_SPI_CTRLR0_TRANS_TYPE_LSB)	/* Send Address in Quad I/O mode (and Command but that is zero bits long) */
+	);
+
+ssi_hw->ssienr = 1;
 }
 
 void qspi_enter_cmd_xip_with_params(uint8_t cmd, bool quad_addr, bool quad_data, int dfs, int addr_l, int waitCycles, int baudDivider) {
@@ -651,7 +760,7 @@ void qspi_write(uint32_t address, const uint8_t * data, uint32_t length)
 	while (length > 0) {
 		uint32_t count = length > 64 ? 64 : length;
 		uint32_t address_masked = address & 0xFFFFFF;
-		uint8_t chip = psram_addr_to_chip(address);
+		uint8_t chip = 2;// psram_addr_to_chip(address);
 		if (lastChipUsed != chip) {
 			printf("CHIP[%d]", chip);
 			lastChipUsed = chip;
@@ -700,7 +809,7 @@ void __no_inline_not_in_flash_func(flash_bulk_read)(uint32_t cmd, uint32_t *rxbu
             DMA_CH0_CTRL_TRIG_EN_BITS;
 
     // Now DMA is waiting, kick off the SSI transfer (mode continuation bits in LSBs)
-    ssi_hw->dr0 = (cmd << 24) | flash_offs;//| 0xa0u;
+    ssi_hw->dr0 = (flash_offs << 8u) | 0xa0u; //(cmd << 24) | flash_offs;//| 0xa0u;
 
     // Wait for DMA finish
     while (dma_hw->ch[dma_chan].ctrl_trig & DMA_CH0_CTRL_TRIG_BUSY_BITS);
@@ -718,7 +827,7 @@ void qspi_read(uint32_t address, uint8_t * data, uint32_t length)
 	while (length > 0) {
 		uint32_t count = (length > 64) ? 64 : length;
 		uint32_t address_masked = address & 0xFFFFFF;
-		uint8_t chip = psram_addr_to_chip(address);
+		uint8_t chip = 2;//psram_addr_to_chip(address);
 #ifdef VERBOSE
 		printf("RD[%d] @%08lX: %d bytes\n", chip, address_masked, count);
 #endif
