@@ -40,17 +40,19 @@
 // static const uint16_t *rom_file_16 = (uint16_t *) rom_chunks;
 #endif
 
+#define DMA_READ_CMD 0x0B
+
 #define ROM_CACHE_SIZE 512 // in 32bit values
 static volatile uint32_t rom_cache0[ROM_CACHE_SIZE];
 static volatile uint32_t rom_cache1[ROM_CACHE_SIZE];
 static volatile uint32_t *rom_cache; // pointer to current cache
 static int rom_cache_index = 0;
 
-static uint32_t cache_startingAddress = 0;
-static uint32_t cache_endingAddress = 0;
+static volatile uint32_t cache_startingAddress = 0;
+static volatile uint32_t cache_endingAddress = 0;
 
-static uint32_t back_cache_startingAddress = 0;
-static uint32_t back_cache_endingAddress = 0;
+static volatile uint32_t back_cache_startingAddress = 0;
+static volatile uint32_t back_cache_endingAddress = 0;
 
 volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
 
@@ -79,11 +81,11 @@ void update_rom_cache(uint32_t address) {
 	// Load the values into other rom cache, so if current index is 0, load in 1, and if 1 load into 0
 	if (rom_cache_index == 0) {
 		psram_set_cs2(2);
-		flash_bulk_read(0x0B, (uint32_t*)rom_cache1, address, ROM_CACHE_SIZE, 0);
+		flash_bulk_read(DMA_READ_CMD, (uint32_t*)rom_cache1, address, ROM_CACHE_SIZE, 0);
 		psram_set_cs2(0);
 	} else {
 		psram_set_cs2(2);
-		flash_bulk_read(0x0B, (uint32_t*)rom_cache0, 0, ROM_CACHE_SIZE, 0);
+		flash_bulk_read(DMA_READ_CMD, (uint32_t*)rom_cache0, 0, ROM_CACHE_SIZE, 0);
 		psram_set_cs2(0);
 	}
 }
@@ -162,7 +164,7 @@ void load_rom_cache(uint32_t startingAt) {
 	uint32_t totalTime = 0;
 	uint32_t now = time_us_32();
 	psram_set_cs2(2);
-	flash_bulk_read(0x0B, (uint32_t*)rom_cache, startingAt, ROM_CACHE_SIZE, 0);
+	flash_bulk_read(DMA_READ_CMD, (uint32_t*)rom_cache, startingAt, ROM_CACHE_SIZE, 0);
 	psram_set_cs2(0);
 	totalTime += time_us_32() - now;
 	for(int i = 0; i < 16; i++) {
@@ -170,16 +172,6 @@ void load_rom_cache(uint32_t startingAt) {
     }
 
 	printf("Loaded %d (32-bit values) of data in %d us.\n", ROM_CACHE_SIZE, totalTime);
-
-	// for(uint32_t i = 0x10000000; i < 0x10000000+0x100; i+=2) {
-	// 	// uint32_t address = base+k;
-	// 	// uint32_t index = (address & 0xFFFFFF) >> 2;
-	// 	uint32_t word = read_from_psram(i);
-	// 	printf("[%08x]%08x ", i, swap8(word));
-	// 	if (i % 8 == 0 && i != 0) {
-	// 		printf("\n");
-	// 	}
-	// }
 }
 
 static inline uint32_t resolve_sram_address(uint32_t address)
@@ -241,6 +233,24 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 
 	uint32_t lastUpdate = 0;
 	while (1) {
+		// tight_loop_contents();
+		// if (time_us_32() - lastUpdate > 30000000) {
+		// 	lastUpdate = time_us_32();
+		// 	printf("Checking values from psram\n");
+		// 	int index = 0;
+		// 	for(uint32_t i = 0; i < 0x1000; i+=2) {
+		// 		uint32_t word = read_from_psram(i+0x10000000);
+		// 		printf("[%04x]%04x ", i, (uint16_t)swap8(word));
+		// 		if (index % 4 == 0 && index != 0) {
+		// 			printf("\n");
+		// 		}
+		// 		index++;
+
+		// 		for(volatile int w = 0; w < 10000; w++) {tight_loop_contents();}; 
+		// 	}
+			
+		// }
+
 		// addr must not be a WRITE or READ request here,
 		// it should contain a 16-bit aligned address.
 		// Assert drains performance, uncomment when debugging.

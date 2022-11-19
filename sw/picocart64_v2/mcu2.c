@@ -117,7 +117,7 @@ void main_task_entry(__unused void *params)
 	// printf("MCU2 SSI CONFIG\n");
 	// dump_current_ssi_config();
 
-	vTaskDelay(2000);
+	vTaskDelay(1000);
 
 	// boot mcu1 before loading rom so it can actually read out of flash to boot
 	// Super Mario 64 (USA).z64

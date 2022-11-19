@@ -332,7 +332,7 @@ void mount_sd(void) {
 }
 
 #define RUN_QSPI_PERMUTATION_TESTS 0
-
+#define ROM_WRITE_OFFSET 1
 #define FLASH_TARGET_OFFSET 256 * 1024
 char buf[1024 / 2 / 2 / 2 / 2];
 // uint8_t buf[FLASH_PAGE_SIZE];
@@ -484,6 +484,7 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
 	int total = 0;
 	uint64_t t0 = to_us_since_boot(get_absolute_time());
 	do {
+        #if ROM_WRITE_OFFSET == 1
         // Some dumb hack to offset the values so reads would work in fast read mode
         // But it seems to keep the extra zeros when I thought they would be chopped off
         // 64 / 4 = 16
@@ -504,16 +505,15 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
             index++;
         } while (index < 64);
 
-        // if (len == 0) {
-        //     printf("\n");
-        //     for(int i = 0; i < 64; i++) {
-        //         printf("%08x ", offset_buf[i]);
-        //     }
-        // }
         qspi_write(total, offset_buf, len);
+
+        #else
         
-        // fr = f_read(&fil, buf, sizeof(buf), &len);
-		// qspi_write(total, buf, len);
+        fr = f_read(&fil, buf, sizeof(buf), &len);
+		qspi_write(total, buf, len);
+
+        #endif
+
 		total += len;
 	} while (len > 0);
 	uint64_t t1 = to_us_since_boot(get_absolute_time());
@@ -542,7 +542,11 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
     uint32_t startTimeReadFunction = time_us_32();
     qspi_read(0, buf2, 4096);
     totalTime = time_us_32() - startTimeReadFunction;
-    for(int i = 0; i < 32; i++) {
+    printf("00000000: ");
+    for(int i = 0; i < 16; i++) {
+        if (i % 8 == 0 && i != 0) {
+            printf("\n%08x: ", i);
+        }
         printf("%02x ", buf2[i]);
     }
     printf("\n128 32bit (4096 bytes) reads with qspi_read took %dus\n", totalTime);
@@ -582,7 +586,7 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
     // printf("MCU2 XIP ENABLED... DUMPING CONFIG\n");
     // dump_current_ssi_config();
     printf("\n\nWITH qspi_enter_cmd_xip\n");
-    // volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+    ptr = (volatile uint32_t *)0x10000000;
     uint32_t cycleCountStart = 0;//systick_hw->cvr
     int psram_csToggleTime = 0;
     int total_memoryAccessTime = 0;
