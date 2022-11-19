@@ -104,55 +104,53 @@ static inline uint16_t read_from_psram(uint32_t rom_address) {
 	// convert the rom_address into an address we can use for getting data out of the cache
 	// rom_address should be 2 byte aligned, which means we are likely to get address 0,2,4
 	// and what we really want are 4 byte aligned addresses
-	//
-	// if address % 10 == 2 then we have to grab two values and stich them together
-	//
-	// uint32_t address = rom_address;
-	// /* If we are already have way through the current cache, start updating for the next set of values */
-	// if (address >= cache_startingAddress && address <= cache_endingAddress && address >= cache_endingAddress >> 2) {
-	// 	if (update_rom_cache_for_address != cache_endingAddress) {
-	// 		update_rom_cache_for_address = cache_endingAddress;
-	// 		multicore_fifo_push_blocking(CORE1_UPDATE_ROM_CACHE);
-	// 	}
-
-	// 	// Calculate the index into the cache
-	// 	uint32_t cache_index = address - cache_startingAddress;
-	// 	return swap16(rom_cache[address]);
-
-	// /* Use the cached value*/
-	// } else if (address >= cache_startingAddress && address <= cache_endingAddress) {
-	// 	// Calculate the index into the cache
-	// 	uint32_t cache_index = address - cache_startingAddress;
-	// 	return swap16(rom_cache[address]);
-
-	// /* If we have cached these values, use those*/
-	// } else if 
-	// (
-	// 	address >= cache_endingAddress || address <= cache_startingAddress &&
-	// 	address >= back_cache_startingAddress && address <= back_cache_endingAddress
-	// ) {
-	// 	swap_rom_cache();
-
-	// 	uint32_t cache_index = address - cache_startingAddress;
-	// 	return swap16(rom_cache[address]);
-
-	// } else {
-	// 	// A total cache miss, update
-	// 	// add_log_to_buffer(address);
-	// 	update_rom_cache_for_address = address;
-	// 	multicore_fifo_push_blocking(CORE1_UPDATE_ROM_CACHE);
-	// }
 	
-	// psram_set_cs2(2);
-	// uint32_t word = ptr[address];
-	// psram_set_cs2(0);
-	// return swap16(word);
-
 	uint32_t index = (rom_address & 0xFFFFFF) >> 1;
-	psram_set_cs2(2);	
+
+	/* If we are already have way through the current cache, start updating for the next set of values */
+	if (index >= cache_startingAddress && index <= cache_endingAddress && index >= cache_endingAddress >> 2) {
+		if (update_rom_cache_for_address != cache_endingAddress) {
+			update_rom_cache_for_address = cache_endingAddress;
+			multicore_fifo_push_blocking(CORE1_UPDATE_ROM_CACHE);
+		}
+
+		// Calculate the index into the cache
+		uint32_t cache_index = index - cache_startingAddress;
+		return swap16(rom_cache[cache_index]);
+
+	/* Use the cached value*/
+	} else if (index >= cache_startingAddress && index <= cache_endingAddress) {
+		// Calculate the index into the cache
+		uint32_t cache_index = index - cache_startingAddress;
+		return swap16(rom_cache[cache_index]);
+
+	/* If we have cached these values, use those*/
+	} else if 
+	(
+		index >= cache_endingAddress || index <= cache_startingAddress &&
+		index >= back_cache_startingAddress && index <= back_cache_endingAddress
+	) {
+		swap_rom_cache();
+
+		uint32_t cache_index = index - cache_startingAddress;
+		return swap16(rom_cache[cache_index]);
+
+	} else {
+		// A total cache miss, update
+		add_log_to_buffer(rom_address);
+		update_rom_cache_for_address = index;
+		multicore_fifo_push_blocking(CORE1_UPDATE_ROM_CACHE);
+	}
+	
+	psram_set_cs2(2);
 	uint32_t word = ptr[index];
 	psram_set_cs2(0);
-	return (uint16_t)swap16(word); // swap so the data is on the right side
+	return swap16(word);
+
+	// psram_set_cs2(2);	
+	// uint32_t word = ptr[index];
+	// psram_set_cs2(0);
+	// return (uint16_t)swap16(word); // swap so the data is on the right side
 }
 
 void load_rom_cache(uint32_t startingAt) {
