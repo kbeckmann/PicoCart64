@@ -111,8 +111,8 @@ void main_task_entry(__unused void *params)
 	// mount_sd();
 
 	// Boot MCU1
-	// printf("Booting MCU1...\n");
-	// gpio_put(PIN_MCU1_RUN, 1);
+	printf("Booting MCU1...\n");
+	gpio_put(PIN_MCU1_RUN, 1);
 
 	// printf("MCU2 SSI CONFIG\n");
 	// dump_current_ssi_config();

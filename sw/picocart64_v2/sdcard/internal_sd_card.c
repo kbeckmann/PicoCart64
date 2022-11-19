@@ -23,6 +23,8 @@
 #include "psram.h"
 #include "ringbuf.h"
 
+#include "utils.h"
+
 #define SD_CARD_RX_READ_DEBUG 0
 
 #define REGISTER_SD_COMMAND 0x0 // 1 byte, r/w
@@ -487,20 +489,20 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
         // 64 / 4 = 16
         // pad each one empty before every 3 bytes
         // 64 - 16 = 48, so each qspi write will write 48 bytes of actual data
-        // char offset_buf[64];
-		// fr = f_read(&fil, buf, sizeof(buf)-16, &len);
-        // int index = 0;
-        // int bufIndex = 0;
-        // do {
-        //     if (index % 4 == 3) {
-        //         offset_buf[index] = 0;
-        //     } else {
-        //         offset_buf[index] = buf[bufIndex];
-        //         bufIndex++;
-        //     }
+        char offset_buf[128];
+		fr = f_read(&fil, buf, sizeof(buf), &len);
+        int index = 0;
+        int bufIndex = 0;
+        do {
+            if (index % 4 == 3 || index % 4 == 0) {
+                offset_buf[index] = 0;
+            } else {
+                offset_buf[index] = buf[bufIndex];
+                bufIndex++;
+            }
             
-        //     index++;
-        // } while (index < 64);
+            index++;
+        } while (index < 64);
 
         // if (len == 0) {
         //     printf("\n");
@@ -508,10 +510,10 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
         //         printf("%08x ", offset_buf[i]);
         //     }
         // }
-        // qspi_write(total, offset_buf, len);
+        qspi_write(total, offset_buf, len);
         
-        fr = f_read(&fil, buf, sizeof(buf), &len);
-		qspi_write(total, buf, len);
+        // fr = f_read(&fil, buf, sizeof(buf), &len);
+		// qspi_write(total, buf, len);
 		total += len;
 	} while (len > 0);
 	uint64_t t1 = to_us_since_boot(get_absolute_time());
@@ -559,8 +561,21 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
         psram_set_cs(2);
         uint32_t word = ptr[modifiedAddress];
         psram_set_cs(0);
-        printf("PSRAM-MCU2[%d]: %08x\n",i, word);
+        printf("PSRAM-MCU2[%d]: %08x\n",i, swap16(word));
     }
+
+    printf("\nFAST READ  - DMA TRANSFER\n");
+    // qspi_enter_cmd_xip();
+    uint32_t dmaBuffer[128];
+    uint32_t startTime_us = time_us_32();
+    psram_set_cs(2);
+    flash_bulk_read(0x0B, dmaBuffer, 0, 128, 0);
+    psram_set_cs(0);
+    uint32_t dma_totalTime = time_us_32() - startTime_us;
+    for(int i = 0; i < 16; i++) {
+        printf("DMA[%d]: %08x\n",i, dmaBuffer[i]);
+    }
+    printf("FAST READ - DMA read 128 32bit reads in %d us\n", dma_totalTime);
 
     // Now see if regular reads work
     qspi_enter_cmd_xip();
@@ -722,12 +737,12 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
     // Try a DMA read
     printf("\nDMA TRANSFER\n");
     qspi_enter_cmd_xip();
-    uint32_t dmaBuffer[128];
-    uint32_t startTime_us = time_us_32();
+    // uint32_t dmaBuffer[128];
+    startTime_us = time_us_32();
     psram_set_cs(2);
     flash_bulk_read(0x03, dmaBuffer, 0, 128, 0);
     psram_set_cs(0);
-    uint32_t dma_totalTime = time_us_32() - startTime_us;
+    dma_totalTime = time_us_32() - startTime_us;
     for(int i = 0; i < 16; i++) {
         printf("DMA[%d]: %08x\n",i, dmaBuffer[i]);
     }

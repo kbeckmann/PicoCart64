@@ -448,7 +448,7 @@ void qspi_init_qspi(void)
 	// OR 7 (ie.e 8 as in 8 bits per byte?)
 	// 31 (i.e. 32) doesn't make sense unless that means we just want to transfer in and our 32 bits values
 
-	ssi_hw->ctrlr0 = ((SSI_CTRLR0_SPI_FRF_VALUE_QUAD << SSI_CTRLR0_SPI_FRF_LSB) |	// 
+	ssi_hw->ctrlr0 = ((SSI_CTRLR0_SPI_FRF_VALUE_STD << SSI_CTRLR0_SPI_FRF_LSB) |	// 
 				   (31 << SSI_CTRLR0_DFS_32_LSB) |	
 				   (SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB)
 		);
@@ -468,9 +468,9 @@ void qspi_init_qspi(void)
 	// 8 wait cycles for "fast read" 0x0B when in spi mode / quad read
 	// 6 wait cycles for "fast read quad" 0xEB when in quad mode
 	ssi_hw->spi_ctrlr0 = ((0x0B << SSI_SPI_CTRLR0_XIP_CMD_LSB) |	//
-						(8 << SSI_RX_SAMPLE_DLY_RSD_LSB) |
+						(0 << SSI_RX_SAMPLE_DLY_RSD_LSB) |
 					   (8 << SSI_SPI_CTRLR0_ADDR_L_LSB) |	/* Total number of address + mode bits, this is also supposed to include the instruction if you aren't using mode bits? So it's either 6 (24bit address) or 8 (24bit address + 8bit command)*/
-					   (8 << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |	/* Hi-Z dummy clocks following address + mode */
+					   (0 << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |	/* Hi-Z dummy clocks following address + mode */
 					   (SSI_SPI_CTRLR0_INST_L_VALUE_8B << SSI_SPI_CTRLR0_INST_L_LSB) |	/* Instruction is 8 bits  */
 					   (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C1A << SSI_SPI_CTRLR0_TRANS_TYPE_LSB)	/* Command and address both in standard SPI mode */
 		);

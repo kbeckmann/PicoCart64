@@ -40,7 +40,7 @@
 // static const uint16_t *rom_file_16 = (uint16_t *) rom_chunks;
 #endif
 
-#define ROM_CACHE_SIZE 1024 // in 32bit values
+#define ROM_CACHE_SIZE 512 // in 32bit values
 static volatile uint32_t rom_cache0[ROM_CACHE_SIZE];
 static volatile uint32_t rom_cache1[ROM_CACHE_SIZE];
 static volatile uint32_t *rom_cache; // pointer to current cache
@@ -52,40 +52,23 @@ static uint32_t cache_endingAddress = 0;
 static uint32_t back_cache_startingAddress = 0;
 static uint32_t back_cache_endingAddress = 0;
 
-volatile uint16_t *ptr = (volatile uint16_t *)0x10000000;
+volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
 
 static inline void psram_set_cs2(uint8_t chip)
 {
+	uint32_t mask = (1 << PIN_DEMUX_IE) | (1 << PIN_DEMUX_A0) | (1 << PIN_DEMUX_A1) | (1 << PIN_DEMUX_A2);
 	uint32_t new_mask;
+
 	if (chip >= 1 && chip <= 8) {
 		chip--;					// convert to 0-indexed
-		new_mask = (1 << 26) | (chip << 23);
+		new_mask = (1 << PIN_DEMUX_IE) | (chip << PIN_DEMUX_A0);
 	} else {
 		// Set PIN_DEMUX_IE = 0 to pull all PSRAM CS-lines high
 		new_mask = 0;
 	}
 
 	uint32_t old_gpio_out = sio_hw->gpio_out;
-	sio_hw->gpio_out = (old_gpio_out & 0xf87fffff) | new_mask;
-}
-
-void load_rom_cache(uint32_t startingAt) {
-	cache_startingAddress = startingAt;
-	cache_endingAddress = startingAt + ROM_CACHE_SIZE;
-	rom_cache = rom_cache0;
-	rom_cache_index = 0;
-
-	uint32_t totalTime = 0;
-	uint32_t now = time_us_32();
-	psram_set_cs2(2);
-	flash_bulk_read(0x03, (uint32_t*)rom_cache, startingAt, ROM_CACHE_SIZE, 0);
-	psram_set_cs2(0);
-	totalTime += time_us_32() - now;
-	for(int i = 0; i < 16; i++) {
-        printf("ROM_CACHE[%d]: %08x\n",i, rom_cache[i]);
-    }
-
-	printf("Loaded %d (32-bit values) of data in %d us.\n", ROM_CACHE_SIZE, totalTime);
+	sio_hw->gpio_out = (old_gpio_out & (~mask)) | new_mask;
 }
 
 volatile uint32_t update_rom_cache_for_address = 0;
@@ -96,11 +79,11 @@ void update_rom_cache(uint32_t address) {
 	// Load the values into other rom cache, so if current index is 0, load in 1, and if 1 load into 0
 	if (rom_cache_index == 0) {
 		psram_set_cs2(2);
-		flash_bulk_read(0x03, (uint32_t*)rom_cache1, address, ROM_CACHE_SIZE, 0);
+		flash_bulk_read(0x0B, (uint32_t*)rom_cache1, address, ROM_CACHE_SIZE, 0);
 		psram_set_cs2(0);
 	} else {
 		psram_set_cs2(2);
-		flash_bulk_read(0x03, (uint32_t*)rom_cache0, 0, ROM_CACHE_SIZE, 0);
+		flash_bulk_read(0x0B, (uint32_t*)rom_cache0, 0, ROM_CACHE_SIZE, 0);
 		psram_set_cs2(0);
 	}
 }
@@ -117,47 +100,88 @@ static inline void swap_rom_cache() {
 	}
 }
 
-static inline uint16_t read_from_psram(uint32_t address) {
-	/* If we are already have way through the current cache, start updating for the next set of values */
-	if (address >= cache_startingAddress && address <= cache_endingAddress && address >= cache_endingAddress >> 2) {
-		if (update_rom_cache_for_address != cache_endingAddress) {
-			update_rom_cache_for_address = cache_endingAddress;
-			multicore_fifo_push_blocking(CORE1_UPDATE_ROM_CACHE);
-		}
+static inline uint16_t read_from_psram(uint32_t rom_address) {
+	// convert the rom_address into an address we can use for getting data out of the cache
+	// rom_address should be 2 byte aligned, which means we are likely to get address 0,2,4
+	// and what we really want are 4 byte aligned addresses
+	//
+	// if address % 10 == 2 then we have to grab two values and stich them together
+	//
+	// uint32_t address = rom_address;
+	// /* If we are already have way through the current cache, start updating for the next set of values */
+	// if (address >= cache_startingAddress && address <= cache_endingAddress && address >= cache_endingAddress >> 2) {
+	// 	if (update_rom_cache_for_address != cache_endingAddress) {
+	// 		update_rom_cache_for_address = cache_endingAddress;
+	// 		multicore_fifo_push_blocking(CORE1_UPDATE_ROM_CACHE);
+	// 	}
 
-		// Calculate the index into the cache
-		uint32_t cache_index = address - cache_startingAddress;
-		return address % 2 ? swap16(rom_cache[address]) : rom_cache[address];
+	// 	// Calculate the index into the cache
+	// 	uint32_t cache_index = address - cache_startingAddress;
+	// 	return swap16(rom_cache[address]);
 
-	/* Use the cached value*/
-	} else if (address >= cache_startingAddress && address <= cache_endingAddress) {
-		// Calculate the index into the cache
-		uint32_t cache_index = address - cache_startingAddress;
-		return address % 2 ? swap16(rom_cache[address]) : rom_cache[address];
+	// /* Use the cached value*/
+	// } else if (address >= cache_startingAddress && address <= cache_endingAddress) {
+	// 	// Calculate the index into the cache
+	// 	uint32_t cache_index = address - cache_startingAddress;
+	// 	return swap16(rom_cache[address]);
 
-	/* If we have cached these values, use those*/
-	} else if 
-	(
-		address >= cache_endingAddress || address <= cache_startingAddress &&
-		address >= back_cache_startingAddress && address <= back_cache_endingAddress
-	) {
-		swap_rom_cache();
+	// /* If we have cached these values, use those*/
+	// } else if 
+	// (
+	// 	address >= cache_endingAddress || address <= cache_startingAddress &&
+	// 	address >= back_cache_startingAddress && address <= back_cache_endingAddress
+	// ) {
+	// 	swap_rom_cache();
 
-		uint32_t cache_index = address - cache_startingAddress;
-		return address % 2 ? swap16(rom_cache[address]) : rom_cache[address];
+	// 	uint32_t cache_index = address - cache_startingAddress;
+	// 	return swap16(rom_cache[address]);
 
-	} else {
-		// A total cache miss, update
-		// add_log_to_buffer(address);
-		update_rom_cache_for_address = address;
-		multicore_fifo_push_blocking(CORE1_UPDATE_ROM_CACHE);
-	}
+	// } else {
+	// 	// A total cache miss, update
+	// 	// add_log_to_buffer(address);
+	// 	update_rom_cache_for_address = address;
+	// 	multicore_fifo_push_blocking(CORE1_UPDATE_ROM_CACHE);
+	// }
 	
-	sio_hw->gpio_out = 0x4000000;
-	uint32_t word = ptr[address];
-	sio_hw->gpio_out = 0x0;
-	uint32_t swapped = address % 2 ? swap16(word) : word;
-	return swapped;
+	// psram_set_cs2(2);
+	// uint32_t word = ptr[address];
+	// psram_set_cs2(0);
+	// return swap16(word);
+
+	uint32_t index = (rom_address & 0xFFFFFF) >> 1;
+	psram_set_cs2(2);	
+	uint32_t word = ptr[index];
+	psram_set_cs2(0);
+	return (uint16_t)swap16(word); // swap so the data is on the right side
+}
+
+void load_rom_cache(uint32_t startingAt) {
+	cache_startingAddress = startingAt;
+	cache_endingAddress = startingAt + ROM_CACHE_SIZE;
+	rom_cache = rom_cache0;
+	rom_cache_index = 0;
+
+	uint32_t totalTime = 0;
+	uint32_t now = time_us_32();
+	psram_set_cs2(2);
+	flash_bulk_read(0x0B, (uint32_t*)rom_cache, startingAt, ROM_CACHE_SIZE, 0);
+	psram_set_cs2(0);
+	totalTime += time_us_32() - now;
+	for(int i = 0; i < 16; i++) {
+        printf("ROM_CACHE[%d]: %08x\n",i, rom_cache[i]);
+    }
+
+	printf("Loaded %d (32-bit values) of data in %d us.\n", ROM_CACHE_SIZE, totalTime);
+
+	// for(uint32_t i = 0x10000000; i < 0x10000000+0x100; i+=2) {
+	// 	// uint32_t address = base+k;
+	// 	// uint32_t index = (address & 0xFFFFFF) >> 2;
+	// 	uint32_t word = read_from_psram(i);
+	// 	printf("[%08x]%08x ", i, swap8(word));
+	// 	if (i % 8 == 0 && i != 0) {
+	// 		printf("\n");
+	// 	}
+	// }
 }
 
 static inline uint32_t resolve_sram_address(uint32_t address)
@@ -215,7 +239,7 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 	// Read addr manually before the loop
 	addr = n64_pi_get_value(pio);
 
-	add_log_to_buffer(0xAAAABBBB);
+	// add_log_to_buffer(0xAAAABBBB);
 
 	uint32_t lastUpdate = 0;
 	while (1) {
@@ -268,7 +292,7 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 			
 #else
 			// next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
-			next_word = read_from_psram((last_addr & 0xFFFFFF) >> 1);
+			next_word = read_from_psram(last_addr);
 #endif
 
 			// ROM patching done
@@ -318,7 +342,7 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 				// next_word = read_from_psram(last_addr);
 #else
 				// next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
-				next_word = read_from_psram((last_addr & 0xFFFFFF) >> 1);
+				next_word = read_from_psram(last_addr);
 #endif
 
 				// Read command/address

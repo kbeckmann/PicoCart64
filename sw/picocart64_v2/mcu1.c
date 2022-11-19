@@ -81,38 +81,27 @@ static inline uint8_t psram_addr_to_chip2(uint32_t address)
 // 1-8: Assert the specific PSRAM CS (1 indexed, matches U1, U2 ... U8)
 static inline void psram_set_cs2(uint8_t chip)
 {
-	// uint32_t mask = (1 << PIN_DEMUX_IE) | (1 << PIN_DEMUX_A0) | (1 << PIN_DEMUX_A1) | (1 << PIN_DEMUX_A2);
-	// uint32_t new_mask;
+	uint32_t mask = (1 << PIN_DEMUX_IE) | (1 << PIN_DEMUX_A0) | (1 << PIN_DEMUX_A1) | (1 << PIN_DEMUX_A2);
+	uint32_t new_mask;
 
-	// // printf("qspi_set_cs(%d)\n", chip);
-
-	// printf("set_cs for chip %d,", chip);
-
-	// if (chip >= 1 && chip <= 8) {
-	// 	chip--;					// convert to 0-indexed
-	// 	new_mask = (1 << PIN_DEMUX_IE) | (chip << PIN_DEMUX_A0);
-	// } else {
-	// 	// Set PIN_DEMUX_IE = 0 to pull all PSRAM CS-lines high
-	// 	new_mask = 0;
-	// }
-
-	// uint32_t old_gpio_out = sio_hw->gpio_out;
-	// printf(" mask %x\n", (old_gpio_out & (~mask)) | new_mask);
-	// sio_hw->gpio_out = (old_gpio_out & (~mask)) | new_mask;
-	if (chip == 1) {
-		sio_hw->gpio_out = 0x4000000;
+	if (chip >= 1 && chip <= 8) {
+		chip--;					// convert to 0-indexed
+		new_mask = (1 << PIN_DEMUX_IE) | (chip << PIN_DEMUX_A0);
 	} else {
-		sio_hw->gpio_out = 0x0;
+		// Set PIN_DEMUX_IE = 0 to pull all PSRAM CS-lines high
+		new_mask = 0;
 	}
+
+	uint32_t old_gpio_out = sio_hw->gpio_out;
+	sio_hw->gpio_out = (old_gpio_out & (~mask)) | new_mask;
 }
 
+volatile uint32_t *rom_ptr = (volatile uint32_t *)0x10000000;
 static inline uint32_t read_from_psram2(uint32_t address) {
-	volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
-	uint32_t modifiedAddress = address / 2;
-	psram_set_cs2(psram_addr_to_chip2(modifiedAddress));
-	uint32_t word = ptr[modifiedAddress];
+	psram_set_cs2(2);
+	uint32_t word = rom_ptr[address];
 	psram_set_cs2(0);
-	return address % 2 == 0 ? word : swap16(word);
+	return swap16(word);
 }
 
 uint32_t log_buffer[128]; // store addresses
@@ -136,11 +125,13 @@ void process_log_buffer() {
 
 	uint32_t value = log_buffer[log_tail++];
 
-	if (lastLoggedValue+1 == value) {
+	if (lastLoggedValue+2 == value) {
 		compactedSequensialValues++;
-	} else {
+	} else if (value > lastLoggedValue) {
 		printf("!%08x ", lastLoggedValue);
-		printf("!%d ||", compactedSequensialValues);
+		if (compactedSequensialValues > 0) {
+			printf("!%d ||", compactedSequensialValues);
+		}
 		compactedSequensialValues = 0;
 	}
 	lastLoggedValue = value;
@@ -191,12 +182,14 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 				// uint32_t next_word = buf2[0];
 				// diff = time_us_32() - now;
 				// printf("Read 1bytes in %d us\n", diff);
-				qspi_restore_to_startup_config();
-				ssi_hw->ssienr = 1;
+				// qspi_restore_to_startup_config();
+				// ssi_hw->ssienr = 1;
 
 				printf("\nMCU1 try to read with ptr\n");
-				// qspi_enable();
-				// qspi_enter_cmd_xip();
+				qspi_enable();
+				qspi_enter_cmd_xip();
+    			qspi_init_qspi();
+
 				volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
 				printf("Access at [0x10000000]\n");
 				uint32_t totalTime = 0;
@@ -210,12 +203,22 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 
 					printf("PSRAM-MCU1[%d] = %08x\n", address_32, word);
 				}
-				printf("xip access for 64(32bit values) took %d us\n", totalTime);
+				printf("xip access for 16 (32bit values) took %d us\n", totalTime);
+
+				totalTime = 0;
+				for(int i = 0; i < 16; i++) {
+					now = time_us_32();
+					uint32_t word = read_from_psram2(i);
+					totalTime += time_us_32() - now;
+
+					printf("PSRAM-MCU1[%d] = %08x\n", i, word);
+				}
+				printf("Read from PSRAM access for 16 (32bit values) took %d us\n", totalTime);
 
 				load_rom_cache(0);
 
 			// 	qspi_disable();
-			} 
+			}
 		}
 
 		process_log_buffer();
