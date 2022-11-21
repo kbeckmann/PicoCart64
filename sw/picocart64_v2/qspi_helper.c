@@ -6,6 +6,7 @@
 #include "utils.h"
 
 #include "psram.h"
+#include "hardware/flash.h"
 
 // #include "gpio_helper.h"
 // #define VERBOSE
@@ -783,44 +784,6 @@ void qspi_write(uint32_t address, const uint8_t * data, uint32_t length)
 	}
 }
 
-void __no_inline_not_in_flash_func(flash_bulk_read)(uint32_t cmd, uint32_t *rxbuf, uint32_t flash_offs, size_t len,
-                                                 uint dma_chan) {
-    // SSI must be disabled to set transfer size. If software is executing
-    // from flash right now then it's about to have a bad time
-    ssi_hw->ssienr = 0;
-    ssi_hw->ctrlr1 = len - 1; // NDF, number of data frames
-    ssi_hw->dmacr = SSI_DMACR_TDMAE_BITS | SSI_DMACR_RDMAE_BITS;
-    ssi_hw->ssienr = 1;
-    // Other than NDF, the SSI configuration used for XIP is suitable for a bulk read too.
-
-    // Configure and start the DMA. Note we are avoiding the dma_*() functions
-    // as we can't guarantee they'll be inlined
-    dma_hw->ch[dma_chan].read_addr = (uint32_t) &ssi_hw->dr0;
-    dma_hw->ch[dma_chan].write_addr = (uint32_t) rxbuf;
-    dma_hw->ch[dma_chan].transfer_count = len;
-    // Must enable DMA byteswap because non-XIP 32-bit flash transfers are
-    // big-endian on SSI (we added a hardware tweak to make XIP sensible)
-    dma_hw->ch[dma_chan].ctrl_trig =
-            DMA_CH0_CTRL_TRIG_BSWAP_BITS |
-            DREQ_XIP_SSIRX << DMA_CH0_CTRL_TRIG_TREQ_SEL_LSB |
-            dma_chan << DMA_CH0_CTRL_TRIG_CHAIN_TO_LSB |
-            DMA_CH0_CTRL_TRIG_INCR_WRITE_BITS |
-            DMA_CH0_CTRL_TRIG_DATA_SIZE_VALUE_SIZE_WORD << DMA_CH0_CTRL_TRIG_DATA_SIZE_LSB |
-            DMA_CH0_CTRL_TRIG_EN_BITS;
-
-    // Now DMA is waiting, kick off the SSI transfer (mode continuation bits in LSBs)
-    ssi_hw->dr0 = (cmd << 24) | flash_offs;// -- when reading from flash -> (flash_offs << 8u) | 0xa0u;
-
-    // Wait for DMA finish
-    while (dma_hw->ch[dma_chan].ctrl_trig & DMA_CH0_CTRL_TRIG_BUSY_BITS);
-
-    // Reconfigure SSI before we jump back into flash!
-    ssi_hw->ssienr = 0;
-    ssi_hw->ctrlr1 = 0; // Single 32-bit data frame per transfer
-    ssi_hw->dmacr = 0;
-    ssi_hw->ssienr = 1;
-}
-
 void qspi_read(uint32_t address, uint8_t * data, uint32_t length)
 {
 	uint32_t offset = 0;
@@ -863,53 +826,117 @@ void qspi_read(uint32_t address, uint8_t * data, uint32_t length)
 	}
 }
 
-// #define DATA_LEN 1024*8
-// #define DATA_LEN 256
-// uint32_t data[DATA_LEN];
-// void qspi_test(void)
-// {
+void __no_inline_not_in_flash_func(flash_bulk_read)(uint32_t cmd, uint32_t *rxbuf, uint32_t flash_offs, size_t len,
+                                                 uint dma_chan) {
+    // SSI must be disabled to set transfer size. If software is executing
+    // from flash right now then it's about to have a bad time
+    ssi_hw->ssienr = 0;
+    ssi_hw->ctrlr1 = len - 1; // NDF, number of data frames
+    ssi_hw->dmacr = SSI_DMACR_TDMAE_BITS | SSI_DMACR_RDMAE_BITS;
+    ssi_hw->ssienr = 1;
+    // Other than NDF, the SSI configuration used for XIP is suitable for a bulk read too.
 
-// 	printf("\n1. ------------\n\n");
-// 	for (int i = 0; i < DATA_LEN; i++) {
-// 		// data[i] = i;
-// 		// data[i] = 0x41;
-// 		// data[i] = 0x00410000 + i;
-// 		// data[i] = 0x004100ff - i;
-// 		// data[i] = 0x0;
-// 		// data[i] = 0xaabbccdd;
-// 		data[i] = 0xaabbcc00 + i;
-// 		// data[i] = 0xa0b0c0d0 + (i << 0) + (i << 8) + (i << 16) + (i << 24);
-// 	}
+    // Configure and start the DMA. Note we are avoiding the dma_*() functions
+    // as we can't guarantee they'll be inlined
+    dma_hw->ch[dma_chan].read_addr = (uint32_t) &ssi_hw->dr0;
+    dma_hw->ch[dma_chan].write_addr = (uint32_t) rxbuf;
+    dma_hw->ch[dma_chan].transfer_count = len;
+    // Must enable DMA byteswap because non-XIP 32-bit flash transfers are
+    // big-endian on SSI (we added a hardware tweak to make XIP sensible)
+    dma_hw->ch[dma_chan].ctrl_trig =
+            DMA_CH0_CTRL_TRIG_BSWAP_BITS |
+            DREQ_XIP_SSIRX << DMA_CH0_CTRL_TRIG_TREQ_SEL_LSB |
+            dma_chan << DMA_CH0_CTRL_TRIG_CHAIN_TO_LSB |
+            DMA_CH0_CTRL_TRIG_INCR_WRITE_BITS |
+            DMA_CH0_CTRL_TRIG_DATA_SIZE_VALUE_SIZE_WORD << DMA_CH0_CTRL_TRIG_DATA_SIZE_LSB |
+            DMA_CH0_CTRL_TRIG_EN_BITS;
 
-// 	printf("\n2. ------------\n\n");
-// 	qspi_enable();
-// 	printf("\n3. ------------\n\n");
-// 	qspi_write(0, data, DATA_LEN * 4);
-// 	for (int i = 0; i < DATA_LEN; i++) {
-// 		data[i] = 0x11223344;
-// 	}
+    // Now DMA is waiting, kick off the SSI transfer (mode continuation bits in LSBs)
+	if (cmd != 0) {
+    	ssi_hw->dr0 = (cmd << 24) | flash_offs;
+	} else {
+		// Read from flash
+		ssi_hw->dr0 = (flash_offs << 8u) | 0xa0u;
+	}
 
-// 	vTaskDelay(5 * 1000);
-// 	printf("\n4. ------------\n\n");
-// 	qspi_init_qspi();
-// 	qspi_read(0, data, DATA_LEN * 4);
-// 	for (int i = 0; i < DATA_LEN; i++) {
-// 		if (data[i] != i) {
-// 			printf("ERROR %08X != %08X\n", data[i], i);
-// 		}
-// 	}
+    // Wait for DMA finish
+    while (dma_hw->ch[dma_chan].ctrl_trig & DMA_CH0_CTRL_TRIG_BUSY_BITS);
 
-// 	// for (int i = 0; i < DATA_LEN; i++) {
-// 	for (int i = 0; i < 8; i++) {
-// 		printf("%d: %08X\n", i, data[i]);
-// 	}
+    // Reconfigure SSI before we jump back into flash!
+    ssi_hw->ssienr = 0;
+    ssi_hw->ctrlr1 = 0; // Single 32-bit data frame per transfer
+    ssi_hw->dmacr = 0;
+    ssi_hw->ssienr = 1;
+}
 
-// 	while (1) {
-// 		printf("\n\n**** HALTuuu \n");
-// 		vTaskDelay(5 * 1000);
-// 	}
+void qspi_flash_init() {
+	qspi_oeover_normal(false); // don't use the SS pin, we will control that
+	current_mcu_enable_demux(true);
 
-// 	printf("\n5. ------------\n\n");
-// 	qspi_disable();
-// 	printf("\n6. ------------\n\n");
+	xip_ctrl_hw->ctrl = (xip_ctrl_hw->ctrl & (~XIP_CTRL_EN_BITS));
+	xip_ctrl_hw->flush = 1;
+}
+
+// Flash init spi must be used to issue serial commands
+// Set up the SSI controller for standard SPI mode,i.e. for every byte sent we get one back
+// This is only called by flash_exit_xip(), not by any of the other functions.
+// This makes it possible for the debugger or user code to edit SPI settings
+// e.g. baud rate, CPOL/CPHA.
+void flash_init_spi() {
+    // Disable SSI for further config
+    ssi->ssienr = 0;
+    // Clear sticky errors (clear-on-read)
+    (void) ssi->sr;
+    (void) ssi->icr;
+    // Hopefully-conservative baud rate for boot and programming
+    ssi->baudr = 6;
+    ssi->ctrlr0 =
+            (SSI_CTRLR0_SPI_FRF_VALUE_STD << SSI_CTRLR0_SPI_FRF_LSB) | // Standard 1-bit SPI serial frames
+            (7 << SSI_CTRLR0_DFS_32_LSB) | // 8 clocks per data frame
+            (SSI_CTRLR0_TMOD_VALUE_TX_AND_RX << SSI_CTRLR0_TMOD_LSB);  // TX and RX FIFOs are both used for every byte
+    // Slave selected when transfers in progress
+    ssi->ser = 1;
+    // Re-enable
+    ssi->ssienr = 1;
+}
+
+// void qspi_flash_read(uint32_t address, uint8_t * data, uint32_t length) {
 // }
+
+#define FLASH_BLOCK_ERASE_CMD 0xD8
+#define FLASH_WRITE_ENABLE_CMD 0x06
+
+// Easier to call erase on the whole chip than 
+void qspi_flash_erase_block(uint32_t address) {
+	//FLASH_BLOCK_SIZE = 64k
+
+	// enable write bit
+	qspi_do_cmd(DEBUG_CS_CHIP_USE, FLASH_WRITE_ENABLE_CMD, NULL, NULL, 0);
+
+	// send erase command and address
+	qspi_put_cmd_addr(DEBUG_CS_CHIP_USE, FLASH_BLOCK_ERASE_CMD, address, 0);
+
+	// wait for status bit
+	qspi_wait_ready(DEBUG_CS_CHIP_USE);
+}
+
+void qspi_flash_write(uint32_t address, uint8_t * data, uint32_t length) {
+	qspi_do_cmd(DEBUG_CS_CHIP_USE, FLASH_WRITE_ENABLE_CMD, NULL, NULL, 0);
+	
+	uint32_t offset = 0;
+	while (length > 0) {
+		uint32_t count = length > 64 ? 64 : length;
+		uint32_t address_masked = address & 0xFFFFFF;
+		uint8_t chip = DEBUG_CS_CHIP_USE;
+
+		qspi_put_cmd_addr(chip, FLASHCMD_WRITE, address_masked, 0);
+		qspi_put_get(chip, &data[offset], NULL, count);
+		
+		// Wait for busy bit to clear
+		qspi_wait_ready(chip);
+
+		offset += count;
+		address += count;
+		length -= count;
+	}
+}

@@ -31,6 +31,8 @@
 #define QSPI_SD3_PAD   (4)
 #define QSPI_SS_PAD    (5)
 
+#define DEBUG_CS_CHIP_USE 1
+
 extern uint32_t log_buffer[128]; // store addresses
 void add_log_to_buffer(uint32_t value);
 
@@ -59,4 +61,8 @@ void qspi_read(uint32_t address, uint8_t * data, uint32_t length);
 
 void qspi_test(void);
 
+void qspi_flash_init();
+void flash_init_spi(); // used before issuing serial commands to flash (ie erase/write)
 void __no_inline_not_in_flash_func(flash_bulk_read)(uint32_t cmd, uint32_t *rxbuf, uint32_t flash_offs, size_t len, uint dma_chan);
+void qspi_flash_write(uint32_t address, uint8_t * data, uint32_t length);
+void qspi_flash_erase_block(uint32_t address);

@@ -159,31 +159,8 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 			t = time_us_32();
 			it++;
 
-			if (it == 10) {
-
-				// printf("MCU1 SSI CONFIG\n");
-				// dump_current_ssi_config();
-
-				// qspi_enable();
-				// printf("MCU1 PSRAM via qspi_read1\n");
-				// char buf2[64];
+			if (it == 8) {
 				uint32_t now = time_us_32();
-				// qspi_read(0, buf2, 64);
-				// uint32_t diff = time_us_32() - now;
-				// printf("Read 64bytes in %d us\n", diff);
-				// for(int i = 0; i < 64; i++) {
-				// 	printf("[%x]%02x ", i, buf2[i]);
-				// }
-
-				// printf("\n");
-
-				// now = time_us_32();
-				// qspi_read(0, buf2, 1);
-				// uint32_t next_word = buf2[0];
-				// diff = time_us_32() - now;
-				// printf("Read 1bytes in %d us\n", diff);
-				// qspi_restore_to_startup_config();
-				// ssi_hw->ssienr = 1;
 
 				printf("\nMCU1 try to read with ptr\n");
 				qspi_enable();
@@ -196,7 +173,7 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 				for(int i = 0; i < 64 / 4; i++) {
 					now = time_us_32();
 					uint32_t address_32 = i;
-					psram_set_cs2(2);
+					psram_set_cs2(DEBUG_CS_CHIP_USE);
 					uint32_t word = ptr[address_32];
 					psram_set_cs2(0);
 					totalTime += time_us_32() - now;
@@ -216,8 +193,6 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 				printf("Read from PSRAM access for 16 (32bit values) took %d us\n", totalTime);
 
 				load_rom_cache(0);
-
-			// 	qspi_disable();
 			}
 		}
 

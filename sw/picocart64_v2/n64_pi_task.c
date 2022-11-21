@@ -28,20 +28,10 @@
 #include "qspi_helper.h"
 #include "psram.h"
 
-// The rom to load in normal .z64, big endian, format
-// #include "rom_vars.h"
-// #include "rom.h"
-
-// uint16_t rom_mapping[MAPPING_TABLE_LEN];
-
-#if COMPRESSED_ROM
-// do something
-#else
-// static const uint16_t *rom_file_16 = (uint16_t *) rom_chunks;
-#endif
-
+#define USE_ROM_CACHE 0
 #define DMA_READ_CMD 0x0B
 
+#if USE_ROM_CACHE == 1
 #define ROM_CACHE_SIZE 512 // in 32bit values
 static volatile uint32_t rom_cache0[ROM_CACHE_SIZE];
 static volatile uint32_t rom_cache1[ROM_CACHE_SIZE];
@@ -53,6 +43,7 @@ static volatile uint32_t cache_endingAddress = 0;
 
 static volatile uint32_t back_cache_startingAddress = 0;
 static volatile uint32_t back_cache_endingAddress = 0;
+#endif
 
 volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
 
@@ -75,22 +66,25 @@ static inline void psram_set_cs2(uint8_t chip)
 
 volatile uint32_t update_rom_cache_for_address = 0;
 void update_rom_cache(uint32_t address) {
+	#if USE_ROM_CACHE == 1
 	back_cache_startingAddress = address;
 	back_cache_endingAddress = address + ROM_CACHE_SIZE;
 
 	// Load the values into other rom cache, so if current index is 0, load in 1, and if 1 load into 0
 	if (rom_cache_index == 0) {
-		psram_set_cs2(2);
+		psram_set_cs2(DEBUG_CS_CHIP_USE);
 		flash_bulk_read(DMA_READ_CMD, (uint32_t*)rom_cache1, address, ROM_CACHE_SIZE, 0);
 		psram_set_cs2(0);
 	} else {
-		psram_set_cs2(2);
+		psram_set_cs2(DEBUG_CS_CHIP_USE);
 		flash_bulk_read(DMA_READ_CMD, (uint32_t*)rom_cache0, 0, ROM_CACHE_SIZE, 0);
 		psram_set_cs2(0);
 	}
+	#endif
 }
 
 static inline void swap_rom_cache() {
+	#if USE_ROM_CACHE == 1
 	cache_startingAddress = back_cache_startingAddress;
 	cache_endingAddress = back_cache_endingAddress;
 	if (rom_cache_index == 0) {
@@ -100,6 +94,7 @@ static inline void swap_rom_cache() {
 		rom_cache = rom_cache0;
 		rom_cache_index = 0;
 	}
+	#endif
 }
 
 static inline uint16_t read_from_psram(uint32_t rom_address) {
@@ -108,7 +103,7 @@ static inline uint16_t read_from_psram(uint32_t rom_address) {
 	// and what we really want are 4 byte aligned addresses
 	
 	uint32_t index = (rom_address & 0xFFFFFF) >> 1;
-
+	#if USE_ROM_CACHE == 1
 	/* If we are already have way through the current cache, start updating for the next set of values */
 	if (index >= cache_startingAddress && index <= cache_endingAddress && index >= cache_endingAddress >> 2) {
 		if (update_rom_cache_for_address != cache_endingAddress) {
@@ -143,19 +138,16 @@ static inline uint16_t read_from_psram(uint32_t rom_address) {
 		update_rom_cache_for_address = index;
 		multicore_fifo_push_blocking(CORE1_UPDATE_ROM_CACHE);
 	}
+	#endif
 	
-	psram_set_cs2(2);
+	psram_set_cs2(DEBUG_CS_CHIP_USE);
 	uint32_t word = ptr[index];
 	psram_set_cs2(0);
 	return swap16(word);
-
-	// psram_set_cs2(2);	
-	// uint32_t word = ptr[index];
-	// psram_set_cs2(0);
-	// return (uint16_t)swap16(word); // swap so the data is on the right side
 }
 
 void load_rom_cache(uint32_t startingAt) {
+	#if USE_ROM_CACHE == 1
 	cache_startingAddress = startingAt;
 	cache_endingAddress = startingAt + ROM_CACHE_SIZE;
 	rom_cache = rom_cache0;
@@ -163,7 +155,7 @@ void load_rom_cache(uint32_t startingAt) {
 
 	uint32_t totalTime = 0;
 	uint32_t now = time_us_32();
-	psram_set_cs2(2);
+	psram_set_cs2(DEBUG_CS_CHIP_USE);
 	flash_bulk_read(DMA_READ_CMD, (uint32_t*)rom_cache, startingAt, ROM_CACHE_SIZE, 0);
 	psram_set_cs2(0);
 	totalTime += time_us_32() - now;
@@ -172,6 +164,9 @@ void load_rom_cache(uint32_t startingAt) {
     }
 
 	printf("Loaded %d (32-bit values) of data in %d us.\n", ROM_CACHE_SIZE, totalTime);
+	#else
+	printf("No rom cache in use. Set USE_ROM_CACHE to 1 to use.\n");
+	#endif
 }
 
 static inline uint32_t resolve_sram_address(uint32_t address)
@@ -192,19 +187,6 @@ static inline uint32_t resolve_sram_address(uint32_t address)
 static inline uint32_t n64_pi_get_value(PIO pio)
 {
 	uint32_t value = pio_sm_get_blocking(pio, 0);
-
-	// Disable to get some more performance. Enable for debugging.
-	// Without ringbuf, ROM access takes 160-180ns. With, 240-260ns.
-#if 0
-	ringbuf_add(ringbuf, value);
-#elif 0
-	uart_tx_program_putc((value & 0xFF000000) >> 24);
-	uart_tx_program_putc((value & 0x00FF0000) >> 16);
-	uart_tx_program_putc((value & 0x0000FF00) >> 8);
-	uart_tx_program_putc((value & 0x000000FF));
-	uart_tx_program_putc('\n');
-#endif
-
 	return value;
 }
 
@@ -228,8 +210,6 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 
 	// Read addr manually before the loop
 	addr = n64_pi_get_value(pio);
-
-	// add_log_to_buffer(0xAAAABBBB);
 
 	uint32_t lastUpdate = 0;
 	while (1) {

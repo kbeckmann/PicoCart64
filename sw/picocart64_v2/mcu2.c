@@ -111,8 +111,8 @@ void main_task_entry(__unused void *params)
 	// mount_sd();
 
 	// Boot MCU1
-	printf("Booting MCU1...\n");
-	gpio_put(PIN_MCU1_RUN, 1);
+	// printf("Booting MCU1...\n");
+	// gpio_put(PIN_MCU1_RUN, 1);
 
 	// printf("MCU2 SSI CONFIG\n");
 	// dump_current_ssi_config();
@@ -120,16 +120,9 @@ void main_task_entry(__unused void *params)
 	vTaskDelay(1000);
 
 	// boot mcu1 before loading rom so it can actually read out of flash to boot
-	// Super Mario 64 (USA).z64
-	// load super mario into psram
-	// load_rom("Super Mario 64 (USA).z64");
-
-	// load_rom("Doom 64 (USA) (Rev 1).z64");
-	// load_rom2("testrom.z64"); // try to do on cs1 where I soldered a another flash chip instead of psram
-	load_rom("testrom.z64"); // use chip 2 which has psram
+	load_rom("testrom.z64"); 
 	printf("\nfinished loading rom.\n");
-	// printf("No rom to load this time\n");
-
+	
 	// Setup PIO UART
 	// pio_uart_init(PIN_SPI1_CS, PIN_SPI1_RX);
 	// printf("pio uart inited\n");

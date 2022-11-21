@@ -333,12 +333,11 @@ void mount_sd(void) {
 
 #define RUN_QSPI_PERMUTATION_TESTS 0
 #define ROM_WRITE_OFFSET 1
-#define FLASH_TARGET_OFFSET 256 * 1024
-char buf[1024 / 2 / 2 / 2 / 2];
-// uint8_t buf[FLASH_PAGE_SIZE];
-// uint8_t flash_buf[FLASH_PAGE_SIZE];
+//#define FLASH_TARGET_OFFSET 256 * 1024
 
-void __no_inline_not_in_flash_func(load_rom2)(const char* filename) {
+#if LOAD_TO_PSRAM_ARRAY == 0
+uint8_t buf[64];
+void __no_inline_not_in_flash_func(load_rom)(const char* filename) {
     // Renable normal flash stuff?
     // printf("--------------------\n");
     // qspi_print_pull();
@@ -351,7 +350,7 @@ void __no_inline_not_in_flash_func(load_rom2)(const char* filename) {
 	// ssi_hw->ssienr = 1;
 
     // qspi_init_spi();
-    qspi_enable();
+    // qspi_enable();
     // qspi_enter_cmd_xip();
 
     // qspi_oeover_normal(true); // disable CS
@@ -384,27 +383,27 @@ void __no_inline_not_in_flash_func(load_rom2)(const char* filename) {
     
     
     printf("DONE!\nLoading rom into flash\n");
+    
+    qspi_flash_init();
+    flash_init_spi();
 
-    uint8_t txbuf[64] = { 0x05 };
-    uint8_t rxbuf[64];
-    flash_do_cmd(txbuf, rxbuf, 1);
+    uint32_t numBlocksToErase = filinfo.fsize / FLASH_BLOCK_SIZE;
+    uint32_t erasedBlocks = 0;
+    printf("Erasing %d %dk blocks flash...\n", numBlocksToErase, FLASH_BLOCK_SIZE);
+    do {
+        uint32_t addressToErase = erasedBlocks * FLASH_BLOCK_SIZE;
+        qspi_flash_erase_block(addressToErase);
 
-    printf("register status %x\n", rxbuf[0]);
-    qspi_print_pull();
+        numBlocksToErase++;
+        erasedBlocks++;
+    } while(numBlocksToErase > 0);
 
-    // printf("Erasing flash...\n");
-    // psram_set_cs(1);
-    // flash_range_erase(total, FLASH_PAGE_SIZE*385);
-    // psram_set_cs(0);
-    // printf("DONE!\nProgramming flash...\n");
+    printf("Erased %d blocks.\nProgramming flash...\n", erasedBlocks);
 
 	uint64_t t0 = to_us_since_boot(get_absolute_time());
 	do {        
         fr = f_read(&fil, buf, sizeof(buf), &len);
-        psram_set_cs(1);
-        // flash_range_program(total, buf, len);
-        qspi_write(total, buf, len);
-        psram_set_cs(0);
+        qspi_flash_write(total, buf, len);
 		total += len;
 	} while (len > 0);
 	uint64_t t1 = to_us_since_boot(get_absolute_time());
@@ -426,7 +425,7 @@ void __no_inline_not_in_flash_func(load_rom2)(const char* filename) {
         uint32_t modifiedAddress = i;
         
         uint32_t startTime_us = time_us_32();
-        psram_set_cs(1);
+        psram_set_cs(DEBUG_CS_CHIP_USE);
         uint32_t word = ptr[modifiedAddress];
         psram_set_cs(0);
 
@@ -440,7 +439,7 @@ void __no_inline_not_in_flash_func(load_rom2)(const char* filename) {
 
     uint32_t rom_buf[128];
     uint32_t startTime_us = time_us_32();
-    psram_set_cs(1);
+    psram_set_cs(DEBUG_CS_CHIP_USE);
     flash_bulk_read(0, rom_buf, 0, sizeof(rom_buf), 0);
     psram_set_cs(0);
 
@@ -451,6 +450,8 @@ void __no_inline_not_in_flash_func(load_rom2)(const char* filename) {
     printf("DMA read %d 32bit value reads in %d us\n", 128, dma_totalTime);
 }
 
+#elif LOAD_TO_PSRAM_ARRAY == 1
+char buf[1024 / 2 / 2 / 2 / 2];
 void __no_inline_not_in_flash_func(load_rom)(const char *filename)
 {
 	// Set output enable (OE) to normal mode on all QSPI IO pins except SS
@@ -562,7 +563,7 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
     volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
     for (int i = 0; i < 16; i++) {
         uint32_t modifiedAddress = i;
-        psram_set_cs(2);
+        psram_set_cs(DEBUG_CS_CHIP_USE);
         uint32_t word = ptr[modifiedAddress];
         psram_set_cs(0);
         printf("PSRAM-MCU2[%d]: %08x\n",i, swap16(word));
@@ -572,7 +573,7 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
     // qspi_enter_cmd_xip();
     uint32_t dmaBuffer[128];
     uint32_t startTime_us = time_us_32();
-    psram_set_cs(2);
+    psram_set_cs(DEBUG_CS_CHIP_USE);
     flash_bulk_read(0x0B, dmaBuffer, 0, 128, 0);
     psram_set_cs(0);
     uint32_t dma_totalTime = time_us_32() - startTime_us;
@@ -596,7 +597,7 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
         
         uint32_t startTime_us = time_us_32();
         // uint32_t n = systick_hw->cvr;
-        psram_set_cs(2);
+        psram_set_cs(DEBUG_CS_CHIP_USE);
         // psram_csToggleTime += systick_hw->cvr - n;
         
         // uint32_t startTime_ticks = systick_hw->cvr;
@@ -620,7 +621,7 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
     // volatile uint16_t *ptr_16 = (volatile uint16_t *)0x10000000;
     // for (int i = 0; i < 256;) {
     //     uint32_t startTime_us = time_us_32();
-    //     psram_set_cs(2));
+    //     psram_set_cs(DEBUG_CS_CHIP_USE));
     //     uint32_t word1 = ptr_16[i];
     //     uint32_t word2 = ptr_16[i+1];
     //     psram_set_cs(0);
@@ -694,7 +695,7 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
                                 // The DMA reads will stall out if there is a configuration error
                                 // uint32_t p_buffer[128];
                                 // uint32_t startTime_us = time_us_32();
-                                // psram_set_cs(2));
+                                // psram_set_cs(DEBUG_CS_CHIP_USE));
                                 // flash_bulk_read(cmd, p_buffer, 0, 128, 0);
                                 // psram_set_cs(0);
                                 // totalTime += time_us_32() - startTime_us;
@@ -714,7 +715,7 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
                                 for (int i = 0; i < 128; i++) {
                                     uint32_t startTime_us = time_us_32();
                                     uint32_t modifiedAddress = i;
-                                    psram_set_cs(2);
+                                    psram_set_cs(DEBUG_CS_CHIP_USE);
                                     uint32_t word = ptr[modifiedAddress];
                                     psram_set_cs(0);
                                     totalTime += time_us_32() - startTime_us;
@@ -743,7 +744,7 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
     qspi_enter_cmd_xip();
     // uint32_t dmaBuffer[128];
     startTime_us = time_us_32();
-    psram_set_cs(2);
+    psram_set_cs(DEBUG_CS_CHIP_USE);
     flash_bulk_read(0x03, dmaBuffer, 0, 128, 0);
     psram_set_cs(0);
     dma_totalTime = time_us_32() - startTime_us;
@@ -753,7 +754,7 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
     printf("DMA read 128 32bit reads in %d us\n", dma_totalTime);
 
     // startTime_us = time_us_32();
-    // psram_set_cs(1);
+    // psram_set_cs(DEBUG_CS_CHIP_USE);
     // flash_bulk_read(0x03, dmaBuffer, 0, 1, 0);
     // psram_set_cs(0);
     // dma_totalTime = time_us_32() - startTime_us;
@@ -763,7 +764,7 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
     // printf("DMA read 1 32bit value in %d us\n", dma_totalTime);
 
     // uint32_t oneWordReadStartTime = time_us_32();
-    // psram_set_cs(1);
+    // psram_set_cs(DEBUG_CS_CHIP_USE);
     // uint32_t word = ptr[0];
     // psram_set_cs(0);
     // uint32_t oneWordReadTotalTime = time_us_32() - oneWordReadStartTime;
@@ -779,7 +780,7 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
     // printf("Init fast read qspi and then DMA\n");
     // qspi_init_qspi();
     // startTime_us = time_us_32();
-    // psram_set_cs(1);
+    // psram_set_cs(DEBUG_CS_CHIP_USE);
     // flash_bulk_read(0x0b, dmaBuffer, 0, 128, 0);
     // psram_set_cs(0);
     // dma_totalTime = time_us_32() - startTime_us;
@@ -800,7 +801,7 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
 	//  uint32_t *ptr = (uint32_t *) 0x10000000;
 
 	//  for (int i = 0; i < 8 * 1024 / 4 * 2; i++) {
-	//      psram_set_cs(1);
+	//      psram_set_cs(DEBUG_CS_CHIP_USE);
 	//      uint32_t word = ptr[i];
 	//      psram_set_cs(0);
 	//      // printf("%08X ", word);
@@ -897,3 +898,4 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
 	// Release the qspi control
     qspi_disable();
 }
+#endif

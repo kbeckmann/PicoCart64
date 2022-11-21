@@ -12,6 +12,7 @@
 #include "pc64_regs.h"
 #include "pio_uart/pio_uart.h"
 
+#define LOAD_TO_PSRAM_ARRAY 0 // 1 if use psram, 0 to use flash
 #define SD_CARD_SECTOR_SIZE 512 // 512 bytes
 
 extern int PC64_MCU_ID;
@@ -49,5 +50,3 @@ void mount_sd(void);
 
 // sd/rom/psram stuff
 void load_rom(const char *filename);
-void load_rom2(const char *filename);
-void test_read_from_psram();
