@@ -336,7 +336,7 @@ void mount_sd(void) {
 //#define FLASH_TARGET_OFFSET 256 * 1024
 
 #if LOAD_TO_PSRAM_ARRAY == 0
-uint8_t buf[64];
+uint8_t buf[FLASH_PAGE_SIZE];
 void __no_inline_not_in_flash_func(load_rom)(const char* filename) {
     // Renable normal flash stuff?
     // printf("--------------------\n");
@@ -385,32 +385,32 @@ void __no_inline_not_in_flash_func(load_rom)(const char* filename) {
     printf("DONE!\nLoading rom into flash\n");
     
     qspi_flash_init();
-    flash_init_spi();
+    // qspi_enable();
 
-    uint32_t numBlocksToErase = filinfo.fsize / FLASH_BLOCK_SIZE;
-    uint32_t erasedBlocks = 0;
-    printf("Erasing %d %dk blocks flash...\n", numBlocksToErase, FLASH_BLOCK_SIZE);
-    do {
-        uint32_t addressToErase = erasedBlocks * FLASH_BLOCK_SIZE;
-        qspi_flash_erase_block(addressToErase);
+    // uint32_t numBlocksToErase = filinfo.fsize / FLASH_BLOCK_SIZE;
+    // uint32_t erasedBlocks = 0;
+    // printf("Erasing %d %dKB blocks flash...\n", numBlocksToErase, FLASH_BLOCK_SIZE/1024);
+    // do {
+    //     uint32_t addressToErase = erasedBlocks * FLASH_BLOCK_SIZE;
+    //     qspi_flash_erase_block(addressToErase);
 
-        numBlocksToErase++;
-        erasedBlocks++;
-    } while(numBlocksToErase > 0);
+    //     numBlocksToErase--;
+    //     erasedBlocks++;
+    // } while(numBlocksToErase > 0);
 
-    printf("Erased %d blocks.\nProgramming flash...\n", erasedBlocks);
+    // printf("Erased %d blocks.\nProgramming flash...\n", erasedBlocks);
 
-	uint64_t t0 = to_us_since_boot(get_absolute_time());
-	do {        
-        fr = f_read(&fil, buf, sizeof(buf), &len);
-        qspi_flash_write(total, buf, len);
-		total += len;
-	} while (len > 0);
-	uint64_t t1 = to_us_since_boot(get_absolute_time());
-	uint32_t delta = (t1 - t0) / 1000;
-	uint32_t kBps = (uint32_t) ((float)(total / 1024.0f) / (float)(delta / 1000.0f));
+	// uint64_t t0 = to_us_since_boot(get_absolute_time());
+	// do {        
+    //     fr = f_read(&fil, buf, sizeof(buf), &len);
+    //     qspi_flash_write(total, buf, len);
+	// 	total += len;
+	// } while (len > 0);
+	// uint64_t t1 = to_us_since_boot(get_absolute_time());
+	// uint32_t delta = (t1 - t0) / 1000;
+	// uint32_t kBps = (uint32_t) ((float)(total / 1024.0f) / (float)(delta / 1000.0f));
 
-	printf("Read %d bytes and programmed FLASH in %d ms (%d kB/s)\n\n\n", total, delta, kBps);
+	// printf("Read %d bytes and programmed FLASH in %d ms (%d kB/s)\n\n\n", total, delta, kBps);
 
 	fr = f_close(&fil);
 	if (FR_OK != fr) {
@@ -418,6 +418,20 @@ void __no_inline_not_in_flash_func(load_rom)(const char* filename) {
 	}
 	printf("---- read file done -----\n\n\n");
 
+    printf("\nReading data via qspi_flash_read_cmd\n");
+    uint8_t flash_read_buffer[256];
+    qspi_flash_read_data(0, flash_read_buffer, 256);
+    for(int i = 0; i < 256; i++) {
+        if (i % 8 == 0 && i != 0) {
+            printf("\n");
+        }
+        printf("%02x ", flash_read_buffer[i]);
+    }
+    printf("\n");
+
+    qspi_flash_enable_xip();
+
+    printf("PTR (xip mode?) reads\n");
     volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
     uint32_t cycleCountStart = 0;
     int totalReadTime = 0;
@@ -437,17 +451,49 @@ void __no_inline_not_in_flash_func(load_rom)(const char* filename) {
 
     printf("\n128 32bit reads @ 0x10000000 reads took %d us\n", totalReadTime);
 
-    uint32_t rom_buf[128];
+    printf("\n\nTry DMA Read (0x03)\n");
+    uint32_t rom_buf[256];
     uint32_t startTime_us = time_us_32();
     psram_set_cs(DEBUG_CS_CHIP_USE);
-    flash_bulk_read(0, rom_buf, 0, sizeof(rom_buf), 0);
+    flash_bulk_read(0x03, rom_buf, 0, sizeof(rom_buf), 0);
     psram_set_cs(0);
 
     uint32_t dma_totalTime = time_us_32() - startTime_us;
     for(int i = 0; i < 16; i++) {
         printf("DMA[%d]: %08x\n",i, rom_buf[i]);
     }
-    printf("DMA read %d 32bit value reads in %d us\n", 128, dma_totalTime);
+    printf("DMA read %d 32bit value reads in %d us\n\n", count_of(rom_buf), dma_totalTime);
+
+    // printf("-----------------------------------\n");
+    // qspi_flash_enable_xip2();
+    // totalReadTime = 0;
+    // for (int i = 0; i < 128; i++) {
+    //     uint32_t modifiedAddress = i;
+        
+    //     uint32_t startTime_us = time_us_32();
+    //     psram_set_cs(DEBUG_CS_CHIP_USE);
+    //     uint32_t word = ptr[modifiedAddress];
+    //     psram_set_cs(0);
+
+    //     totalReadTime += time_us_32() - startTime_us;
+    //     if (i < 16) { // only print the first 16 words
+    //         printf("FAST_FLASH-MCU2[%d]: %08x\n",i, word);
+    //     }
+    // }
+
+    // printf("\n128 32bit reads @ 0x10000000 reads took %d us\n", totalReadTime);
+
+    // printf("\n\nTry DMA Read (0xEB)\n");
+    // startTime_us = time_us_32();
+    // psram_set_cs(DEBUG_CS_CHIP_USE);
+    // flash_bulk_read(0, rom_buf, 0, sizeof(rom_buf), 0);
+    // psram_set_cs(0);
+
+    // dma_totalTime = time_us_32() - startTime_us;
+    // for(int i = 0; i < 16; i++) {
+    //     printf("DMA[%d]: %08x\n",i, rom_buf[i]);
+    // }
+    // printf("DMA read %d 32bit value reads in %d us\n", count_of(rom_buf), dma_totalTime);
 }
 
 #elif LOAD_TO_PSRAM_ARRAY == 1
