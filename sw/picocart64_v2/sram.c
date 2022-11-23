@@ -10,7 +10,8 @@
 #include "sram.h"
 
 #include "pico/stdlib.h"
-#include "hardware/flash.h"
+// #include "hardware/flash.h"
+#include "flash_array/flash_array.h"
 
 // todo: review this later
 uint16_t sram[SRAM_256KBIT_SIZE / sizeof(uint16_t)];
@@ -28,6 +29,6 @@ void sram_save_to_flash(void)
 	uint32_t offset = ((uint32_t) sram_backup) - XIP_BASE;
 	uint32_t count = sizeof(sram);
 
-	flash_range_erase(offset, count);
-	flash_range_program(offset, (const uint8_t *)sram, count);
+	picocart_flash_range_erase(offset, count);
+	picocart_flash_range_program(offset, (const uint8_t *)sram, count);
 }

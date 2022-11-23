@@ -46,6 +46,7 @@ static volatile uint32_t back_cache_endingAddress = 0;
 #endif
 
 volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+volatile uint16_t *ptr16 = (volatile uint16_t *)0x10000000;
 
 static inline void psram_set_cs2(uint8_t chip)
 {
@@ -102,7 +103,8 @@ static inline uint16_t read_from_psram(uint32_t rom_address) {
 	// rom_address should be 2 byte aligned, which means we are likely to get address 0,2,4
 	// and what we really want are 4 byte aligned addresses
 	
-	uint32_t index = (rom_address & 0xFFFFFF) >> 1;
+	uint32_t index = (rom_address & 0xFFFFFF) >> 1; // address / 2 (works when storing 16bit values per index)
+	// uint32_t index = (rom_address & 0xFFFFFF) >> 2; // address / 4 (works when storing 32bit values per index)
 	#if USE_ROM_CACHE == 1
 	/* If we are already have way through the current cache, start updating for the next set of values */
 	if (index >= cache_startingAddress && index <= cache_endingAddress && index >= cache_endingAddress >> 2) {
@@ -140,10 +142,8 @@ static inline uint16_t read_from_psram(uint32_t rom_address) {
 	}
 	#endif
 	
-	psram_set_cs2(DEBUG_CS_CHIP_USE);
-	uint32_t word = ptr[index];
-	psram_set_cs2(0);
-	return swap16(word);
+	uint16_t word = ptr16[index];
+	return word;
 }
 
 void load_rom_cache(uint32_t startingAt) {

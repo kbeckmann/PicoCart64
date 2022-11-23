@@ -18,6 +18,9 @@ add_executable(picocart64_v2
 
     ws2812/ws2812.c
 
+    flash_array/flash_array.c
+    flash_array/program_flash_array.c
+
     pio_uart/pio_uart.c
 )
 
@@ -86,6 +89,7 @@ target_include_directories(picocart64_v2 PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/led
     ${CMAKE_CURRENT_LIST_DIR}/sdcard
     ${CMAKE_CURRENT_LIST_DIR}/ws2812
+    ${CMAKE_CURRENT_LIST_DIR}/flash_array
 
     ${CMAKE_CURRENT_LIST_DIR}/../generated
     ${CMAKE_CURRENT_BINARY_DIR}

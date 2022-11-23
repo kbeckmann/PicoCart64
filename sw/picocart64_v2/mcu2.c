@@ -120,6 +120,7 @@ void main_task_entry(__unused void *params)
 	vTaskDelay(1000);
 
 	// boot mcu1 before loading rom so it can actually read out of flash to boot
+	printf("Loading rom...\n");
 	load_rom("testrom.z64"); 
 	printf("\nfinished loading rom.\n");
 	

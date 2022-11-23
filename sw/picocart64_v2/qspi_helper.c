@@ -6,9 +6,9 @@
 #include "utils.h"
 
 #include "psram.h"
-#include "hardware/flash.h"
+// #include "hardware/flash.h"
 
-#include "hardware/resets.h" // pico-sdk reset defines
+// #include "hardware/resets.h" // pico-sdk reset defines
 
 // #include "gpio_helper.h"
 // #define VERBOSE
@@ -740,7 +740,7 @@ void qspi_read(uint32_t address, uint8_t * data, uint32_t length)
 	}
 }
 
-void __no_inline_not_in_flash_func(flash_bulk_read)(uint32_t cmd, uint32_t *rxbuf, uint32_t flash_offs, size_t len,
+void __no_inline_not_in_flash_func(qspi_flash_bulk_read)(uint32_t cmd, uint32_t *rxbuf, uint32_t flash_offs, size_t len,
                                                  uint dma_chan) {
     // SSI must be disabled to set transfer size. If software is executing
     // from flash right now then it's about to have a bad time
@@ -784,417 +784,417 @@ void __no_inline_not_in_flash_func(flash_bulk_read)(uint32_t cmd, uint32_t *rxbu
     ssi_hw->ssienr = 1;
 }
 
-#define QSPI_SS_NORMAL 0x0
-#define QSPI_SS_INVERT 0x1
-#define QSPI_SS_LOW 0x2
-#define QSPI_SS_HIGH 0x3
-// force qspi ss into a high or low state
-static void __noinline flash_cs_force(int over) {
-    io_rw_32 *reg = (io_rw_32 *) (IO_QSPI_BASE + IO_QSPI_GPIO_QSPI_SS_CTRL_OFFSET);
+// #define QSPI_SS_NORMAL 0x0
+// #define QSPI_SS_INVERT 0x1
+// #define QSPI_SS_LOW 0x2
+// #define QSPI_SS_HIGH 0x3
+// // force qspi ss into a high or low state
+// static void __noinline flash_cs_force(int over) {
+//     io_rw_32 *reg = (io_rw_32 *) (IO_QSPI_BASE + IO_QSPI_GPIO_QSPI_SS_CTRL_OFFSET);
 
-	*reg = *reg & ~IO_QSPI_GPIO_QSPI_SS_CTRL_OUTOVER_BITS
-		| (over << IO_QSPI_GPIO_QSPI_SS_CTRL_OUTOVER_LSB);
+// 	*reg = *reg & ~IO_QSPI_GPIO_QSPI_SS_CTRL_OUTOVER_BITS
+// 		| (over << IO_QSPI_GPIO_QSPI_SS_CTRL_OUTOVER_LSB);
 
-    // Read to flush async bridge
-    (void) *reg;
-}
+//     // Read to flush async bridge
+//     (void) *reg;
+// }
 
-// Connect the XIP controller to the flash pads
-void __noinline qspi_connect_internal_flash() {
-    // Use hard reset to force IO and pad controls to known state (don't touch
-    // IO_BANK0 as that does not affect XIP signals)
-    //reset_unreset_block_wait_noinline(RESETS_RESET_IO_QSPI_BITS | RESETS_RESET_PADS_QSPI_BITS);
-	reset_block(RESETS_RESET_IO_QSPI_BITS | RESETS_RESET_PADS_QSPI_BITS);
+// // Connect the XIP controller to the flash pads
+// void __noinline qspi_connect_internal_flash() {
+//     // Use hard reset to force IO and pad controls to known state (don't touch
+//     // IO_BANK0 as that does not affect XIP signals)
+//     //reset_unreset_block_wait_noinline(RESETS_RESET_IO_QSPI_BITS | RESETS_RESET_PADS_QSPI_BITS);
+// 	reset_block(RESETS_RESET_IO_QSPI_BITS | RESETS_RESET_PADS_QSPI_BITS);
 
-    // Then mux XIP block onto internal QSPI flash pads
-    io_rw_32 *iobank1 = (io_rw_32 *) IO_QSPI_BASE;
+//     // Then mux XIP block onto internal QSPI flash pads
+//     io_rw_32 *iobank1 = (io_rw_32 *) IO_QSPI_BASE;
 
-    for (int i = 0; i < 6; ++i) {
-        iobank1[2 * i + 1] = 0;
-	}
-}
+//     for (int i = 0; i < 6; ++i) {
+//         iobank1[2 * i + 1] = 0;
+// 	}
+// }
 
-// Flash init spi must be used to issue serial commands
-// Set up the SSI controller for standard SPI mode,i.e. for every byte sent we get one back
-// This is only called by flash_exit_xip(), not by any of the other functions.
-// This makes it possible for the debugger or user code to edit SPI settings
-// e.g. baud rate, CPOL/CPHA.
-void qspi_flash_init_spi() {
-	//ssi->baudr = 2;
-	printf("Init flash spi - 8bit\n");
-	// Disable SSI for further config
-    ssi->ssienr = 0;
-    // Clear sticky errors (clear-on-read)
-    (void) ssi->sr;
-    (void) ssi->icr;
+// // Flash init spi must be used to issue serial commands
+// // Set up the SSI controller for standard SPI mode,i.e. for every byte sent we get one back
+// // This is only called by flash_exit_xip(), not by any of the other functions.
+// // This makes it possible for the debugger or user code to edit SPI settings
+// // e.g. baud rate, CPOL/CPHA.
+// void qspi_flash_init_spi() {
+// 	//ssi->baudr = 2;
+// 	printf("Init flash spi - 8bit\n");
+// 	// Disable SSI for further config
+//     ssi->ssienr = 0;
+//     // Clear sticky errors (clear-on-read)
+//     (void) ssi->sr;
+//     (void) ssi->icr;
     
-    ssi->baudr = 2;
-    ssi->ctrlr0 =
-            (SSI_CTRLR0_SPI_FRF_VALUE_STD << SSI_CTRLR0_SPI_FRF_LSB) | // Standard 1-bit SPI serial frames
-            (7 << SSI_CTRLR0_DFS_32_LSB) | // 8 clocks per data frame
-            (SSI_CTRLR0_TMOD_VALUE_TX_AND_RX << SSI_CTRLR0_TMOD_LSB);  // TX and RX FIFOs are both used for every byte
-    // Slave selected when transfers in progress
-    ssi->ser = 1;
-    // Re-enable
-    ssi->ssienr = 1;
-}
+//     ssi->baudr = 2;
+//     ssi->ctrlr0 =
+//             (SSI_CTRLR0_SPI_FRF_VALUE_STD << SSI_CTRLR0_SPI_FRF_LSB) | // Standard 1-bit SPI serial frames
+//             (7 << SSI_CTRLR0_DFS_32_LSB) | // 8 clocks per data frame
+//             (SSI_CTRLR0_TMOD_VALUE_TX_AND_RX << SSI_CTRLR0_TMOD_LSB);  // TX and RX FIFOs are both used for every byte
+//     // Slave selected when transfers in progress
+//     ssi->ser = 1;
+//     // Re-enable
+//     ssi->ssienr = 1;
+// }
 
-// Sequence:
-// 1. CSn = 1, IO = 4'h0 (via pulldown to avoid contention), x32 clocks
-// 2. CSn = 0, IO = 4'hf (via pullup to avoid contention), x32 clocks
-// 3. CSn = 1 (brief deassertion)
-// 4. CSn = 0, MOSI = 1'b1 driven, x16 clocks
-//
-// Part 4 is the sequence suggested in W25X10CL datasheet.
-// Parts 1 and 2 are to improve compatibility with Micron parts
+// // Sequence:
+// // 1. CSn = 1, IO = 4'h0 (via pulldown to avoid contention), x32 clocks
+// // 2. CSn = 0, IO = 4'hf (via pullup to avoid contention), x32 clocks
+// // 3. CSn = 1 (brief deassertion)
+// // 4. CSn = 0, MOSI = 1'b1 driven, x16 clocks
+// //
+// // Part 4 is the sequence suggested in W25X10CL datasheet.
+// // Parts 1 and 2 are to improve compatibility with Micron parts
 
-// GCC produces some heinous code if we try to loop over the pad controls,
-// so structs it is
-struct sd_padctrl {
-    io_rw_32 sd0;
-    io_rw_32 sd1;
-    io_rw_32 sd2;
-    io_rw_32 sd3;
-};
-void __noinline qspi_flash_exit_xip() {
-    struct sd_padctrl *qspi_sd_padctrl = (struct sd_padctrl *) (PADS_QSPI_BASE + PADS_QSPI_GPIO_QSPI_SD0_OFFSET);
-    io_rw_32 *qspi_ss_ioctrl = (io_rw_32 *) (IO_QSPI_BASE + IO_QSPI_GPIO_QSPI_SS_CTRL_OFFSET);
-    uint8_t buf[2];
-    buf[0] = 0xff;
-    buf[1] = 0xff;
+// // GCC produces some heinous code if we try to loop over the pad controls,
+// // so structs it is
+// struct sd_padctrl {
+//     io_rw_32 sd0;
+//     io_rw_32 sd1;
+//     io_rw_32 sd2;
+//     io_rw_32 sd3;
+// };
+// void __noinline qspi_flash_exit_xip() {
+//     struct sd_padctrl *qspi_sd_padctrl = (struct sd_padctrl *) (PADS_QSPI_BASE + PADS_QSPI_GPIO_QSPI_SD0_OFFSET);
+//     io_rw_32 *qspi_ss_ioctrl = (io_rw_32 *) (IO_QSPI_BASE + IO_QSPI_GPIO_QSPI_SS_CTRL_OFFSET);
+//     uint8_t buf[2];
+//     buf[0] = 0xff;
+//     buf[1] = 0xff;
 
-    qspi_flash_init_spi();
+//     qspi_flash_init_spi();
 
-    uint32_t padctrl_save = qspi_sd_padctrl->sd0;
-    uint32_t padctrl_tmp = (padctrl_save
-                            & ~(PADS_QSPI_GPIO_QSPI_SD0_OD_BITS | PADS_QSPI_GPIO_QSPI_SD0_PUE_BITS |
-                                PADS_QSPI_GPIO_QSPI_SD0_PDE_BITS)
-                           ) | PADS_QSPI_GPIO_QSPI_SD0_OD_BITS | PADS_QSPI_GPIO_QSPI_SD0_PDE_BITS;
+//     uint32_t padctrl_save = qspi_sd_padctrl->sd0;
+//     uint32_t padctrl_tmp = (padctrl_save
+//                             & ~(PADS_QSPI_GPIO_QSPI_SD0_OD_BITS | PADS_QSPI_GPIO_QSPI_SD0_PUE_BITS |
+//                                 PADS_QSPI_GPIO_QSPI_SD0_PDE_BITS)
+//                            ) | PADS_QSPI_GPIO_QSPI_SD0_OD_BITS | PADS_QSPI_GPIO_QSPI_SD0_PDE_BITS;
 
-    // First two 32-clock sequences
-    // CSn is held high for the first 32 clocks, then asserted low for next 32
-    // flash_cs_force(OUTOVER_HIGH);
-	psram_set_cs(DEBUG_CS_CHIP_USE); // use our custom cs not the qspi one
+//     // First two 32-clock sequences
+//     // CSn is held high for the first 32 clocks, then asserted low for next 32
+//     // flash_cs_force(OUTOVER_HIGH);
+// 	psram_set_cs(DEBUG_CS_CHIP_USE); // use our custom cs not the qspi one
 
-    for (int i = 0; i < 2; ++i) {
-        // This gives 4 16-bit offset store instructions. Anything else seems to
-        // produce a large island of constants
-        qspi_sd_padctrl->sd0 = padctrl_tmp;
-        qspi_sd_padctrl->sd1 = padctrl_tmp;
-        qspi_sd_padctrl->sd2 = padctrl_tmp;
-        qspi_sd_padctrl->sd3 = padctrl_tmp;
+//     for (int i = 0; i < 2; ++i) {
+//         // This gives 4 16-bit offset store instructions. Anything else seems to
+//         // produce a large island of constants
+//         qspi_sd_padctrl->sd0 = padctrl_tmp;
+//         qspi_sd_padctrl->sd1 = padctrl_tmp;
+//         qspi_sd_padctrl->sd2 = padctrl_tmp;
+//         qspi_sd_padctrl->sd3 = padctrl_tmp;
 
-        // Brief delay (~6000 cyc) for pulls to take effect
-        uint32_t delay_cnt = 1u << 11;
-        asm volatile (
-        "1: \n\t"
-        "sub %0, %0, #1 \n\t"
-        "bne 1b"
-        : "+r" (delay_cnt)
-        );
+//         // Brief delay (~6000 cyc) for pulls to take effect
+//         uint32_t delay_cnt = 1u << 11;
+//         asm volatile (
+//         "1: \n\t"
+//         "sub %0, %0, #1 \n\t"
+//         "bne 1b"
+//         : "+r" (delay_cnt)
+//         );
 
-        qspi_flash_put_get(NULL, NULL, 4, 0);
+//         qspi_flash_put_get(NULL, NULL, 4, 0);
 
-        padctrl_tmp = (padctrl_tmp
-                       & ~PADS_QSPI_GPIO_QSPI_SD0_PDE_BITS)
-                      | PADS_QSPI_GPIO_QSPI_SD0_PUE_BITS;
+//         padctrl_tmp = (padctrl_tmp
+//                        & ~PADS_QSPI_GPIO_QSPI_SD0_PDE_BITS)
+//                       | PADS_QSPI_GPIO_QSPI_SD0_PUE_BITS;
 
-        // flash_cs_force(OUTOVER_LOW);
-		psram_set_cs(0);
-    }
+//         // flash_cs_force(OUTOVER_LOW);
+// 		psram_set_cs(0);
+//     }
 
-    // Restore IO/pad controls, and send 0xff, 0xff. Put pullup on IO2/IO3 as
-    // these may be used as WPn/HOLDn at this point, and we are now starting
-    // to issue serial commands.
+//     // Restore IO/pad controls, and send 0xff, 0xff. Put pullup on IO2/IO3 as
+//     // these may be used as WPn/HOLDn at this point, and we are now starting
+//     // to issue serial commands.
 
-    qspi_sd_padctrl->sd0 = padctrl_save;
-    qspi_sd_padctrl->sd1 = padctrl_save;
-    padctrl_save = (padctrl_save
-        & ~PADS_QSPI_GPIO_QSPI_SD0_PDE_BITS
-    ) | PADS_QSPI_GPIO_QSPI_SD0_PUE_BITS;
-    qspi_sd_padctrl->sd2 = padctrl_save;
-    qspi_sd_padctrl->sd3 = padctrl_save;
+//     qspi_sd_padctrl->sd0 = padctrl_save;
+//     qspi_sd_padctrl->sd1 = padctrl_save;
+//     padctrl_save = (padctrl_save
+//         & ~PADS_QSPI_GPIO_QSPI_SD0_PDE_BITS
+//     ) | PADS_QSPI_GPIO_QSPI_SD0_PUE_BITS;
+//     qspi_sd_padctrl->sd2 = padctrl_save;
+//     qspi_sd_padctrl->sd3 = padctrl_save;
 
-    // flash_cs_force(OUTOVER_LOW);
-	psram_set_cs(0);
+//     // flash_cs_force(OUTOVER_LOW);
+// 	psram_set_cs(0);
 
-    qspi_flash_put_get(buf, NULL, 2, 0);
+//     qspi_flash_put_get(buf, NULL, 2, 0);
 
-    *qspi_ss_ioctrl = 0;
-}
+//     *qspi_ss_ioctrl = 0;
+// }
 
-void __noinline qspi_flash_flush_cache() {
-    xip_ctrl_hw->flush = 1;
-    // Read blocks until flush completion
-    (void) xip_ctrl_hw->flush;
-    // Enable the cache
-    hw_set_bits(&xip_ctrl_hw->ctrl, XIP_CTRL_EN_BITS);
+// void __noinline qspi_flash_flush_cache() {
+//     xip_ctrl_hw->flush = 1;
+//     // Read blocks until flush completion
+//     (void) xip_ctrl_hw->flush;
+//     // Enable the cache
+//     hw_set_bits(&xip_ctrl_hw->ctrl, XIP_CTRL_EN_BITS);
 	
-	// We don't want to return the qspi cs to normal
-    //flash_cs_force(OUTOVER_NORMAL);
-}
+// 	// We don't want to return the qspi cs to normal
+//     //flash_cs_force(OUTOVER_NORMAL);
+// }
 
-void qspi_flash_init() {
-	//qspi_oeover_normal(false); // don't use the SS pin, we will control that
-	// qspi_restore_to_startup_config();
-	// flash_cs_force_low();
-	// current_mcu_enable_demux(true);
-	// xip_ctrl_hw->ctrl = (xip_ctrl_hw->ctrl & (~XIP_CTRL_EN_BITS));
-	// xip_ctrl_hw->flush = 1;
+// void qspi_flash_init() {
+// 	//qspi_oeover_normal(false); // don't use the SS pin, we will control that
+// 	// qspi_restore_to_startup_config();
+// 	// flash_cs_force_low();
+// 	// current_mcu_enable_demux(true);
+// 	// xip_ctrl_hw->ctrl = (xip_ctrl_hw->ctrl & (~XIP_CTRL_EN_BITS));
+// 	// xip_ctrl_hw->flush = 1;
 
-	// uint8_t stat;
-	// qspi_flash_do_cmd(DEBUG_CS_CHIP_USE, 0x05, NULL, &stat, 1);
-	// printf("reg 1: %02x\n", stat);
-	// qspi_flash_do_cmd(DEBUG_CS_CHIP_USE, 0x35, NULL, &stat, 1);
-	// printf("reg 2: %02x\n", stat);
+// 	// uint8_t stat;
+// 	// qspi_flash_do_cmd(DEBUG_CS_CHIP_USE, 0x05, NULL, &stat, 1);
+// 	// printf("reg 1: %02x\n", stat);
+// 	// qspi_flash_do_cmd(DEBUG_CS_CHIP_USE, 0x35, NULL, &stat, 1);
+// 	// printf("reg 2: %02x\n", stat);
 
-	flash_cs_force(QSPI_SS_HIGH); // turn off the qspi cs pin so we don't overwrite the program flash
-
-	current_mcu_enable_demux(true);
-	// qspi_restore_to_startup_config();
-	//qspi_connect_internal_flash();
-	qspi_oeover_normal(false);
-
-	// printf("Exiting xip...\n");
-	// qspi_flash_exit_xip();
-	qspi_flash_init_spi();
-
-	// qspi_flash_init_spi(); // this is called in flash exit xip
-	printf("\nDONE!\n");
-}
-
-void helper_enable_qspi_flash_mode() {
-
-}
-
-void qspi_flash_enable_xip() {
-	printf("Setup Flash XIP. CMD 0x6b\n");
-	ssi->ssienr = 0;
-	ssi->baudr = 2;
-    ssi->ctrlr0 =
-            (SSI_CTRLR0_SPI_FRF_VALUE_QUAD << SSI_CTRLR0_SPI_FRF_LSB) |  // Standard 1-bit SPI serial frames
-            (31 << SSI_CTRLR0_DFS_32_LSB) |                             // 32 clocks per data frame
-            (SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB); // Send instr + addr, receive data
-    ssi->spi_ctrlr0 =
-            (0x6b << SSI_SPI_CTRLR0_XIP_CMD_LSB) | // Standard 03h read
-			(8u << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |
-            (2u << SSI_SPI_CTRLR0_INST_L_LSB) |    // 8-bit instruction prefix
-            (6u << SSI_SPI_CTRLR0_ADDR_L_LSB) |    // 24-bit addressing for 03h commands
-            (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C1A  // Command and address both in serial format
-                    << SSI_SPI_CTRLR0_TRANS_TYPE_LSB);
-    ssi->ssienr = 1;
-}
-
-void qspi_flash_enable_xip2() {
-	printf("Setup Flash XIP. CMD 0xeb\n");
-	ssi->ssienr = 0;
-	ssi->baudr = 2;
-    ssi->ctrlr0 =
-            (SSI_CTRLR0_SPI_FRF_VALUE_QUAD << SSI_CTRLR0_SPI_FRF_LSB) |  // Standard 1-bit SPI serial frames
-            (31 << SSI_CTRLR0_DFS_32_LSB) |                             // 32 clocks per data frame
-            (SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB); // Send instr + addr, receive data
-    ssi->spi_ctrlr0 =
-            (0xeb << SSI_SPI_CTRLR0_XIP_CMD_LSB) | // Standard 03h read
-			(4u << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |
-            (2u << SSI_SPI_CTRLR0_INST_L_LSB) |    // 8-bit instruction prefix
-            (6u << SSI_SPI_CTRLR0_ADDR_L_LSB) |    // 24-bit addressing for 03h commands
-            (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C2A  // Command and address both in serial format
-                    << SSI_SPI_CTRLR0_TRANS_TYPE_LSB);
-    ssi->ssienr = 1;
-}
-
-
-// This SHOULD enable quad reads but may or may not work. Seems that writes still aren't working correctly
-// void qspi_flash_enable_xip() {
-// 	// ssi->baudr = 2;
-// 	printf("Init flash spi - 32bit. Baud divider %d\n", ssi->baudr);
-
-// 	// Config from bootloader
-// 	ssi->ssienr = 0;
-	
-// 	ssi_hw->ctrlr1 = 0;			// NDF=0 (single 32b read)
-
-// 	ssi->ctrlr0 =
-// 			(SSI_CTRLR0_SPI_FRF_VALUE_QUAD << SSI_CTRLR0_SPI_FRF_LSB) |  // Standard 1-bit SPI serial frames
-// 			(31 << SSI_CTRLR0_DFS_32_LSB) |                             // 32 clocks per data frame
-// 			(SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB); // Send instr + addr, receive data
-
-// 	ssi->spi_ctrlr0 = 
-// 			(8 << SSI_SPI_CTRLR0_ADDR_L_LSB) |    /* Total number of address + mode bits */
-// 			(4 << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |    /* Hi-Z dummy clocks following address + mode */
-// 			(SSI_SPI_CTRLR0_INST_L_VALUE_8B << SSI_SPI_CTRLR0_INST_L_LSB) |         /* Do not send a command, instead send XIP_CMD as mode bits after address */
-// 			(SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C2A << SSI_SPI_CTRLR0_TRANS_TYPE_LSB);     /* Send Command in serial mode then address in Quad I/O mode */
-
-// 	ssi->ssienr = 1;
-
-// // Sending this data or waiting for ready bit causes it to freeze
-// 	printf("Send fast read quad command and contious mode bits\n");
-// 	// uint8_t tx[] = {0x00, 0x00, 0x00, 0xa0};
-// 	qspi_flash_put_cmd_addr(DEBUG_CS_CHIP_USE, FLASHCMD_FAST_QUAD_READ, 0x000000a0);
-// 	qspi_flash_do_cmd(DEBUG_CS_CHIP_USE, FLASHCMD_FAST_QUAD_READ, NULL, NULL, 0);
-// 	// psram_set_cs(DEBUG_CS_CHIP_USE);
-//     // ssi->dr0 = FLASHCMD_FAST_QUAD_READ;
-// 	// qspi_flash_put_get(tx, NULL, 4, 1);
-	
-// 	// wait
-// 	printf("Wating for ready bit...\n");
-// 	// qspi_wait_ready(DEBUG_CS_CHIP_USE);
-
-// 	printf("DONE!\nNow configure for bus access via xip\n");
-
-// 	// now we should be in xip quad mode so let's setup continuous read
-// 	ssi->ssienr = 0;
-
-// 	ssi->spi_ctrlr0 = (MODE_CONTINUOUS_READ << SSI_SPI_CTRLR0_XIP_CMD_LSB) | /* Mode bits to keep flash in continuous read mode */ \
-// 					(8 << SSI_SPI_CTRLR0_ADDR_L_LSB) |    /* Total number of address + mode bits */
-// 					(4 << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |    /* Hi-Z dummy clocks following address + mode */
-// 					(SSI_SPI_CTRLR0_INST_L_VALUE_NONE << SSI_SPI_CTRLR0_INST_L_LSB) |         /* Do not send a command, instead send XIP_CMD as mode bits after address */
-// 					(SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_2C2A << SSI_SPI_CTRLR0_TRANS_TYPE_LSB);     /* Send Address in Quad I/O mode (and Command but that is zero bits long) */ \
-
-// 	ssi->ssienr = 1;
-
-// 	// I don't trust this
 // 	flash_cs_force(QSPI_SS_HIGH); // turn off the qspi cs pin so we don't overwrite the program flash
+
+// 	current_mcu_enable_demux(true);
+// 	// qspi_restore_to_startup_config();
+// 	//qspi_connect_internal_flash();
+// 	qspi_oeover_normal(false);
+
+// 	// printf("Exiting xip...\n");
+// 	// qspi_flash_exit_xip();
+// 	qspi_flash_init_spi();
+
+// 	// qspi_flash_init_spi(); // this is called in flash exit xip
+// 	printf("\nDONE!\n");
+// }
+
+// void helper_enable_qspi_flash_mode() {
+
+// }
+
+// void qspi_flash_enable_xip() {
+// 	printf("Setup Flash XIP. CMD 0x6b\n");
+// 	ssi->ssienr = 0;
+// 	ssi->baudr = 2;
+//     ssi->ctrlr0 =
+//             (SSI_CTRLR0_SPI_FRF_VALUE_QUAD << SSI_CTRLR0_SPI_FRF_LSB) |  // Standard 1-bit SPI serial frames
+//             (31 << SSI_CTRLR0_DFS_32_LSB) |                             // 32 clocks per data frame
+//             (SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB); // Send instr + addr, receive data
+//     ssi->spi_ctrlr0 =
+//             (0x6b << SSI_SPI_CTRLR0_XIP_CMD_LSB) | // Standard 03h read
+// 			(8u << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |
+//             (2u << SSI_SPI_CTRLR0_INST_L_LSB) |    // 8-bit instruction prefix
+//             (6u << SSI_SPI_CTRLR0_ADDR_L_LSB) |    // 24-bit addressing for 03h commands
+//             (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C1A  // Command and address both in serial format
+//                     << SSI_SPI_CTRLR0_TRANS_TYPE_LSB);
+//     ssi->ssienr = 1;
+// }
+
+// void qspi_flash_enable_xip2() {
+// 	printf("Setup Flash XIP. CMD 0xeb\n");
+// 	ssi->ssienr = 0;
+// 	ssi->baudr = 2;
+//     ssi->ctrlr0 =
+//             (SSI_CTRLR0_SPI_FRF_VALUE_QUAD << SSI_CTRLR0_SPI_FRF_LSB) |  // Standard 1-bit SPI serial frames
+//             (31 << SSI_CTRLR0_DFS_32_LSB) |                             // 32 clocks per data frame
+//             (SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB); // Send instr + addr, receive data
+//     ssi->spi_ctrlr0 =
+//             (0xeb << SSI_SPI_CTRLR0_XIP_CMD_LSB) | // Standard 03h read
+// 			(4u << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |
+//             (2u << SSI_SPI_CTRLR0_INST_L_LSB) |    // 8-bit instruction prefix
+//             (6u << SSI_SPI_CTRLR0_ADDR_L_LSB) |    // 24-bit addressing for 03h commands
+//             (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C2A  // Command and address both in serial format
+//                     << SSI_SPI_CTRLR0_TRANS_TYPE_LSB);
+//     ssi->ssienr = 1;
 // }
 
 
-#define FLASH_BLOCK_ERASE_CMD 0xD8
-#define FLASH_WRITE_ENABLE_CMD 0x06
+// // This SHOULD enable quad reads but may or may not work. Seems that writes still aren't working correctly
+// // void qspi_flash_enable_xip() {
+// // 	// ssi->baudr = 2;
+// // 	printf("Init flash spi - 32bit. Baud divider %d\n", ssi->baudr);
 
-// Put bytes from one buffer, and get bytes into another buffer.
-// These can be the same buffer.
-// If tx is NULL then send zeroes.
-// If rx is NULL then all read data will be dropped.
-//
-// If rx_skip is nonzero, this many bytes will first be consumed from the FIFO,
-// before reading a further count bytes into *rx.
-// E.g. if you have written a command+address just before calling this function.
-void __noinline qspi_flash_put_get(const uint8_t *tx, uint8_t *rx, size_t count, size_t rx_skip) {
-    // Make sure there is never more data in flight than the depth of the RX
-    // FIFO. Otherwise, when we are interrupted for long periods, hardware
-    // will overflow the RX FIFO.
-    const uint max_in_flight = 16 - 2; // account for data internal to SSI
-    size_t tx_count = count;
-    size_t rx_count = count;
-    while (tx_count || rx_skip || rx_count) {
-        // NB order of reads, for pessimism rather than optimism
-        uint32_t tx_level = ssi_hw->txflr;
-        uint32_t rx_level = ssi_hw->rxflr;
-        bool did_something = false; // Expect this to be folded into control flow, not register
-        if (tx_count && tx_level + rx_level < max_in_flight) {
-            ssi->dr0 = (uint32_t) (tx ? *tx++ : 0);
-            --tx_count;
-            did_something = true;
-        }
-        if (rx_level) {
-            uint8_t rxbyte = ssi->dr0;
-            did_something = true;
-            if (rx_skip) {
-                --rx_skip;
-            } else {
-                if (rx)
-                    *rx++ = rxbyte;
-                --rx_count;
-            }
-        }
-        // APB load costs 4 cycles, so only do it on idle loops (our budget is 48 cyc/byte)
-        if (!did_something)
-            break;
-    }
-    psram_set_cs(0);
-}
-
-// Timing of this one is critical, so do not expose the symbol to debugger etc
-static inline void qspi_flash_put_cmd_addr(uint8_t chip, uint8_t cmd, uint32_t addr) {
-    psram_set_cs(chip);
-    addr |= cmd << 24;
-    for (int i = 0; i < 4; ++i) {
-        ssi->dr0 = addr >> 24;
-        addr <<= 8;
-    }
-}
-
-// Convenience wrapper for above
-// (And it's hard for the debug host to get the tight timing between
-// cmd DR0 write and the remaining data)
-void qspi_flash_do_cmd(uint8_t chip, uint8_t cmd, const uint8_t *tx, uint8_t *rx, size_t count) {
-    psram_set_cs(chip);
-    ssi->dr0 = cmd;
-    qspi_flash_put_get(tx, rx, count, 1);
-}
-
-// Set the WEL bit (needed before any program/erase operation)
-static __noinline void qspi_flash_enable_write() {
-    qspi_flash_do_cmd(DEBUG_CS_CHIP_USE, FLASH_WRITE_ENABLE_CMD, NULL, NULL, 0);
-}
-
-// Poll the flash status register until the busy bit (LSB) clears
-static inline void qspi_flash_wait_ready(uint8_t chip) {
-    uint8_t stat;
-    do {
-        qspi_flash_do_cmd(chip, FLASHCMD_READ_STATUS, NULL, &stat, 1);
-    } while (stat & 0x1);
-}
-
-void t(const uint8_t *txbuf, uint8_t *rxbuf, size_t count) {
-	psram_set_cs(1);
-    size_t tx_remaining = count;
-    size_t rx_remaining = count;
-    // We may be interrupted -- don't want FIFO to overflow if we're distracted.
-    const size_t max_in_flight = 16 - 2;
-    while (tx_remaining || rx_remaining) {
-        uint32_t flags = ssi_hw->sr;
-        bool can_put = !!(flags & SSI_SR_TFNF_BITS);
-        bool can_get = !!(flags & SSI_SR_RFNE_BITS);
-        if (can_put && tx_remaining && rx_remaining - tx_remaining < max_in_flight) {
-            ssi_hw->dr0 = *txbuf++;
-            --tx_remaining;
-        }
-        if (can_get && rx_remaining) {
-            *rxbuf++ = (uint8_t)ssi_hw->dr0;
-            --rx_remaining;
-        }
-    }
-    psram_set_cs(0);
-}
-
-// Easier to call erase on the whole chip than 
-void qspi_flash_erase_block(uint32_t address) {
-	// enable write bit
-
-	// uint8_t stat[4];
-	// qspi_flash_put_cmd_addr(1, 0x90, 0);
-	// qspi_flash_put_get(NULL, stat, 2, 1);
-	// printf("id: %02x %02x\n", stat[0], stat[1]);
-
-	uint8_t txbuf[4] = {0x90, 0, 0, 0};
-    uint8_t rxbuf[4] = {0};
-	t(txbuf, rxbuf, 4);
-	printf("id: %02x %02x %02x %02x\n", rxbuf[0], rxbuf[1], rxbuf[2], rxbuf[3]);
-
-	// qspi_flash_enable_write();
-
-	// // send erase command and address
-	// qspi_flash_put_cmd_addr(DEBUG_CS_CHIP_USE, FLASH_BLOCK_ERASE_CMD, address);
-
-	// // in pico bootrom code fo erase, it does this before waiting for the status bit
-	// qspi_flash_put_get(NULL, NULL, 0, 4);
-
-	// // wait for status bit
-	// qspi_flash_wait_ready(DEBUG_CS_CHIP_USE);
-}
-
-void qspi_flash_write(uint32_t address, uint8_t * data, uint32_t length) {
-	qspi_flash_enable_write();
-
-	qspi_flash_put_cmd_addr(DEBUG_CS_CHIP_USE, FLASHCMD_WRITE, address);
-	qspi_flash_put_get(data, NULL, length, 4);
+// // 	// Config from bootloader
+// // 	ssi->ssienr = 0;
 	
-	// Wait for busy bit to clear
-	qspi_flash_wait_ready(DEBUG_CS_CHIP_USE);
-}
+// // 	ssi_hw->ctrlr1 = 0;			// NDF=0 (single 32b read)
 
-void qspi_flash_read_data(uint32_t addr, uint8_t *rx, size_t count) {
-    qspi_flash_put_cmd_addr(DEBUG_CS_CHIP_USE, FLASHCMD_READ_DATA, addr);
-    qspi_flash_put_get(NULL, rx, count, 4);
-}
+// // 	ssi->ctrlr0 =
+// // 			(SSI_CTRLR0_SPI_FRF_VALUE_QUAD << SSI_CTRLR0_SPI_FRF_LSB) |  // Standard 1-bit SPI serial frames
+// // 			(31 << SSI_CTRLR0_DFS_32_LSB) |                             // 32 clocks per data frame
+// // 			(SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB); // Send instr + addr, receive data
+
+// // 	ssi->spi_ctrlr0 = 
+// // 			(8 << SSI_SPI_CTRLR0_ADDR_L_LSB) |    /* Total number of address + mode bits */
+// // 			(4 << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |    /* Hi-Z dummy clocks following address + mode */
+// // 			(SSI_SPI_CTRLR0_INST_L_VALUE_8B << SSI_SPI_CTRLR0_INST_L_LSB) |         /* Do not send a command, instead send XIP_CMD as mode bits after address */
+// // 			(SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C2A << SSI_SPI_CTRLR0_TRANS_TYPE_LSB);     /* Send Command in serial mode then address in Quad I/O mode */
+
+// // 	ssi->ssienr = 1;
+
+// // // Sending this data or waiting for ready bit causes it to freeze
+// // 	printf("Send fast read quad command and contious mode bits\n");
+// // 	// uint8_t tx[] = {0x00, 0x00, 0x00, 0xa0};
+// // 	qspi_flash_put_cmd_addr(DEBUG_CS_CHIP_USE, FLASHCMD_FAST_QUAD_READ, 0x000000a0);
+// // 	qspi_flash_do_cmd(DEBUG_CS_CHIP_USE, FLASHCMD_FAST_QUAD_READ, NULL, NULL, 0);
+// // 	// psram_set_cs(DEBUG_CS_CHIP_USE);
+// //     // ssi->dr0 = FLASHCMD_FAST_QUAD_READ;
+// // 	// qspi_flash_put_get(tx, NULL, 4, 1);
+	
+// // 	// wait
+// // 	printf("Wating for ready bit...\n");
+// // 	// qspi_wait_ready(DEBUG_CS_CHIP_USE);
+
+// // 	printf("DONE!\nNow configure for bus access via xip\n");
+
+// // 	// now we should be in xip quad mode so let's setup continuous read
+// // 	ssi->ssienr = 0;
+
+// // 	ssi->spi_ctrlr0 = (MODE_CONTINUOUS_READ << SSI_SPI_CTRLR0_XIP_CMD_LSB) | /* Mode bits to keep flash in continuous read mode */ \
+// // 					(8 << SSI_SPI_CTRLR0_ADDR_L_LSB) |    /* Total number of address + mode bits */
+// // 					(4 << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |    /* Hi-Z dummy clocks following address + mode */
+// // 					(SSI_SPI_CTRLR0_INST_L_VALUE_NONE << SSI_SPI_CTRLR0_INST_L_LSB) |         /* Do not send a command, instead send XIP_CMD as mode bits after address */
+// // 					(SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_2C2A << SSI_SPI_CTRLR0_TRANS_TYPE_LSB);     /* Send Address in Quad I/O mode (and Command but that is zero bits long) */ \
+
+// // 	ssi->ssienr = 1;
+
+// // 	// I don't trust this
+// // 	flash_cs_force(QSPI_SS_HIGH); // turn off the qspi cs pin so we don't overwrite the program flash
+// // }
+
+
+// #define FLASH_BLOCK_ERASE_CMD 0xD8
+// #define FLASH_WRITE_ENABLE_CMD 0x06
+
+// // Put bytes from one buffer, and get bytes into another buffer.
+// // These can be the same buffer.
+// // If tx is NULL then send zeroes.
+// // If rx is NULL then all read data will be dropped.
+// //
+// // If rx_skip is nonzero, this many bytes will first be consumed from the FIFO,
+// // before reading a further count bytes into *rx.
+// // E.g. if you have written a command+address just before calling this function.
+// void __noinline qspi_flash_put_get(const uint8_t *tx, uint8_t *rx, size_t count, size_t rx_skip) {
+//     // Make sure there is never more data in flight than the depth of the RX
+//     // FIFO. Otherwise, when we are interrupted for long periods, hardware
+//     // will overflow the RX FIFO.
+//     const uint max_in_flight = 16 - 2; // account for data internal to SSI
+//     size_t tx_count = count;
+//     size_t rx_count = count;
+//     while (tx_count || rx_skip || rx_count) {
+//         // NB order of reads, for pessimism rather than optimism
+//         uint32_t tx_level = ssi_hw->txflr;
+//         uint32_t rx_level = ssi_hw->rxflr;
+//         bool did_something = false; // Expect this to be folded into control flow, not register
+//         if (tx_count && tx_level + rx_level < max_in_flight) {
+//             ssi->dr0 = (uint32_t) (tx ? *tx++ : 0);
+//             --tx_count;
+//             did_something = true;
+//         }
+//         if (rx_level) {
+//             uint8_t rxbyte = ssi->dr0;
+//             did_something = true;
+//             if (rx_skip) {
+//                 --rx_skip;
+//             } else {
+//                 if (rx)
+//                     *rx++ = rxbyte;
+//                 --rx_count;
+//             }
+//         }
+//         // APB load costs 4 cycles, so only do it on idle loops (our budget is 48 cyc/byte)
+//         if (!did_something)
+//             break;
+//     }
+//     psram_set_cs(0);
+// }
+
+// // Timing of this one is critical, so do not expose the symbol to debugger etc
+// static inline void qspi_flash_put_cmd_addr(uint8_t chip, uint8_t cmd, uint32_t addr) {
+//     psram_set_cs(chip);
+//     addr |= cmd << 24;
+//     for (int i = 0; i < 4; ++i) {
+//         ssi->dr0 = addr >> 24;
+//         addr <<= 8;
+//     }
+// }
+
+// // Convenience wrapper for above
+// // (And it's hard for the debug host to get the tight timing between
+// // cmd DR0 write and the remaining data)
+// void qspi_flash_do_cmd(uint8_t chip, uint8_t cmd, const uint8_t *tx, uint8_t *rx, size_t count) {
+//     psram_set_cs(chip);
+//     ssi->dr0 = cmd;
+//     qspi_flash_put_get(tx, rx, count, 1);
+// }
+
+// // Set the WEL bit (needed before any program/erase operation)
+// static __noinline void qspi_flash_enable_write() {
+//     qspi_flash_do_cmd(DEBUG_CS_CHIP_USE, FLASH_WRITE_ENABLE_CMD, NULL, NULL, 0);
+// }
+
+// // Poll the flash status register until the busy bit (LSB) clears
+// static inline void qspi_flash_wait_ready(uint8_t chip) {
+//     uint8_t stat;
+//     do {
+//         qspi_flash_do_cmd(chip, FLASHCMD_READ_STATUS, NULL, &stat, 1);
+//     } while (stat & 0x1);
+// }
+
+// void t(const uint8_t *txbuf, uint8_t *rxbuf, size_t count) {
+// 	psram_set_cs(1);
+//     size_t tx_remaining = count;
+//     size_t rx_remaining = count;
+//     // We may be interrupted -- don't want FIFO to overflow if we're distracted.
+//     const size_t max_in_flight = 16 - 2;
+//     while (tx_remaining || rx_remaining) {
+//         uint32_t flags = ssi_hw->sr;
+//         bool can_put = !!(flags & SSI_SR_TFNF_BITS);
+//         bool can_get = !!(flags & SSI_SR_RFNE_BITS);
+//         if (can_put && tx_remaining && rx_remaining - tx_remaining < max_in_flight) {
+//             ssi_hw->dr0 = *txbuf++;
+//             --tx_remaining;
+//         }
+//         if (can_get && rx_remaining) {
+//             *rxbuf++ = (uint8_t)ssi_hw->dr0;
+//             --rx_remaining;
+//         }
+//     }
+//     psram_set_cs(0);
+// }
+
+// // Easier to call erase on the whole chip than 
+// void qspi_flash_erase_block(uint32_t address) {
+// 	// enable write bit
+
+// 	// uint8_t stat[4];
+// 	// qspi_flash_put_cmd_addr(1, 0x90, 0);
+// 	// qspi_flash_put_get(NULL, stat, 2, 1);
+// 	// printf("id: %02x %02x\n", stat[0], stat[1]);
+
+// 	uint8_t txbuf[4] = {0x90, 0, 0, 0};
+//     uint8_t rxbuf[4] = {0};
+// 	t(txbuf, rxbuf, 4);
+// 	printf("id: %02x %02x %02x %02x\n", rxbuf[0], rxbuf[1], rxbuf[2], rxbuf[3]);
+
+// 	// qspi_flash_enable_write();
+
+// 	// // send erase command and address
+// 	// qspi_flash_put_cmd_addr(DEBUG_CS_CHIP_USE, FLASH_BLOCK_ERASE_CMD, address);
+
+// 	// // in pico bootrom code fo erase, it does this before waiting for the status bit
+// 	// qspi_flash_put_get(NULL, NULL, 0, 4);
+
+// 	// // wait for status bit
+// 	// qspi_flash_wait_ready(DEBUG_CS_CHIP_USE);
+// }
+
+// void qspi_flash_write(uint32_t address, uint8_t * data, uint32_t length) {
+// 	qspi_flash_enable_write();
+
+// 	qspi_flash_put_cmd_addr(DEBUG_CS_CHIP_USE, FLASHCMD_WRITE, address);
+// 	qspi_flash_put_get(data, NULL, length, 4);
+	
+// 	// Wait for busy bit to clear
+// 	qspi_flash_wait_ready(DEBUG_CS_CHIP_USE);
+// }
+
+// void qspi_flash_read_data(uint32_t addr, uint8_t *rx, size_t count) {
+//     qspi_flash_put_cmd_addr(DEBUG_CS_CHIP_USE, FLASHCMD_READ_DATA, addr);
+//     qspi_flash_put_get(NULL, rx, count, 4);
+// }

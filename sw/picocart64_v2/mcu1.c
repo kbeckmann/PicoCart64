@@ -12,20 +12,21 @@
 #include "hardware/structs/ssi.h"
 
 #include "pins_mcu1.h"
-#include "qspi_helper.h"
 #include "n64_pi_task.h"
 #include "reset_reason.h"
 #include "sha256.h"
-// #include "rom_vars.h"
 
 #include "stdio_async_uart.h"
 
 #include "gpio_helper.h"
 #include "utils.h"
 
+#include "qspi_helper.h"
 #include "sdcard/internal_sd_card.h"
 #include "pio_uart/pio_uart.h"
 #include "psram.h"
+#include "flash_array/flash_array.h"
+#include "flash_array/program_flash_array.h"
 
 static const gpio_config_t mcu1_gpio_config[] = {
 	// PIO0 pins
@@ -98,9 +99,7 @@ static inline void psram_set_cs2(uint8_t chip)
 
 volatile uint32_t *rom_ptr = (volatile uint32_t *)0x10000000;
 static inline uint32_t read_from_psram2(uint32_t address) {
-	psram_set_cs2(2);
 	uint32_t word = rom_ptr[address];
-	psram_set_cs2(0);
 	return swap16(word);
 }
 
@@ -159,40 +158,46 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 			t = time_us_32();
 			it++;
 
-			if (it == 8) {
+			if (it == 3) {
 				uint32_t now = time_us_32();
 
 				printf("\nMCU1 try to read with ptr\n");
-				qspi_enable();
-				qspi_enter_cmd_xip();
-    			qspi_init_qspi();
+				// qspi_enable();
+				// qspi_enter_cmd_xip();
+    			// qspi_init_qspi();
+				current_mcu_enable_demux(true);
+    			psram_set_cs(2);
+				program_connect_internal_flash();
+    			program_flash_exit_xip();
+				program_flash_flush_cache();
+    			picocart_flash_enable_xip_via_boot2();
 
 				volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
 				printf("Access at [0x10000000]\n");
 				uint32_t totalTime = 0;
-				for(int i = 0; i < 64 / 4; i++) {
+				for(int i = 0; i < 128; i++) {
 					now = time_us_32();
 					uint32_t address_32 = i;
-					psram_set_cs2(DEBUG_CS_CHIP_USE);
 					uint32_t word = ptr[address_32];
-					psram_set_cs2(0);
 					totalTime += time_us_32() - now;
 
-					printf("PSRAM-MCU1[%d] = %08x\n", address_32, word);
+					if (i < 32) {
+						printf("PSRAM-MCU1[%d] = %08x\n", address_32, word);
+					}
 				}
-				printf("xip access for 16 (32bit values) took %d us\n", totalTime);
+				printf("xip access for 128 (32bit values) took %d us\n", totalTime);
 
-				totalTime = 0;
-				for(int i = 0; i < 16; i++) {
-					now = time_us_32();
-					uint32_t word = read_from_psram2(i);
-					totalTime += time_us_32() - now;
+				// totalTime = 0;
+				// for(int i = 0; i < 16; i++) {
+				// 	now = time_us_32();
+				// 	uint32_t word = read_from_psram2(i);
+				// 	totalTime += time_us_32() - now;
 
-					printf("PSRAM-MCU1[%d] = %08x\n", i, word);
-				}
-				printf("Read from PSRAM access for 16 (32bit values) took %d us\n", totalTime);
+				// 	printf("PSRAM-MCU1[%d] = %08x\n", i, word);
+				// }
+				// printf("Read from PSRAM access for 16 (32bit values) took %d us\n", totalTime);
 
-				load_rom_cache(0);
+				//load_rom_cache(0);
 			}
 		}
 
@@ -222,11 +227,12 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 					
 					pc64_send_sd_read_command();
 				case CORE1_UPDATE_ROM_CACHE:
-					if (last_rom_cache_update_address != update_rom_cache_for_address) {
-						update_rom_cache(update_rom_cache_for_address);
-						last_rom_cache_update_address = update_rom_cache_for_address;
-						printf("Cache update %08x\n", update_rom_cache_for_address);
-					}
+					printf("Not using cache. Uncomment code to load cache...\n");
+					// if (last_rom_cache_update_address != update_rom_cache_for_address) {
+					// 	update_rom_cache(update_rom_cache_for_address);
+					// 	last_rom_cache_update_address = update_rom_cache_for_address;
+					// 	printf("Cache update %08x\n", update_rom_cache_for_address);
+					// }
 					break;
 				default:
 					break;
@@ -258,8 +264,8 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 	stdio_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
 
 	// IF READING FROM FROM FLASH... (works for compressed roms)
-	// qspi_oeover_normal(true);
-	// ssi_hw->ssienr = 1;
+	qspi_oeover_normal(true);
+	ssi_hw->ssienr = 1;
 	// // Set up ROM mapping table
 	// if (memcmp(picocart_header, "picocartcompress", 16) == 0) {
 	// 	// Copy rom compressed map from flash into RAM
