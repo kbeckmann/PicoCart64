@@ -119,8 +119,8 @@ void main_task_entry(__unused void *params)
 	// printf("Total time for 4096 bytes %d us\n", totalTime);
 
 	// vTaskDelay(1000);
-	// printf("Booting MCU1...\n");
-	// gpio_put(PIN_MCU1_RUN, 1);
+	printf("Booting MCU1...\n");
+	gpio_put(PIN_MCU1_RUN, 1);
 
 	// boot mcu1 before loading rom so it can actually read out of flash to boot
 	printf("Loading rom...\n");

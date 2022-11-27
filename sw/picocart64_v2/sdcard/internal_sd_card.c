@@ -569,17 +569,17 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename) {
 ////////////////////////////////////////////////////////////////////////////////////////////////
     // QSPI(actual quad spi) READS DON'T WORK
     // Try to do qspi reads
-    // qspi_enter_cmd_xip();
-    // qspi_init_qspi();
-    // printf("\n\nRead with XIP in QSPI(real quad) mode\n");
-    // volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
-    // for (int i = 0; i < 16; i++) {
-    //     uint32_t modifiedAddress = i;
-    //     psram_set_cs(DEBUG_CS_CHIP_USE);
-    //     uint32_t word = ptr[modifiedAddress];
-    //     psram_set_cs(0);
-    //     printf("PSRAM-MCU2[%d]: %08x\n",i, swap16(word));
-    // }
+    qspi_enter_cmd_xip();
+    qspi_init_qspi();
+    printf("\n\nRead with XIP in QSPI(real quad) mode\n");
+    volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+    for (int i = 0; i < 16; i++) {
+        uint32_t modifiedAddress = i;
+        psram_set_cs(DEBUG_CS_CHIP_USE);
+        uint32_t word = ptr[modifiedAddress];
+        psram_set_cs(0);
+        printf("PSRAM-MCU2[%d]: %08x\n",i, swap16(word));
+    }
 
     // printf("\nFAST READ  - DMA TRANSFER\n");
     // // qspi_enter_cmd_xip();
@@ -599,12 +599,11 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename) {
     // Now see if regular reads work
     qspi_enter_cmd_xip();
     printf("\n\nWITH qspi_enter_cmd_xip\n");
-    volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+    ptr = (volatile uint32_t *)0x10000000;
     uint32_t cycleCountStart = 0;
     int psram_csToggleTime = 0;
     int total_memoryAccessTime = 0;
     int totalReadTime = 0;
-    uint32_t testBuffer[16];
     for (int i = 0; i < 128; i++) {
         uint32_t modifiedAddress = i;
         
@@ -615,7 +614,6 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename) {
 
         totalReadTime += time_us_32() - startTime_us;
         if (i < 16) { // only print the first 16 words
-            testBuffer[i] = word;
             printf("PSRAM-MCU2[%d]: %08x\n",i, word);
         }
     }

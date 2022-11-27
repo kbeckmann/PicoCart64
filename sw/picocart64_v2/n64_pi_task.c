@@ -280,7 +280,9 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 			
 #else
 			// next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
+			psram_set_cs(1);
 			next_word = ptr16[(last_addr & 0xFFFFFF) >> 1];
+			psram_set_cs(0);
 			// next_word = read_from_psram(last_addr);
 #endif
 
@@ -331,7 +333,9 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 				// next_word = read_from_psram(last_addr);
 #else
 				// next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
+				psram_set_cs(1);
 				next_word = ptr16[(last_addr & 0xFFFFFF) >> 1];
+				psram_set_cs(0);
 				// next_word = read_from_psram(last_addr);
 #endif
 

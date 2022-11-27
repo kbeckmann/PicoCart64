@@ -170,6 +170,7 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 				printf("\nMCU1 try to read with ptr\n");
 				qspi_enable();
 				qspi_enter_cmd_xip();
+				qspi_init_qspi();
     			// qspi_init_qspi();
 				
 				// THIS IS FOR FLASH READING
@@ -224,11 +225,13 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 					psram_set_cs(0);
 					totalTime += time_us_32() - now;
 
-					if (i % 8 == 0) {
-						printf("\n%08x: ", i);
-						
+					if (i < 64) {
+						if (i % 8 == 0) {
+							printf("\n%08x: ", i);
+							
+						}
+						printf("%04x ", word);
 					}
-					printf("%04x ", word);
 				}
 				printf("\nxip access for 4k Bytes via 16bit pointer took %d us\n", totalTime);
 
