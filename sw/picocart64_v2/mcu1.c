@@ -149,6 +149,7 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 	printf("MCU1 core1 booted!\n");
 	
 	bool readingData = false;
+	bool hasInit = false;
 	uint32_t t = 0;
 	uint32_t it = 0;
 	while (1) {
@@ -158,13 +159,19 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 			t = time_us_32();
 			it++;
 
-			if (it == 3) {
+			if (it < 8) {
+				printf("MCU1 alive!\n");
+			}
+
+			if (it > 8 && !hasInit) {
+				hasInit = true;
 				uint32_t now = time_us_32();
 
 				printf("\nMCU1 try to read with ptr\n");
 				// qspi_enable();
 				// qspi_enter_cmd_xip();
     			// qspi_init_qspi();
+				
 				current_mcu_enable_demux(true);
     			psram_set_cs(2);
 				program_connect_internal_flash();
@@ -172,21 +179,42 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 				program_flash_flush_cache();
     			picocart_flash_enable_xip_via_boot2();
 
-				volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+				volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;//0x10000000;
 				printf("Access at [0x10000000]\n");
 				uint32_t totalTime = 0;
-				for(int i = 0; i < 128; i++) {
+				for(int i = 0; i < 1024; i++) {
 					now = time_us_32();
 					uint32_t address_32 = i;
+					psram_set_cs(1);
 					uint32_t word = ptr[address_32];
+					psram_set_cs(0);
 					totalTime += time_us_32() - now;
 
 					if (i < 32) {
 						printf("PSRAM-MCU1[%d] = %08x\n", address_32, word);
 					}
 				}
-				printf("xip access for 128 (32bit values) took %d us\n", totalTime);
+				printf("xip access for 1024 (32bit values)(4k bytes total) took %d us\n", totalTime);
 
+				volatile uint16_t *ptr16 = (volatile uint16_t *)0x10000000;//0x10000000;
+				printf("Access using 16bit pointer at [0x10000000]\n");
+				totalTime = 0;
+				for(int i = 0; i < 4096; i+=2) {
+					now = time_us_32();
+					uint32_t address_16 = i >> 1;
+					psram_set_cs(1);
+					uint16_t word = ptr16[address_16];
+					psram_set_cs(0);
+					totalTime += time_us_32() - now;
+
+					if (i % 8 == 0) {
+						printf("\n%08x: ", i);
+						
+					}
+					printf("%04x ", word);
+					
+				}
+				printf("\nxip access for 4096 (16bit values) took %d us\n", totalTime);
 				// totalTime = 0;
 				// for(int i = 0; i < 16; i++) {
 				// 	now = time_us_32();
@@ -244,7 +272,8 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 void __no_inline_not_in_flash_func(mcu1_main)(void)
 {
 	int count = 0;
-	const int freq_khz = 133000;
+	// const int freq_khz = 133000;
+	const int freq_khz = 166000;
 	// const int freq_khz = 200000;
 	// const int freq_khz = 210000;
 	// const int freq_khz = 220000;
@@ -253,7 +282,7 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 	// const int freq_khz = 240000;
 	// const int freq_khz = 266000;
 
-	set_sys_clock_khz(freq_khz, true);
+	bool clockWasSet = set_sys_clock_khz(freq_khz, false);
 
 	gpio_configure(mcu1_gpio_config, ARRAY_SIZE(mcu1_gpio_config));
 	set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
@@ -263,9 +292,11 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 	// stdio_async_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
 	stdio_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
 
+	printf("Was%s able to set clock to %d MHz\n", clockWasSet ? "" : " not", freq_khz/1000);
+
 	// IF READING FROM FROM FLASH... (works for compressed roms)
-	qspi_oeover_normal(true);
-	ssi_hw->ssienr = 1;
+	// qspi_oeover_normal(true);
+	// ssi_hw->ssienr = 1;
 	// // Set up ROM mapping table
 	// if (memcmp(picocart_header, "picocartcompress", 16) == 0) {
 	// 	// Copy rom compressed map from flash into RAM

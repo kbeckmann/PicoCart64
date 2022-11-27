@@ -65,10 +65,10 @@ int main(void)
 	PC64_MCU_ID = mcu_id;
 
 	// Turn off SSI
-	// ssi_hw->ssienr = 0;
+	ssi_hw->ssienr = 0;
 
 	// Disable output enable (OE) on all QSPI IO pins
-	// qspi_oeover_disable();
+	qspi_oeover_disable();
 
 	if (mcu_id == MCU1_ID) {
 		mcu1_main();

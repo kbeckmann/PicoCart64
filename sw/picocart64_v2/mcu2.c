@@ -104,23 +104,30 @@ static const gpio_config_t mcu2_gpio_config[] = {
 void main_task_entry(__unused void *params)
 {
 	int count = 0;
-
 	printf("MCU2 Main Entry\n");
 
 	// Mount the SD card
 	// mount_sd();
 
-	// Boot MCU1
-	// printf("Booting MCU1...\n");
-	// gpio_put(PIN_MCU1_RUN, 1);
-
-	// printf("MCU2 SSI CONFIG\n");
-	// dump_current_ssi_config();
+	// volatile uint16_t *rom16 = (uint16_t*)rom_chunks;
+	// uint32_t totalTime = 0;
+	// for(int i = 0; i < 4096; i+=2) {
+	// 	uint32_t s = time_us_32();
+	// 	uint16_t word = rom16[i >> 1];
+	// 	totalTime += time_us_32() - s;
+	// } takes ~200us
+	// printf("Total time for 4096 bytes %d us\n", totalTime);
 
 	vTaskDelay(1000);
+	printf("Booting MCU1...\n");
+	gpio_put(PIN_MCU1_RUN, 1);
+
+	// Boot MCU1
+	vTaskDelay(100);
 
 	// boot mcu1 before loading rom so it can actually read out of flash to boot
 	printf("Loading rom...\n");
+	// load_rom("Doom 64 (USA) (Rev 1).z64");
 	load_rom("testrom.z64"); 
 	printf("\nfinished loading rom.\n");
 	
@@ -132,10 +139,25 @@ void main_task_entry(__unused void *params)
 	while (true) {
 		tight_loop_contents();
 
-		if(time_us_32() - t > 10000000) {
+		if(time_us_32() - t > 1000000) {
 			// printf(". ");
 			// test_read_from_psram();
 			t = time_us_32();
+
+			// if (count == 0) {
+			// 	count++;
+			// 	printf("Booting MCU1...\n");
+			// 	gpio_put(PIN_MCU1_RUN, 1);
+			// }
+			// count++;
+			// if (count % 60 == 0 && count != 0) {
+			// 	printf("Resetting core 1\n");
+			// 	gpio_put(PIN_MCU1_RUN, 0);
+			// 	for(int k = 0; k < 10000; k++) {
+			// 		tight_loop_contents();
+			// 	}
+			// 	gpio_put(PIN_MCU1_RUN, 1);
+			// }
 		}
 
 		// process the buffer look for cmd data
@@ -176,7 +198,7 @@ void vLaunch(void)
 {
 	xTaskCreateStatic(main_task_entry, "Main", MAIN_TASK_STACK_SIZE, NULL, MAIN_TASK_PRIORITY, main_task_stack, &main_task);
 	xTaskCreateStatic(led_task_entry, "LED", LED_TASK_STACK_SIZE, NULL, LED_TASK_PRIORITY, led_task_stack, &led_task);
-	xTaskCreateStatic(esp32_task_entry, "ESP32", ESP32_TASK_STACK_SIZE, NULL, ESP32_TASK_PRIORITY, esp32_task_stack, &esp32_task);
+	//xTaskCreateStatic(esp32_task_entry, "ESP32", ESP32_TASK_STACK_SIZE, NULL, ESP32_TASK_PRIORITY, esp32_task_stack, &esp32_task);
 
 	// Start the tasks and timer.
 	vTaskStartScheduler();
@@ -199,10 +221,7 @@ void mcu2_main(void)
 	// Init async UART on pin 0/1
 	// stdio_async_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
 	stdio_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
-	// stdio_usb_init();
-
 	gpio_configure(mcu2_gpio_config, ARRAY_SIZE(mcu2_gpio_config));
-	set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
 
 	// Enable a 12MHz clock output on GPIO21 / clk_gpout0
 	clock_gpio_init(PIN_MCU2_GPIO21, CLOCKS_CLK_GPOUT0_CTRL_AUXSRC_VALUE_XOSC_CLKSRC, 1);
