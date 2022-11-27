@@ -12,6 +12,10 @@
 #include "program_flash_array.h"
 #include "hardware/resets.h"
 
+#include "psram.h"
+
+#define QSPI_SS_PIN    (1)
+
 // These are supported by almost any SPI flash
 #define FLASHCMD_PAGE_PROGRAM     0x02
 #define FLASHCMD_READ_DATA        0x03
@@ -107,16 +111,22 @@ typedef enum {
 // handlers concurrently with flash programming) so we control the CS pin
 // manually
 static void __noinline program_flash_cs_force(outover_t over) {
-    io_rw_32 *reg = (io_rw_32 *) (IO_QSPI_BASE + IO_QSPI_GPIO_QSPI_SS_CTRL_OFFSET);
-#ifndef GENERAL_SIZE_HACKS
-    *reg = *reg & ~IO_QSPI_GPIO_QSPI_SS_CTRL_OUTOVER_BITS
-        | (over << IO_QSPI_GPIO_QSPI_SS_CTRL_OUTOVER_LSB);
-#else
-    // The only functions we want are FSEL (== 0 for XIP) and OUTOVER!
-    *reg = over << IO_QSPI_GPIO_QSPI_SS_CTRL_OUTOVER_LSB;
-#endif
-    // Read to flush async bridge
-    (void) *reg;
+//     io_rw_32 *reg = (io_rw_32 *) (IO_QSPI_BASE + IO_QSPI_GPIO_QSPI_SS_CTRL_OFFSET);
+// #ifndef GENERAL_SIZE_HACKS
+//     *reg = *reg & ~IO_QSPI_GPIO_QSPI_SS_CTRL_OUTOVER_BITS
+//         | (over << IO_QSPI_GPIO_QSPI_SS_CTRL_OUTOVER_LSB);
+// #else
+//     // The only functions we want are FSEL (== 0 for XIP) and OUTOVER!
+//     *reg = over << IO_QSPI_GPIO_QSPI_SS_CTRL_OUTOVER_LSB;
+// #endif
+//     // Read to flush async bridge
+//     (void) *reg;
+
+    if (over == OUTOVER_LOW) {
+        psram_set_cs(2);
+    } else {
+        psram_set_cs(0);
+    }
 }
 
 // Put bytes from one buffer, and get bytes into another buffer.
@@ -215,6 +225,9 @@ void __noinline program_flash_exit_xip() {
                                 PADS_QSPI_GPIO_QSPI_SD0_PDE_BITS)
                            ) | PADS_QSPI_GPIO_QSPI_SD0_OD_BITS | PADS_QSPI_GPIO_QSPI_SD0_PDE_BITS;
 
+    ioqspi_hw->io[QSPI_SS_PIN].ctrl = (ioqspi_hw->io[QSPI_SS_PIN].ctrl & (~IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_BITS) |
+                    (IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_VALUE_DISABLE << IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_LSB));
+
     // First two 32-clock sequences
     // CSn is held high for the first 32 clocks, then asserted low for next 32
     program_flash_cs_force(OUTOVER_HIGH);
@@ -256,8 +269,14 @@ void __noinline program_flash_exit_xip() {
     qspi_sd_padctrl->sd2 = padctrl_save;
     qspi_sd_padctrl->sd3 = padctrl_save;
 
+    ioqspi_hw->io[QSPI_SS_PIN].ctrl = (ioqspi_hw->io[QSPI_SS_PIN].ctrl & (~IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_BITS) |
+                    (IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_VALUE_DISABLE << IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_LSB));
+
     program_flash_cs_force(OUTOVER_LOW);
     program_flash_put_get(buf, NULL, 2, 0);
+
+    ioqspi_hw->io[QSPI_SS_PIN].ctrl = (ioqspi_hw->io[QSPI_SS_PIN].ctrl & (~IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_BITS) |
+                    (IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_VALUE_DISABLE << IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_LSB));
 
     *qspi_ss_ioctrl = 0;
 }
@@ -498,8 +517,10 @@ void __noinline program_flash_enter_cmd_xip() {
                     << SSI_SPI_CTRLR0_TRANS_TYPE_LSB);
     ssi->ssienr = 1;
 
+    psram_set_cs(2);
     ssi->dr0 = 0xEB;
     ssi->dr0 = 0x000000a0;
+    psram_set_cs(0);
 
     while ((ssi_hw->sr & SSI_SR_BUSY_BITS) != 0) { tight_loop_contents(); }  
     printf("Sent read commands now setting up continous read mode\n");  

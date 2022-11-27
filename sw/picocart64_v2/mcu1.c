@@ -159,15 +159,14 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 			t = time_us_32();
 			it++;
 
-			if (it > 7 && !hasInit) {
+			if (it > 11 && !hasInit) {
 				hasInit = true;
 				uint32_t now = time_us_32();
 
 				printf("\nMCU1 try to read with ptr\n");
 				qspi_enable();
-				qspi_enter_cmd_xip();
-				qspi_init_qspi();
-    			// qspi_init_qspi();
+				// qspi_enter_cmd_xip();
+				qspi_init_qspi(true);
 				
 				// THIS IS FOR FLASH READING
 				// current_mcu_enable_demux(true);
@@ -176,6 +175,7 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
     			// program_flash_exit_xip();
 				// program_flash_flush_cache();
     			// picocart_flash_enable_xip_via_boot2();
+				// qspi_oeover_normal(false);
 
 				// volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;//0x10000000;
 				// printf("Access at [0x10000000]\n");
@@ -215,10 +215,12 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 				uint32_t totalTime = 0;
 				for(int i = 0; i < 4096; i+=2) {
 					now = time_us_32();
-					uint32_t address_16 = i >> 1;
-					psram_set_cs(1);
-					uint16_t word = ptr16[address_16];
-					psram_set_cs(0);
+					// psram_set_cs(2);
+					// sio_hw->gpio_out = 0x04800000;
+					sio_hw->gpio_out = 04000000;
+					uint16_t word = ptr16[i >> 1];
+					// psram_set_cs(0);
+					sio_hw->gpio_out = 0x00000000;
 					totalTime += time_us_32() - now;
 
 					if (i < 64) {
@@ -278,9 +280,9 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 void __no_inline_not_in_flash_func(mcu1_main)(void)
 {
 	int count = 0;
-	// const int freq_khz = 133000;
+	const int freq_khz = 133000;
 	// const int freq_khz = 166000;
-	const int freq_khz = 200000;
+	// const int freq_khz = 200000;
 	// const int freq_khz = 210000;
 	// const int freq_khz = 220000;
 	// const int freq_khz = 230000;
@@ -298,7 +300,7 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 	// stdio_async_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
 	stdio_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
 
-	printf("Was%s able to set clock to %d MHz\n", clockWasSet ? "" : " not", freq_khz/1000);
+	printf("MCU1: Was%s able to set clock to %d MHz\n", clockWasSet ? "" : " not", freq_khz/1000);
 
 	// IF READING FROM FROM FLASH... (works for compressed roms)
 	// qspi_oeover_normal(true);

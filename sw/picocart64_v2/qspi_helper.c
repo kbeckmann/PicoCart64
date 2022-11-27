@@ -333,34 +333,35 @@ static inline void qspi_put_cmd_addr(uint8_t chip, uint8_t cmd, uint32_t addr, u
 	}
 }
 
-void qspi_init_qspi(void)
+void qspi_init_qspi(bool sendQuadEnableCommand)
 {
-	
-	ssi->ssienr = 0;
-    ssi->baudr = 4;
-    ssi->ctrlr0 =
-            (SSI_CTRLR0_SPI_FRF_VALUE_STD << SSI_CTRLR0_SPI_FRF_LSB) |  // Standard 1-bit SPI serial frames
-            (7 << SSI_CTRLR0_DFS_32_LSB) |                             // 32 clocks per data frame
-            (SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB); // Send instr + addr, receive data
-    ssi->spi_ctrlr0 =
-            (0 << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |
-            (2u << SSI_SPI_CTRLR0_INST_L_LSB) |    // 8-bit instruction prefix
-            (8u << SSI_SPI_CTRLR0_ADDR_L_LSB) |    // 24-bit addressing for 03h commands
-            (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C2A  // Command in serial format address in quad
-                    << SSI_SPI_CTRLR0_TRANS_TYPE_LSB);
-    ssi->ssienr = 1;
+	if (sendQuadEnableCommand) {
+		ssi->ssienr = 0;
+		ssi->baudr = 4;
+		ssi->ctrlr0 =
+				(SSI_CTRLR0_SPI_FRF_VALUE_STD << SSI_CTRLR0_SPI_FRF_LSB) |  // Standard 1-bit SPI serial frames
+				(7 << SSI_CTRLR0_DFS_32_LSB) |                             // 32 clocks per data frame
+				(SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB); // Send instr + addr, receive data
+		ssi->spi_ctrlr0 =
+				(0 << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |
+				(2u << SSI_SPI_CTRLR0_INST_L_LSB) |    // 8-bit instruction prefix
+				(8u << SSI_SPI_CTRLR0_ADDR_L_LSB) |    // 24-bit addressing for 03h commands
+				(SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C2A  // Command in serial format address in quad
+						<< SSI_SPI_CTRLR0_TRANS_TYPE_LSB);
+		ssi->ssienr = 1;
 
-	psram_set_cs(1);
-    ssi->dr0 = 0x35;
-	psram_set_cs(0);
+		psram_set_cs(1);
+		ssi->dr0 = 0x35;
+		psram_set_cs(0);
 
-	// psram_set_cs(1);
-	// ssi->dr0 = 0x000000;
-	// psram_set_cs(0);
+		// psram_set_cs(1);
+		// ssi->dr0 = 0x000000;
+		// psram_set_cs(0);
 
-    while ((ssi_hw->sr & SSI_SR_BUSY_BITS) != 0) { tight_loop_contents(); }  
+		while ((ssi_hw->sr & SSI_SR_BUSY_BITS) != 0) { tight_loop_contents(); }  
 
-    printf("Sent quad mode enable command\n");  
+		printf("Sent quad mode enable command\n");  
+	}
 
     ssi->ssienr = 0;
     ssi->baudr = 2;
@@ -378,65 +379,6 @@ void qspi_init_qspi(void)
     ssi->ssienr = 1;
 
     printf("DONE!\n");
-
-	// printf("Setting up SSI_QSPI\n");
-
-	// // This is only something to worry about if putting it in QPI mode vs SPI mode
-	// // qspi_put_cmd_addr(1, PSRAM_ENTER_QUAD_MODE, 0, 0);
-	// // First enable quad mode, spi should be working before this
-	// // probably want regular xip mode before we enter into this mode
-	// // printf("Sending ENTER QUAD MODE command\n");
-	// // qspi_put_cmd_addr(1, PSRAM_ENTER_QUAD_MODE, 0, 0);
-	// // psram_set_cs(0);
-
-	// // Disable SSI for further config
-	// ssi_hw->ssienr = 0;
-	// // Clear sticky errors (clear-on-read)
-	// (void)ssi_hw->sr;
-	// (void)ssi_hw->icr;
-
-	// // ssi->baudr = 2;
-	// // ssi->baudr = 6;
-	// ssi->baudr = 2;
-
-	// // This value doesn't make sense. Some places say clocks per data frame and other are bits per data frame
-	// //SSI_CTRLR0_DFS_32_LSB
-	// // If it's bits per clock it's 4, if it's clocks per byte it's 2 (need to value-1 because reasons)
-	// // I can see using 1 (i.e. 2 as in 2 clocks per byte)
-	// // OR 7 (ie.e 8 as in 8 bits per byte?)
-	// // 31 (i.e. 32) doesn't make sense unless that means we just want to transfer in and our 32 bits values
-
-	// ssi_hw->ctrlr0 = ((SSI_CTRLR0_SPI_FRF_VALUE_STD << SSI_CTRLR0_SPI_FRF_LSB) |	// 
-	// 			   (31 << SSI_CTRLR0_DFS_32_LSB) |	
-	// 			   (SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB)
-	// 	);
-
-	// ssi_hw->ctrlr1 = 0;			// NDF=0 (single 32b read)
-
-	// /*
-	// FROM THE BOOT LOADER ASSEMBLY
-	// // Note that the INST_L field is used to select what XIP data gets pushed into
-	// // the TX FIFO:
-	// //      INST_L_0_BITS   {ADDR[23:0],XIP_CMD[7:0]}       Load "mode bits" into XIP_CMD
-	// //      Anything else   {XIP_CMD[7:0],ADDR[23:0]}       Load SPI command into XIP_CMD
-	// // So in this case SSI_SPI_CTRLR0_ADDR_L_LSB should be 8 = (8 bit command + 24 bit address)/4
-	// */
-
-	// // 4 wait cycles for "fast read" 0x0B when in quad mode
-	// // 8 wait cycles for "fast read" 0x0B when in spi mode / quad read
-	// // 6 wait cycles for "fast read quad" 0xEB when in quad mode
-	// ssi_hw->spi_ctrlr0 = ((0x0B << SSI_SPI_CTRLR0_XIP_CMD_LSB) |	//
-	// 					(0 << SSI_RX_SAMPLE_DLY_RSD_LSB) |
-	// 				   (8 << SSI_SPI_CTRLR0_ADDR_L_LSB) |	/* Total number of address + mode bits, this is also supposed to include the instruction if you aren't using mode bits? So it's either 6 (24bit address) or 8 (24bit address + 8bit command)*/
-	// 				   (0 << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |	/* Hi-Z dummy clocks following address + mode */
-	// 				   (SSI_SPI_CTRLR0_INST_L_VALUE_8B << SSI_SPI_CTRLR0_INST_L_LSB) |	/* Instruction is 8 bits  */
-	// 				   (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C1A << SSI_SPI_CTRLR0_TRANS_TYPE_LSB)	/* Command and address both in standard SPI mode */
-	// 	);
-
-	// // Slave selected when transfers in progress
-	// ssi_hw->ser = 1;
-	// // Re-enable
-	// ssi_hw->ssienr = 1;
 }
 
 static inline void qspi_put_cmd_addr_qspi(uint8_t chip, uint8_t cmd, uint32_t addr, uint8_t dummy)

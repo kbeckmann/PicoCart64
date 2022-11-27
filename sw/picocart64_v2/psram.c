@@ -5,13 +5,13 @@
 #include "psram.h"
 #include "gpio_helper.h"
 
-int current_mcu_demux_pin_0 =  -1;
-int current_mcu_demux_pin_1 =  -1;
-int current_mcu_demux_pin_2 =  -1;
-int current_mcu_demux_pin_ie = -1;
+volatile int current_mcu_demux_pin_0 =  -1;
+volatile int current_mcu_demux_pin_1 =  -1;
+volatile int current_mcu_demux_pin_2 =  -1;
+volatile int current_mcu_demux_pin_ie = -1;
 
-gpio_config_t current_demux_disabled_config[4];
-gpio_config_t current_demux_enabled_config[4];
+static gpio_config_t current_demux_disabled_config[4];
+static gpio_config_t current_demux_enabled_config[4];
 
 void set_demux_mcu_variables(int demux_pin0, int demux_pin1, int demux_pin2, int demux_pinIE) {
     current_mcu_demux_pin_0 = demux_pin0;

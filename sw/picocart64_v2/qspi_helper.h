@@ -54,7 +54,7 @@ void qspi_demux_enable(bool enabled);
 void qspi_enter_cmd_xip(void);
 void qspi_enter_cmd_xip_with_params(uint8_t cmd, bool quad_addr, bool quad_data, int dfs, int addr_l, int waitCycles, int baudDivider);
 void qspi_init_spi(void);
-void qspi_init_qspi(void);
+void qspi_init_qspi(bool sendQuadEnableCommand);
 void qspi_enable();
 void qspi_disable();
 void qspi_write(uint32_t address, const uint8_t * data, uint32_t length);

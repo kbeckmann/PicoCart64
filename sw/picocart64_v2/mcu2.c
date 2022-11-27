@@ -101,6 +101,7 @@ static const gpio_config_t mcu2_gpio_config[] = {
 	{PIN_SPI1_CS, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO1},
 };
 
+#define NEED_LOAD_ROM 1
 void main_task_entry(__unused void *params)
 {
 	int count = 0;
@@ -118,24 +119,21 @@ void main_task_entry(__unused void *params)
 	// } takes ~200us
 	// printf("Total time for 4096 bytes %d us\n", totalTime);
 
+	// printf("Booting MCU1...\n");
+	// gpio_put(PIN_MCU1_RUN, 1);
+
 	// vTaskDelay(1000);
-	printf("Booting MCU1...\n");
-	gpio_put(PIN_MCU1_RUN, 1);
 
 	// boot mcu1 before loading rom so it can actually read out of flash to boot
-	printf("Loading rom...\n");
-	vTaskDelay(100);
-
-	set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
-	current_mcu_enable_demux(true);
-
-	vTaskDelay(100);
-
-	printf("configured demux\n");
-
-	// load_rom("Doom 64 (USA) (Rev 1).z64");
-	load_rom("testrom.z64"); 
-	printf("\nfinished loading rom.\n");
+	if (NEED_LOAD_ROM == 1) {
+		vTaskDelay(1000);
+		printf("Loading rom...\n");
+		// load_rom("Doom 64 (USA) (Rev 1).z64");
+		load_rom("testrom.z64"); 
+		printf("\nfinished loading rom.\n");
+	} else {
+		printf("Skipping rom load this time. Rom should already be in flash.\n");
+	}
 	
 	// Setup PIO UART
 	// pio_uart_init(PIN_SPI1_CS, PIN_SPI1_RX);
@@ -213,6 +211,7 @@ void vLaunch(void)
 void mcu2_main(void)
 {
 	const int freq_khz = 133000;
+	// const int freq_khz = 166000;
 	// const int freq_khz = 200000;
 	// const int freq_khz = 210000;
 	// const int freq_khz = 220000;
@@ -222,12 +221,16 @@ void mcu2_main(void)
 
 	// Note that this might call set_sys_clock_pll,
 	// which might set clk_peri to 48 MHz
-	set_sys_clock_khz(freq_khz, true);
+	bool clockWasSet = set_sys_clock_khz(freq_khz, false);
 
 	// Init async UART on pin 0/1
 	// stdio_async_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
 	stdio_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
 	gpio_configure(mcu2_gpio_config, ARRAY_SIZE(mcu2_gpio_config));
+
+	set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
+
+	printf("MCU2: Was%s able to set clock to %d MHz\n", clockWasSet ? "" : " not", freq_khz/1000);
 
 	// Enable a 12MHz clock output on GPIO21 / clk_gpout0
 	clock_gpio_init(PIN_MCU2_GPIO21, CLOCKS_CLK_GPOUT0_CTRL_AUXSRC_VALUE_XOSC_CLKSRC, 1);

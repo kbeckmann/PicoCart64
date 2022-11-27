@@ -361,18 +361,18 @@ void __no_inline_not_in_flash_func(load_rom)(const char* filename) {
 	printf("%s [size=%llu]\n", filinfo.fname, filinfo.fsize);
     printf("DONE!\nStarting rom->flash loading process...\n");
 
-    printf("Enabling demux...\n");
-    current_mcu_enable_demux(true);
-    printf("DONE!\n");
+    // printf("Enabling demux...\n");
+    // current_mcu_enable_demux(true);
+    // printf("DONE!\n");
 
-    printf("Setting flash chip select to 2...\n");
-    psram_set_cs(2);
-    printf("DONE!\n");
+    // printf("Setting flash chip select to 2...\n");
+    // psram_set_cs(2);
+    // printf("DONE!\n");
 
 #if ERASE_AND_WRITE_TO_FLASH_ARRAY == 1
     program_connect_internal_flash();
     program_flash_exit_xip();
-    // qspi_oeover_normal(false);
+    qspi_oeover_normal(false);
 
     int len = 0;
 	int total = 0;
@@ -415,6 +415,7 @@ void __no_inline_not_in_flash_func(load_rom)(const char* filename) {
 
     program_flash_flush_cache();
     picocart_flash_enable_xip_via_boot2();
+    qspi_oeover_normal(false);
 #endif
 
     // If xip is renabled, this won't work anymore
@@ -433,9 +434,9 @@ void __no_inline_not_in_flash_func(load_rom)(const char* filename) {
         uint32_t modifiedAddress = i;
         
         uint32_t startTime_us = time_us_32();
-        // psram_set_cs(1);
+        psram_set_cs(2);
         uint32_t word = ptr[modifiedAddress];
-        // psram_set_cs(0);
+        psram_set_cs(0);
         totalReadTime += time_us_32() - startTime_us;
 
         if (i < 16) { // only print the first 16 words
@@ -453,9 +454,9 @@ void __no_inline_not_in_flash_func(load_rom)(const char* filename) {
     for (int i = 0; i < 128; i++) {
         uint32_t modifiedAddress = i;
         uint32_t startTime_us = time_us_32();
-        // psram_set_cs(1);
+        psram_set_cs(2);
         uint16_t word = ptr16[modifiedAddress];
-        // psram_set_cs(0);
+        psram_set_cs(0);
         totalReadTime += time_us_32() - startTime_us;
 
         if (i < 32) { // only print the first 16 words
@@ -570,16 +571,58 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename) {
     // QSPI(actual quad spi) READS DON'T WORK
     // Try to do qspi reads
     qspi_enter_cmd_xip();
-    qspi_init_qspi();
+    qspi_init_qspi(true);
     printf("\n\nRead with XIP in QSPI(real quad) mode\n");
-    volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
-    for (int i = 0; i < 16; i++) {
-        uint32_t modifiedAddress = i;
-        psram_set_cs(DEBUG_CS_CHIP_USE);
-        uint32_t word = ptr[modifiedAddress];
-        psram_set_cs(0);
-        printf("PSRAM-MCU2[%d]: %08x\n",i, swap16(word));
+    // volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+    // for (int i = 0; i < 16; i++) {
+    //     uint32_t modifiedAddress = i;
+    //     psram_set_cs(DEBUG_CS_CHIP_USE);
+    //     uint32_t word = ptr[modifiedAddress];
+    //     psram_set_cs(0);
+    //     printf("PSRAM-MCU2[%d]: %08x\n",i, swap16(word));
+    // }
+
+    volatile uint16_t *ptr16 = (volatile uint16_t *)0x10000000;//0x10000000;
+    printf("Access using 16bit pointer at [0x10000000]\n");
+    totalTime = 0;
+    for(int i = 0; i < 4096; i+=2) {
+        uint32_t now = time_us_32();
+
+        sio_hw->gpio_out = 0x00040000;
+        uint16_t word = ptr16[i >> 1];
+        sio_hw->gpio_out = 0x00000000;
+        
+        totalTime += time_us_32() - now;
+
+        if (i < 64) {
+            if (i % 8 == 0) {
+                printf("\n%08x: ", i);
+                
+            }
+            printf("%04x ", word);
+        }
     }
+    printf("\nxip access (using raw gpio mask) for 4k Bytes via 16bit pointer took %d us\n\n", totalTime);
+
+    totalTime = 0;
+    for(int i = 0; i < 4096; i+=2) {
+        uint32_t now = time_us_32();
+
+        psram_set_cs(1);
+        uint16_t word = ptr16[i >> 1];
+        psram_set_cs(0);
+        
+        totalTime += time_us_32() - now;
+
+        if (i < 64) {
+            if (i % 8 == 0) {
+                printf("\n%08x: ", i);
+                
+            }
+            printf("%04x ", word);
+        }
+    }
+    printf("\nxip access (using psram_set_cs) for 4k Bytes via 16bit pointer took %d us\n", totalTime);
 
     // printf("\nFAST READ  - DMA TRANSFER\n");
     // // qspi_enter_cmd_xip();

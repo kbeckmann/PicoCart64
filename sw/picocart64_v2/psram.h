@@ -14,10 +14,10 @@
 
 #include "hardware/regs/pads_qspi.h"
 
-extern int current_mcu_demux_pin_0;
-extern int current_mcu_demux_pin_1;
-extern int current_mcu_demux_pin_2;
-extern int current_mcu_demux_pin_ie;
+// extern int current_mcu_demux_pin_0;
+// extern int current_mcu_demux_pin_1;
+// extern int current_mcu_demux_pin_2;
+// extern int current_mcu_demux_pin_ie;
 
 uint8_t psram_addr_to_chip(uint32_t address);
 void psram_set_cs(uint8_t chip);

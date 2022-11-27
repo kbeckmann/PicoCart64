@@ -213,24 +213,6 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 
 	uint32_t lastUpdate = 0;
 	while (1) {
-		// tight_loop_contents();
-		// if (time_us_32() - lastUpdate > 30000000) {
-		// 	lastUpdate = time_us_32();
-		// 	printf("Checking values from psram\n");
-		// 	int index = 0;
-		// 	for(uint32_t i = 0; i < 0x1000; i+=2) {
-		// 		uint32_t word = read_from_psram(i+0x10000000);
-		// 		printf("[%04x]%04x ", i, (uint16_t)swap8(word));
-		// 		if (index % 4 == 0 && index != 0) {
-		// 			printf("\n");
-		// 		}
-		// 		index++;
-
-		// 		for(volatile int w = 0; w < 10000; w++) {tight_loop_contents();}; 
-		// 	}
-			
-		// }
-
 		// addr must not be a WRITE or READ request here,
 		// it should contain a 16-bit aligned address.
 		// Assert drains performance, uncomment when debugging.
@@ -280,9 +262,12 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 			
 #else
 			// next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
-			psram_set_cs(1);
+			// psram_set_cs(2);
+			// sio_hw->gpio_out = 0x04800000;
+			sio_hw->gpio_out = 04000000;
 			next_word = ptr16[(last_addr & 0xFFFFFF) >> 1];
-			psram_set_cs(0);
+			// psram_set_cs(0);
+			sio_hw->gpio_out = 0x00000000;
 			// next_word = read_from_psram(last_addr);
 #endif
 
@@ -333,9 +318,12 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 				// next_word = read_from_psram(last_addr);
 #else
 				// next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
-				psram_set_cs(1);
+				// psram_set_cs(2);
+				// sio_hw->gpio_out = 0x04800000;
+				sio_hw->gpio_out = 04000000;
 				next_word = ptr16[(last_addr & 0xFFFFFF) >> 1];
-				psram_set_cs(0);
+				// psram_set_cs(0);
+				sio_hw->gpio_out = 0x00000000;
 				// next_word = read_from_psram(last_addr);
 #endif
 
