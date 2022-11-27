@@ -118,15 +118,21 @@ void main_task_entry(__unused void *params)
 	// } takes ~200us
 	// printf("Total time for 4096 bytes %d us\n", totalTime);
 
-	vTaskDelay(1000);
-	printf("Booting MCU1...\n");
-	gpio_put(PIN_MCU1_RUN, 1);
-
-	// Boot MCU1
-	vTaskDelay(100);
+	// vTaskDelay(1000);
+	// printf("Booting MCU1...\n");
+	// gpio_put(PIN_MCU1_RUN, 1);
 
 	// boot mcu1 before loading rom so it can actually read out of flash to boot
 	printf("Loading rom...\n");
+	vTaskDelay(100);
+
+	set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
+	current_mcu_enable_demux(true);
+
+	vTaskDelay(100);
+
+	printf("configured demux\n");
+
 	// load_rom("Doom 64 (USA) (Rev 1).z64");
 	load_rom("testrom.z64"); 
 	printf("\nfinished loading rom.\n");

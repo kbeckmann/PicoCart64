@@ -32,7 +32,7 @@
 #define QSPI_SD3_PAD   (4)
 #define QSPI_SS_PAD    (5)
 
-#define DEBUG_CS_CHIP_USE 2
+#define DEBUG_CS_CHIP_USE 1
 
 extern uint32_t log_buffer[128]; // store addresses
 void add_log_to_buffer(uint32_t value);
@@ -68,7 +68,7 @@ void qspi_test(void);
 
 // void qspi_flash_enable_xip();
 // void qspi_flash_enable_xip2();
-// void __no_inline_not_in_flash_func(qspi_flash_bulk_read)(uint32_t cmd, uint32_t *rxbuf, uint32_t flash_offs, size_t len, uint dma_chan);
+void __no_inline_not_in_flash_func(qspi_flash_bulk_read)(uint32_t cmd, uint32_t *rxbuf, uint32_t flash_offs, size_t len, uint dma_chan);
 // void qspi_flash_write(uint32_t address, uint8_t * data, uint32_t length);
 // void qspi_flash_erase_block(uint32_t address);
 // void qspi_flash_read_data(uint32_t addr, uint8_t *rx, size_t count);

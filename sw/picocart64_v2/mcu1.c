@@ -163,42 +163,59 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 				printf("MCU1 alive!\n");
 			}
 
-			if (it > 8 && !hasInit) {
+			if (it > 4 && !hasInit) {
 				hasInit = true;
 				uint32_t now = time_us_32();
 
 				printf("\nMCU1 try to read with ptr\n");
-				// qspi_enable();
-				// qspi_enter_cmd_xip();
+				qspi_enable();
+				qspi_enter_cmd_xip();
     			// qspi_init_qspi();
 				
-				current_mcu_enable_demux(true);
-    			psram_set_cs(2);
-				program_connect_internal_flash();
-    			program_flash_exit_xip();
-				program_flash_flush_cache();
-    			picocart_flash_enable_xip_via_boot2();
+				// THIS IS FOR FLASH READING
+				// current_mcu_enable_demux(true);
+    			// psram_set_cs(2);
+				// program_connect_internal_flash();
+    			// program_flash_exit_xip();
+				// program_flash_flush_cache();
+    			// picocart_flash_enable_xip_via_boot2();
 
-				volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;//0x10000000;
-				printf("Access at [0x10000000]\n");
-				uint32_t totalTime = 0;
-				for(int i = 0; i < 1024; i++) {
-					now = time_us_32();
-					uint32_t address_32 = i;
-					psram_set_cs(1);
-					uint32_t word = ptr[address_32];
-					psram_set_cs(0);
-					totalTime += time_us_32() - now;
+				// volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;//0x10000000;
+				// printf("Access at [0x10000000]\n");
+				// uint32_t totalTime = 0;
+				// for(int i = 0; i < 1024; i++) {
+				// 	now = time_us_32();
+				// 	uint32_t address_32 = i;
+				// 	uint32_t word = ptr[address_32];
+				// 	totalTime += time_us_32() - now;
 
-					if (i < 32) {
-						printf("PSRAM-MCU1[%d] = %08x\n", address_32, word);
-					}
-				}
-				printf("xip access for 1024 (32bit values)(4k bytes total) took %d us\n", totalTime);
+				// 	if (i < 32) {
+				// 		printf("PSRAM-MCU1[%d] = %08x\n", address_32, word);
+				// 	}
+				// }
+				// printf("xip access for 1024 (32bit values)(4k bytes total) took %d us\n", totalTime);
+
+				// volatile uint16_t *ptr16 = (volatile uint16_t *)0x10000000;//0x10000000;
+				// printf("Access using 16bit pointer at [0x10000000]\n");
+				// totalTime = 0;
+				// for(int i = 0; i < 4096; i+=2) {
+				// 	now = time_us_32();
+				// 	uint32_t address_16 = i >> 1;
+				// 	uint16_t word = ptr16[address_16];
+				// 	totalTime += time_us_32() - now;
+
+				// 	if (i % 8 == 0) {
+				// 		printf("\n%08x: ", i);
+						
+				// 	}
+				// 	printf("%04x ", word);
+					
+				// }
+				// printf("\nxip access for 4096 (16bit values) took %d us\n", totalTime);
 
 				volatile uint16_t *ptr16 = (volatile uint16_t *)0x10000000;//0x10000000;
 				printf("Access using 16bit pointer at [0x10000000]\n");
-				totalTime = 0;
+				uint32_t totalTime = 0;
 				for(int i = 0; i < 4096; i+=2) {
 					now = time_us_32();
 					uint32_t address_16 = i >> 1;
@@ -212,18 +229,8 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 						
 					}
 					printf("%04x ", word);
-					
 				}
-				printf("\nxip access for 4096 (16bit values) took %d us\n", totalTime);
-				// totalTime = 0;
-				// for(int i = 0; i < 16; i++) {
-				// 	now = time_us_32();
-				// 	uint32_t word = read_from_psram2(i);
-				// 	totalTime += time_us_32() - now;
-
-				// 	printf("PSRAM-MCU1[%d] = %08x\n", i, word);
-				// }
-				// printf("Read from PSRAM access for 16 (32bit values) took %d us\n", totalTime);
+				printf("\nxip access for 4k Bytes via 16bit pointer took %d us\n", totalTime);
 
 				//load_rom_cache(0);
 			}

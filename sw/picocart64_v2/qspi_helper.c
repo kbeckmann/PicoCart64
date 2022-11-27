@@ -675,7 +675,7 @@ void qspi_write(uint32_t address, const uint8_t * data, uint32_t length)
 	while (length > 0) {
 		uint32_t count = length > 64 ? 64 : length;
 		uint32_t address_masked = address & 0xFFFFFF;
-		uint8_t chip = 2;// psram_addr_to_chip(address);
+		uint8_t chip = psram_addr_to_chip(address);
 		if (lastChipUsed != chip) {
 			printf("CHIP[%d]", chip);
 			lastChipUsed = chip;

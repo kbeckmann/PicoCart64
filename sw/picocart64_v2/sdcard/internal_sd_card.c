@@ -469,14 +469,7 @@ void __no_inline_not_in_flash_func(load_rom)(const char* filename) {
 
 #elif LOAD_TO_PSRAM_ARRAY == 1
 char buf[1024 / 2 / 2 / 2 / 2];
-void __no_inline_not_in_flash_func(load_rom)(const char *filename)
-{
-	// Set output enable (OE) to normal mode on all QSPI IO pins except SS
-	qspi_enable();
-
-    // printf("MCU2 QSPI_ENABLED... DUMPING CONFIG\n");
-    // dump_current_ssi_config();
-
+void __no_inline_not_in_flash_func(load_rom)(const char *filename) {
 	// See FatFs - Generic FAT Filesystem Module, "Application Interface",
 	// http://elm-chan.org/fsw/ff/00index_e.html
 	sd_card_t *pSD = sd_get_by_num(0);
@@ -497,6 +490,11 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
 	FILINFO filinfo;
 	fr = f_stat(filename, &filinfo);
 	printf("%s [size=%llu]\n", filinfo.fname, filinfo.fsize);
+
+    for(int i = 0; i < 10000; i++) { tight_loop_contents(); }
+
+    // Set output enable (OE) to normal mode on all QSPI IO pins except SS
+	qspi_enable();
 
 	int len = 0;
 	int total = 0;
@@ -567,64 +565,57 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
     // }
     // printf("\n128 32bit (4096 bytes) reads with qspi_read took %dus\n", totalTime);
 
+
+////////////////////////////////////////////////////////////////////////////////////////////////
     // QSPI(actual quad spi) READS DON'T WORK
     // Try to do qspi reads
-    qspi_enter_cmd_xip();
-    qspi_init_qspi();
-    // printf("MCU2 QSPI_XIP ENABLED... DUMPING CONFIG\n");
-    // dump_current_ssi_config();
-
-    printf("\n\nRead with XIP in QSPI(real quad) mode\n");
-    volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
-    for (int i = 0; i < 16; i++) {
-        uint32_t modifiedAddress = i;
-        psram_set_cs(DEBUG_CS_CHIP_USE);
-        uint32_t word = ptr[modifiedAddress];
-        psram_set_cs(0);
-        printf("PSRAM-MCU2[%d]: %08x\n",i, swap16(word));
-    }
-
-    printf("\nFAST READ  - DMA TRANSFER\n");
     // qspi_enter_cmd_xip();
-    uint32_t dmaBuffer[128];
-    uint32_t startTime_us = time_us_32();
-    psram_set_cs(DEBUG_CS_CHIP_USE);
-    qspi_flash_bulk_read(0x0B, dmaBuffer, 0, 128, 0);
-    psram_set_cs(0);
-    uint32_t dma_totalTime = time_us_32() - startTime_us;
-    for(int i = 0; i < 16; i++) {
-        printf("DMA[%d]: %08x\n",i, dmaBuffer[i]);
-    }
-    printf("FAST READ - DMA read 128 32bit reads in %d us\n", dma_totalTime);
+    // qspi_init_qspi();
+    // printf("\n\nRead with XIP in QSPI(real quad) mode\n");
+    // volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+    // for (int i = 0; i < 16; i++) {
+    //     uint32_t modifiedAddress = i;
+    //     psram_set_cs(DEBUG_CS_CHIP_USE);
+    //     uint32_t word = ptr[modifiedAddress];
+    //     psram_set_cs(0);
+    //     printf("PSRAM-MCU2[%d]: %08x\n",i, swap16(word));
+    // }
+
+    // printf("\nFAST READ  - DMA TRANSFER\n");
+    // // qspi_enter_cmd_xip();
+    // uint32_t dmaBuffer[128];
+    // uint32_t startTime_us = time_us_32();
+    // psram_set_cs(DEBUG_CS_CHIP_USE);
+    // qspi_flash_bulk_read(0x0B, dmaBuffer, 0, 128, 0);
+    // psram_set_cs(0);
+    // uint32_t dma_totalTime = time_us_32() - startTime_us;
+    // for(int i = 0; i < 16; i++) {
+    //     printf("DMA[%d]: %08x\n",i, dmaBuffer[i]);
+    // }
+    // printf("FAST READ - DMA read 128 32bit reads in %d us\n", dma_totalTime);
+////////////////////////////////////////////////////////////////////////////////////////////////
+
 
     // Now see if regular reads work
     qspi_enter_cmd_xip();
-    // printf("MCU2 XIP ENABLED... DUMPING CONFIG\n");
-    // dump_current_ssi_config();
     printf("\n\nWITH qspi_enter_cmd_xip\n");
-    ptr = (volatile uint32_t *)0x10000000;
-    uint32_t cycleCountStart = 0;//systick_hw->cvr
+    volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+    uint32_t cycleCountStart = 0;
     int psram_csToggleTime = 0;
     int total_memoryAccessTime = 0;
     int totalReadTime = 0;
+    uint32_t testBuffer[16];
     for (int i = 0; i < 128; i++) {
         uint32_t modifiedAddress = i;
         
         uint32_t startTime_us = time_us_32();
-        // uint32_t n = systick_hw->cvr;
         psram_set_cs(DEBUG_CS_CHIP_USE);
-        // psram_csToggleTime += systick_hw->cvr - n;
-        
-        // uint32_t startTime_ticks = systick_hw->cvr;
         uint32_t word = ptr[modifiedAddress];
-        // total_memoryAccessTime += systick_hw->cvr - startTime_ticks;
-        
-        // n = systick_hw->cvr;
         psram_set_cs(0);
-        // psram_csToggleTime += systick_hw->cvr - n;
 
         totalReadTime += time_us_32() - startTime_us;
         if (i < 16) { // only print the first 16 words
+            testBuffer[i] = word;
             printf("PSRAM-MCU2[%d]: %08x\n",i, word);
         }
     }
@@ -757,158 +748,16 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename)
     // Try a DMA read
     printf("\nDMA TRANSFER\n");
     qspi_enter_cmd_xip();
-    // uint32_t dmaBuffer[128];
-    startTime_us = time_us_32();
+    uint32_t dmaBuffer[128];
+    uint32_t startTime_us = time_us_32();
     psram_set_cs(DEBUG_CS_CHIP_USE);
     qspi_flash_bulk_read(0x03, dmaBuffer, 0, 128, 0);
     psram_set_cs(0);
-    dma_totalTime = time_us_32() - startTime_us;
+    uint32_t dma_totalTime = time_us_32() - startTime_us;
     for(int i = 0; i < 16; i++) {
         printf("DMA[%d]: %08x\n",i, dmaBuffer[i]);
     }
     printf("DMA read 128 32bit reads in %d us\n", dma_totalTime);
-
-    // startTime_us = time_us_32();
-    // psram_set_cs(DEBUG_CS_CHIP_USE);
-    // qspi_flash_bulk_read(0x03, dmaBuffer, 0, 1, 0);
-    // psram_set_cs(0);
-    // dma_totalTime = time_us_32() - startTime_us;
-    // for(int i = 0; i < 16; i++) {
-    //     printf("DMA[%d]: %08x\n",i, dmaBuffer[i]);
-    // }
-    // printf("DMA read 1 32bit value in %d us\n", dma_totalTime);
-
-    // uint32_t oneWordReadStartTime = time_us_32();
-    // psram_set_cs(DEBUG_CS_CHIP_USE);
-    // uint32_t word = ptr[0];
-    // psram_set_cs(0);
-    // uint32_t oneWordReadTotalTime = time_us_32() - oneWordReadStartTime;
-    // printf("PTR read 1 32bit value in %d us\n", oneWordReadTotalTime);
-
-    // oneWordReadStartTime = time_us_32();
-    // word = dmaBuffer[0];
-    // oneWordReadTotalTime = time_us_32() - oneWordReadStartTime;
-    // printf("1 32bit read from an array in %d us\n", oneWordReadTotalTime);
-
-
-    // QSPI fast read and fast read quad just don't work :(
-    // printf("Init fast read qspi and then DMA\n");
-    // qspi_init_qspi();
-    // startTime_us = time_us_32();
-    // psram_set_cs(DEBUG_CS_CHIP_USE);
-    // qspi_flash_bulk_read(0x0b, dmaBuffer, 0, 128, 0);
-    // psram_set_cs(0);
-    // dma_totalTime = time_us_32() - startTime_us;
-    // for(int i = 0; i < 16; i++) {
-    //     printf("DMA[%d]: %08x\n",i, dmaBuffer[i]);
-    // }
-    // printf("DMA(fast read) read 128 32bit value in %d us\n", dma_totalTime);
-
-	// fr = f_open(&fil, filename, FA_OPEN_EXISTING | FA_READ);
-	// if (FR_OK != fr && FR_EXIST != fr) {
-	// 	panic("f_open(%s) error: %s (%d)\n", filename, FRESULT_str(fr), fr);
-	// }
-
-	// fr = f_stat(filename, &filinfo);
-	// printf("%s [size=%llu]\n", filinfo.fname, filinfo.fsize);
-
-	// // {
-	//  uint32_t *ptr = (uint32_t *) 0x10000000;
-
-	//  for (int i = 0; i < 8 * 1024 / 4 * 2; i++) {
-	//      psram_set_cs(DEBUG_CS_CHIP_USE);
-	//      uint32_t word = ptr[i];
-	//      psram_set_cs(0);
-	//      // printf("%08X ", word);
-	//      if (word != i) {
-	//          printf("ERR: %08X != %08X\n", word, i);
-	//      }
-	//  }
-
-	// //  printf("----- halt ----\n");
-
-	// //  while (1) {
-
-	// //  }
-	// // }
-
-	// len = 0;
-	// total = 0;
-	// t0 = to_us_since_boot(get_absolute_time());
-    // int numAddressesPrinted = 0;
-	// do {
-	// 	fr = f_read(&fil, buf, sizeof(buf), &len);
-
-	// 	volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
-	// 	uint32_t *buf32 = (uint32_t *) buf;
-	// 	for (int i = 0; i < 8; i++) {
-	// 		uint32_t address_32 = total / 4 + i;
-	// 		uint32_t address = address_32 * 4;
-	// 		psram_set_cs(psram_addr_to_chip(address));
-	// 		uint32_t word = ptr[address_32];
-	// 		uint32_t facit = buf32[i];
-	// 		psram_set_cs(0);
-	// 		// if (word != facit) {
-	// 		// 	printf("diff @%08X + %d: %08X %08X\n", total, i * 4, word, facit);
-	// 		// }
-
-    //         if (numAddressesPrinted < 16) {
-    //             numAddressesPrinted++;
-    //             printf("%d, %08x | %08x -- addr=%d, addr32=%d\n", i, word, facit, address, address_32);
-                
-    //         }
-	// 	}
-	// 	total += len;
-	// 	// printf("@%08X [len=%d]\n", total, len);
-
-	// 	// if (total > 128) {
-	// 	//  printf("Halting\n");
-	// 	//  while (1) {
-	// 	//  }
-	// 	// }
-
-    //     if (numAddressesPrinted >= 16) {
-    //         break;
-    //     }
-
-	// } while (len > 0);
-	// t1 = to_us_since_boot(get_absolute_time());
-	// delta = (t1 - t0) / 1000;
-	// kBps = (uint32_t) ((float)(total / 1024.0f) / (float)(delta / 1000.0f));
-
-	// printf("Verified %d bytes with PSRAM in %d ms (%d kB/s)\n\n\n", total, delta, kBps);
-
-	// //////////////////////////////
-	// t0 = to_us_since_boot(get_absolute_time());
-	// len = 64;
-	// uint32_t totalRead = 0;
-	// do {
-	// 	volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
-	// 	for (int i = 0; i < len / 4; i++) {
-	// 		uint32_t address_32 = totalRead / 4 + i;
-	// 		uint32_t address = address_32 * 4;
-	// 		psram_set_cs(psram_addr_to_chip(address));
-	// 		uint32_t word = ptr[address_32];
-	// 		// uint32_t facit = buf32[i];
-	// 		psram_set_cs(0);
-	// 	}
-	// 	totalRead += len;
-	// } while (totalRead <= total);
-	// t1 = to_us_since_boot(get_absolute_time());
-	// delta = (t1 - t0) / 1000;
-	// kBps = (uint32_t) ((float)(total / 1024.0f) / (float)(delta / 1000.0f));
-
-	// printf("Reread %d bytes from PSRAM in %d ms (%d kB/s)\n\n\n", totalRead, delta, kBps);
-	// //////////////////////////////
-
-	// fr = f_close(&fil);
-	// if (FR_OK != fr) {
-	// 	printf("f_close error: %s (%d)\n", FRESULT_str(fr), fr);
-	// }
-
-	// printf("---- Verify file with PSRAM Done -----\n\n\n");
-
-	// f_unmount(pSD->pcName);
 
 	// Release the qspi control
     qspi_disable();
