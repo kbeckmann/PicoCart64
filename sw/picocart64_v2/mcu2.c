@@ -119,10 +119,10 @@ void main_task_entry(__unused void *params)
 	// } takes ~200us
 	// printf("Total time for 4096 bytes %d us\n", totalTime);
 
-	// printf("Booting MCU1...\n");
-	// gpio_put(PIN_MCU1_RUN, 1);
+	printf("Booting MCU1...\n");
+	gpio_put(PIN_MCU1_RUN, 1);
 
-	// vTaskDelay(1000);
+	vTaskDelay(1000);
 
 	// boot mcu1 before loading rom so it can actually read out of flash to boot
 	if (NEED_LOAD_ROM == 1) {

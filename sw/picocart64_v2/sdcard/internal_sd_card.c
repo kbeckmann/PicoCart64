@@ -568,61 +568,30 @@ void __no_inline_not_in_flash_func(load_rom)(const char *filename) {
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
-    // QSPI(actual quad spi) READS DON'T WORK
-    // Try to do qspi reads
-    qspi_enter_cmd_xip();
-    qspi_init_qspi(true);
-    printf("\n\nRead with XIP in QSPI(real quad) mode\n");
-    // volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
-    // for (int i = 0; i < 16; i++) {
-    //     uint32_t modifiedAddress = i;
-    //     psram_set_cs(DEBUG_CS_CHIP_USE);
-    //     uint32_t word = ptr[modifiedAddress];
-    //     psram_set_cs(0);
-    //     printf("PSRAM-MCU2[%d]: %08x\n",i, swap16(word));
+    // qspi_enter_cmd_xip();
+    // qspi_init_qspi(true);
+    // printf("\n\nRead with XIP in QSPI(real quad) mode\n");
+    // volatile uint16_t *ptr16 = (volatile uint16_t *)0x10000000;//0x10000000;
+    // printf("Access using 16bit pointer at [0x10000000]\n");
+    // totalTime = 0;
+    // for(int i = 0; i < 4096; i+=2) {
+    //     uint32_t now = time_us_32();
+
+    //     sio_hw->gpio_out = 0x00040000;
+    //     uint16_t word = ptr16[i >> 1];
+    //     sio_hw->gpio_out = 0x00000000;
+        
+    //     totalTime += time_us_32() - now;
+
+    //     if (i < 64) {
+    //         if (i % 8 == 0) {
+    //             printf("\n%08x: ", i);
+                
+    //         }
+    //         printf("%02x %02x ", (word & 0x00FF), word >> 8);
+    //     }
     // }
-
-    volatile uint16_t *ptr16 = (volatile uint16_t *)0x10000000;//0x10000000;
-    printf("Access using 16bit pointer at [0x10000000]\n");
-    totalTime = 0;
-    for(int i = 0; i < 4096; i+=2) {
-        uint32_t now = time_us_32();
-
-        sio_hw->gpio_out = 0x00040000;
-        uint16_t word = ptr16[i >> 1];
-        sio_hw->gpio_out = 0x00000000;
-        
-        totalTime += time_us_32() - now;
-
-        if (i < 64) {
-            if (i % 8 == 0) {
-                printf("\n%08x: ", i);
-                
-            }
-            printf("%04x ", word);
-        }
-    }
-    printf("\nxip access (using raw gpio mask) for 4k Bytes via 16bit pointer took %d us\n\n", totalTime);
-
-    totalTime = 0;
-    for(int i = 0; i < 4096; i+=2) {
-        uint32_t now = time_us_32();
-
-        psram_set_cs(1);
-        uint16_t word = ptr16[i >> 1];
-        psram_set_cs(0);
-        
-        totalTime += time_us_32() - now;
-
-        if (i < 64) {
-            if (i % 8 == 0) {
-                printf("\n%08x: ", i);
-                
-            }
-            printf("%04x ", word);
-        }
-    }
-    printf("\nxip access (using psram_set_cs) for 4k Bytes via 16bit pointer took %d us\n", totalTime);
+    // printf("\nxip access (using raw gpio mask) for 4k Bytes via 16bit pointer took %d us\n\n", totalTime);
 
     // printf("\nFAST READ  - DMA TRANSFER\n");
     // // qspi_enter_cmd_xip();

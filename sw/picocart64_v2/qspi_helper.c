@@ -366,7 +366,7 @@ void qspi_init_qspi(bool sendQuadEnableCommand)
     ssi->ssienr = 0;
     ssi->baudr = 2;
     ssi->ctrlr0 =
-            (SSI_CTRLR0_SPI_FRF_VALUE_QUAD << SSI_CTRLR0_SPI_FRF_LSB) |  // Standard 1-bit SPI serial frames
+            (SSI_CTRLR0_SPI_FRF_VALUE_QUAD << SSI_CTRLR0_SPI_FRF_LSB) |  // Quad SPI serial frames
             (31 << SSI_CTRLR0_DFS_32_LSB) |                             // 32 clocks per data frame
             (SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB); // Send instr + addr, receive data
     ssi->spi_ctrlr0 =
@@ -479,8 +479,6 @@ ssi->ssienr = 0;
 (void)ssi_hw->sr;
 (void)ssi_hw->icr;
 
-// ssi_hw->baudr = 2;
-// ssi_hw->baudr = 4;
 ssi_hw->baudr = 4;
 
 ssi_hw->ctrlr0 = ((0 << SSI_CTRLR0_SSTE_LSB) |	// 
@@ -693,24 +691,8 @@ void qspi_read(uint32_t address, uint8_t * data, uint32_t length)
 #ifdef VERBOSE
 		printf("RD[%d] @%08lX: %d bytes\n", chip, address_masked, count);
 #endif
-		// qspi_put_cmd_addr(chip, FLASHCMD_FAST_READ, address_masked, 1);
-		// qspi_put_cmd_addr(chip, FLASHCMD_READ_DATA, address_masked, 0);
-		
-		// psram_set_cs(chip);
-		// flash_bulk_read((uint32_t*)data, 0, length/4, 0);
-		// psram_set_cs(0);
-
-		// This works //////////////////////////////////////////////////////////////
 		qspi_put_cmd_addr(chip, FLASHCMD_READ_DATA, address_masked, 0); 
 		qspi_put_get(chip, NULL, &data[offset], count);
-		////////////////////////////////////////////////////////////////////////////
-
-		// qspi_put_cmd_addr(chip, FLASHCMD_FAST_READ, address_masked, 0);  // this also seems to work but the first byte is empty?
-		// qspi_put_cmd_addr(chip, FLASHCMD_FAST_QUAD_READ, address_masked, 0); // this doesn't stall but seems to return junk
-
-		// qspi_put_cmd_addr_qspi(chip, FLASHCMD_FAST_QUAD_READ, address_masked, 0);
-		// qspi_put_cmd_addr(chip, FLASHCMD_FAST_QUAD_READ, address_masked, 0);
-		// qspi_put_get_qspi(chip, NULL, &data[offset], count);
 
 #ifdef VERBOSE
 		printf("  ");

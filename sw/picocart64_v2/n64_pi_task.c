@@ -264,7 +264,7 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 			// next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
 			// psram_set_cs(2);
 			// sio_hw->gpio_out = 0x04800000;
-			sio_hw->gpio_out = 04000000;
+			sio_hw->gpio_out = 0x04000000;
 			next_word = ptr16[(last_addr & 0xFFFFFF) >> 1];
 			// psram_set_cs(0);
 			sio_hw->gpio_out = 0x00000000;
@@ -320,7 +320,7 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 				// next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
 				// psram_set_cs(2);
 				// sio_hw->gpio_out = 0x04800000;
-				sio_hw->gpio_out = 04000000;
+				sio_hw->gpio_out = 0x04000000;
 				next_word = ptr16[(last_addr & 0xFFFFFF) >> 1];
 				// psram_set_cs(0);
 				sio_hw->gpio_out = 0x00000000;

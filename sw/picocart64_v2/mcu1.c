@@ -94,7 +94,9 @@ static inline void psram_set_cs2(uint8_t chip)
 	}
 
 	uint32_t old_gpio_out = sio_hw->gpio_out;
-	sio_hw->gpio_out = (old_gpio_out & (~mask)) | new_mask;
+	// sio_hw->gpio_out = (old_gpio_out & (~mask)) | new_mask;
+
+	printf("MCU1 gpio for chip 1: %08x\n", (old_gpio_out & (~mask)) | new_mask);
 }
 
 volatile uint32_t *rom_ptr = (volatile uint32_t *)0x10000000;
@@ -149,9 +151,9 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 	printf("MCU1 core1 booted!\n");
 	
 	bool readingData = false;
-	bool hasInit = false;
-	uint32_t t = 0;
-	uint32_t it = 0;
+	volatile bool hasInit = false;
+	volatile uint32_t t = 0;
+	volatile uint32_t it = 0;
 	while (1) {
 		tight_loop_contents();
 		
@@ -159,14 +161,20 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 			t = time_us_32();
 			it++;
 
-			if (it > 11 && !hasInit) {
+			// if (it < 8 && it > 3) {
+			// 	printf("MCU1!\n");
+			// }
+
+			if (it > 8 && !hasInit) {
 				hasInit = true;
 				uint32_t now = time_us_32();
 
 				printf("\nMCU1 try to read with ptr\n");
 				qspi_enable();
-				// qspi_enter_cmd_xip();
+				qspi_enter_cmd_xip();
 				qspi_init_qspi(true);
+
+				// psram_set_cs2(1);
 				
 				// THIS IS FOR FLASH READING
 				// current_mcu_enable_demux(true);
@@ -210,17 +218,23 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 				// }
 				// printf("\nxip access for 4096 (16bit values) took %d us\n", totalTime);
 
-				volatile uint16_t *ptr16 = (volatile uint16_t *)0x10000000;//0x10000000;
+				volatile uint16_t *ptr16 = (volatile uint16_t *)0x10000000;
+				volatile uint32_t *ptr32 = (volatile uint32_t *)0x10000000;
 				printf("Access using 16bit pointer at [0x10000000]\n");
 				uint32_t totalTime = 0;
 				for(int i = 0; i < 4096; i+=2) {
 					now = time_us_32();
-					// psram_set_cs(2);
-					// sio_hw->gpio_out = 0x04800000;
-					sio_hw->gpio_out = 04000000;
+					
+					// psram_set_cs(1);
+					// sio_hw->gpio_out = 0x04800000; // chip 2
+					sio_hw->gpio_out = 0x04000000; // chip 1
+					
 					uint16_t word = ptr16[i >> 1];
+					// uint32_t word32 = ptr32[i >> 1];
+
 					// psram_set_cs(0);
 					sio_hw->gpio_out = 0x00000000;
+					
 					totalTime += time_us_32() - now;
 
 					if (i < 64) {
@@ -230,8 +244,17 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 						}
 						printf("%04x ", word);
 					}
+
+					// if (i < 64) {
+					// 	if (i % 8 == 0) {
+					// 		printf("\n%08x: ", i);
+							
+					// 	}
+					// 	printf("%08x ", word32);
+					// }
 				}
-				printf("\nxip access for 4k Bytes via 16bit pointer took %d us\n", totalTime);
+				float elapsed_time_s = 1e-6f * totalTime;
+				printf("\nxip access for 4kB via 16bit pointer took %d us. %.3f MB/s\n", totalTime, ((4096 / 1e6f) / elapsed_time_s));
 
 				//load_rom_cache(0);
 			}
@@ -280,23 +303,22 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 void __no_inline_not_in_flash_func(mcu1_main)(void)
 {
 	int count = 0;
-	const int freq_khz = 133000;
-	// const int freq_khz = 166000;
+	// const int freq_khz = 133000;
+	const int freq_khz = 166000;
 	// const int freq_khz = 200000;
 	// const int freq_khz = 210000;
 	// const int freq_khz = 220000;
 	// const int freq_khz = 230000;
-	///// below no workie
 	// const int freq_khz = 240000;
 	// const int freq_khz = 266000;
+	// const int freq_khz = 300000;
 
 	bool clockWasSet = set_sys_clock_khz(freq_khz, false);
 
 	gpio_configure(mcu1_gpio_config, ARRAY_SIZE(mcu1_gpio_config));
 	set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
 
-	// Enable STDIO over USB
-	// stdio_usb_init();
+	// Enable STDIO
 	// stdio_async_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
 	stdio_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
 
