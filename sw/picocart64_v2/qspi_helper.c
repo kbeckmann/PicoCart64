@@ -369,8 +369,8 @@ void qspi_init_qspi(void)
             (31 << SSI_CTRLR0_DFS_32_LSB) |                             // 32 clocks per data frame
             (SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB); // Send instr + addr, receive data
     ssi->spi_ctrlr0 =
-            (0x0B << SSI_SPI_CTRLR0_XIP_CMD_LSB) | 
-            (2u << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |
+            (0xEB << SSI_SPI_CTRLR0_XIP_CMD_LSB) | 
+            (4u << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |
             (SSI_SPI_CTRLR0_INST_L_VALUE_8B << SSI_SPI_CTRLR0_INST_L_LSB) |    // 
             (8u << SSI_SPI_CTRLR0_ADDR_L_LSB) |    // 24-bit addressing for 03h commands
             (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_2C2A  // Command and address both in serial format

@@ -155,15 +155,11 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 	while (1) {
 		tight_loop_contents();
 		
-		if(time_us_32() - t > 2000000) {
+		if(time_us_32() - t > 1000000) {
 			t = time_us_32();
 			it++;
 
-			if (it < 8) {
-				printf("MCU1 alive!\n");
-			}
-
-			if (it > 4 && !hasInit) {
+			if (it > 7 && !hasInit) {
 				hasInit = true;
 				uint32_t now = time_us_32();
 
@@ -283,8 +279,8 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 {
 	int count = 0;
 	// const int freq_khz = 133000;
-	const int freq_khz = 166000;
-	// const int freq_khz = 200000;
+	// const int freq_khz = 166000;
+	const int freq_khz = 200000;
 	// const int freq_khz = 210000;
 	// const int freq_khz = 220000;
 	// const int freq_khz = 230000;
