@@ -28,6 +28,9 @@
 #include "flash_array.h"
 #include "program_flash_array.h"
 
+#include "FreeRTOS.h"
+#include "task.h"
+
 #define SD_CARD_RX_READ_DEBUG 0
 
 #define REGISTER_SD_COMMAND 0x0 // 1 byte, r/w
@@ -336,7 +339,6 @@ void mount_sd(void) {
 
 #define RUN_QSPI_PERMUTATION_TESTS 0
 #define ROM_WRITE_OFFSET 0
-//#define FLASH_TARGET_OFFSET 256 * 1024
 
 #if LOAD_TO_PSRAM_ARRAY == 0
 uint8_t buf[FLASH_PAGE_SIZE];
@@ -361,18 +363,18 @@ void __no_inline_not_in_flash_func(load_rom)(const char* filename) {
 	printf("%s [size=%llu]\n", filinfo.fname, filinfo.fsize);
     printf("DONE!\nStarting rom->flash loading process...\n");
 
-    // printf("Enabling demux...\n");
-    // current_mcu_enable_demux(true);
-    // printf("DONE!\n");
-
-    // printf("Setting flash chip select to 2...\n");
-    // psram_set_cs(2);
-    // printf("DONE!\n");
+    printf("Enable demux.\n");
+    current_mcu_enable_demux(true);
+    
+    printf("Set CS pad address to 2.\n");
+    psram_set_cs(2);
+    printf("DONE!\n");
 
 #if ERASE_AND_WRITE_TO_FLASH_ARRAY == 1
+    printf("Conecting internal flash.\n");
     program_connect_internal_flash();
+    printf("Exiting flash xip.\n");
     program_flash_exit_xip();
-    qspi_oeover_normal(false);
 
     int len = 0;
 	int total = 0;
@@ -415,7 +417,11 @@ void __no_inline_not_in_flash_func(load_rom)(const char* filename) {
 
     program_flash_flush_cache();
     picocart_flash_enable_xip_via_boot2();
-    qspi_oeover_normal(false);
+#else
+    program_connect_internal_flash();
+    program_flash_exit_xip();
+    program_flash_flush_cache();
+    picocart_flash_enable_xip_via_boot2();
 #endif
 
     // If xip is renabled, this won't work anymore
@@ -426,46 +432,48 @@ void __no_inline_not_in_flash_func(load_rom)(const char* filename) {
     // }
     // printf("\n");
 
-    printf("PTR (xip mode?) reads\n");
-    volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+    // printf("PTR (xip mode?) reads\n");
+    // volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
     uint32_t cycleCountStart = 0;
     int totalReadTime = 0;
-    for (int i = 0; i < 128; i++) {
-        uint32_t modifiedAddress = i;
+    // for (int i = 0; i < 128; i++) {
+    //     uint32_t modifiedAddress = i;
         
-        uint32_t startTime_us = time_us_32();
-        psram_set_cs(2);
-        uint32_t word = ptr[modifiedAddress];
-        psram_set_cs(0);
-        totalReadTime += time_us_32() - startTime_us;
+    //     uint32_t startTime_us = time_us_32();
+    //     psram_set_cs(2);
+    //     uint32_t word = ptr[modifiedAddress];
+    //     psram_set_cs(0);
+    //     totalReadTime += time_us_32() - startTime_us;
 
-        if (i < 16) { // only print the first 16 words
-            // if (i == 16) { printf("\n"); }
-            printf("FLASH-MCU2[%d]: %08x\n",i, word);
-        }
-    }
+    //     if (i < 16) { // only print the first 16 words
+    //         // if (i == 16) { printf("\n"); }
+    //         printf("FLASH-MCU2[%d]: %08x\n",i, word);
+    //     }
+    // }
 
-    printf("\n128 32bit reads @ 0x10000000 reads took %d us\n", totalReadTime);
+    // printf("\n128 32bit reads @ 0x10000000 reads took %d us\n", totalReadTime);
 
     printf("PTR (xip mode?) reads\n");
     volatile uint16_t *ptr16 = (volatile uint16_t *)0x10000000;
     cycleCountStart = 0;
     totalReadTime = 0;
-    for (int i = 0; i < 128; i++) {
-        uint32_t modifiedAddress = i;
+    for (int i = 0; i < 4096; i+=2) {
         uint32_t startTime_us = time_us_32();
-        psram_set_cs(2);
-        uint16_t word = ptr16[modifiedAddress];
-        psram_set_cs(0);
+
+        uint16_t word = ptr16[i >> 1];
+        
         totalReadTime += time_us_32() - startTime_us;
 
-        if (i < 32) { // only print the first 16 words
-            // if (i == 16) { printf("\n"); }
-            printf("FLASH-MCU2[%d]: %04x\n",i, word);
+        if (i < 64) {
+            if (i % 8 == 0) {
+                printf("\n%08x: ", i);
+                
+            }
+            printf("%04x ", word);
         }
     }
 
-    printf("\n128 16bit reads @ 0x10000000 reads took %d us\n", totalReadTime);
+    printf("\n4kB using 16bit ptr @ 0x10000000 took %d us\n", totalReadTime);
 }
 
 #elif LOAD_TO_PSRAM_ARRAY == 1

@@ -32,7 +32,7 @@
 #define QSPI_SD3_PAD   (4)
 #define QSPI_SS_PAD    (5)
 
-#define DEBUG_CS_CHIP_USE 1
+#define DEBUG_CS_CHIP_USE 2
 
 extern uint32_t log_buffer[128]; // store addresses
 void add_log_to_buffer(uint32_t value);

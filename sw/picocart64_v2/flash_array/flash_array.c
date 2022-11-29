@@ -124,19 +124,13 @@ void __no_inline_not_in_flash_func(picocart_flash_range_program)(uint32_t flash_
 // Bitbanging the chip select using IO overrides, in case RAM-resident IRQs
 // are still running, and the FIFO bottoms out. (the bootrom does the same)
 static void __no_inline_not_in_flash_func(picocart_flash_cs_force)(bool high) {
-    // uint32_t field_val = high ?
-    //     IO_QSPI_GPIO_QSPI_SS_CTRL_OUTOVER_VALUE_HIGH :
-    //     IO_QSPI_GPIO_QSPI_SS_CTRL_OUTOVER_VALUE_LOW;
-    // hw_write_masked(&ioqspi_hw->io[1].ctrl,
-    //     field_val << IO_QSPI_GPIO_QSPI_SS_CTRL_OUTOVER_LSB,
-    //     IO_QSPI_GPIO_QSPI_SS_CTRL_OUTOVER_BITS
-    // );
-
-    if (high) {
-        psram_set_cs(0);
-    } else {
-        psram_set_cs(2);
-    }
+    uint32_t field_val = high ?
+        IO_QSPI_GPIO_QSPI_SS_CTRL_OUTOVER_VALUE_HIGH :
+        IO_QSPI_GPIO_QSPI_SS_CTRL_OUTOVER_VALUE_LOW;
+    hw_write_masked(&ioqspi_hw->io[1].ctrl,
+        field_val << IO_QSPI_GPIO_QSPI_SS_CTRL_OUTOVER_LSB,
+        IO_QSPI_GPIO_QSPI_SS_CTRL_OUTOVER_BITS
+    );
 }
 
 void __no_inline_not_in_flash_func(picocart_flash_do_cmd)(const uint8_t *txbuf, uint8_t *rxbuf, size_t count) {

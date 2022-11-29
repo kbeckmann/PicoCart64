@@ -337,7 +337,7 @@ void qspi_init_qspi(bool sendQuadEnableCommand)
 {
 	if (sendQuadEnableCommand) {
 		ssi->ssienr = 0;
-		ssi->baudr = 4;
+		ssi->baudr = 8;
 		ssi->ctrlr0 =
 				(SSI_CTRLR0_SPI_FRF_VALUE_STD << SSI_CTRLR0_SPI_FRF_LSB) |  // Standard 1-bit SPI serial frames
 				(7 << SSI_CTRLR0_DFS_32_LSB) |                             // 32 clocks per data frame
@@ -361,7 +361,10 @@ void qspi_init_qspi(bool sendQuadEnableCommand)
 		while ((ssi_hw->sr & SSI_SR_BUSY_BITS) != 0) { tight_loop_contents(); }  
 
 		printf("Sent quad mode enable command\n");  
+		printf("Sample delay %d\n",ssi->rx_sample_dly);
 	}
+
+	
 
     ssi->ssienr = 0;
     ssi->baudr = 2;
@@ -376,6 +379,8 @@ void qspi_init_qspi(bool sendQuadEnableCommand)
             (8u << SSI_SPI_CTRLR0_ADDR_L_LSB) |    // 24-bit addressing for 03h commands
             (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_2C2A  // Command and address both in serial format
                     << SSI_SPI_CTRLR0_TRANS_TYPE_LSB);
+
+	ssi->rx_sample_dly = 2;
     ssi->ssienr = 1;
 
     printf("DONE!\n");

@@ -94,9 +94,7 @@ static inline void psram_set_cs2(uint8_t chip)
 	}
 
 	uint32_t old_gpio_out = sio_hw->gpio_out;
-	// sio_hw->gpio_out = (old_gpio_out & (~mask)) | new_mask;
-
-	printf("MCU1 gpio for chip 1: %08x\n", (old_gpio_out & (~mask)) | new_mask);
+	sio_hw->gpio_out = (old_gpio_out & (~mask)) | new_mask;
 }
 
 volatile uint32_t *rom_ptr = (volatile uint32_t *)0x10000000;
@@ -161,80 +159,42 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 			t = time_us_32();
 			it++;
 
-			// if (it < 8 && it > 3) {
-			// 	printf("MCU1!\n");
-			// }
+			if (it < 8 && it > 3) {
+				printf("MCU1!\n");
+			}
 
 			if (it > 8 && !hasInit) {
 				hasInit = true;
 				uint32_t now = time_us_32();
 
 				printf("\nMCU1 try to read with ptr\n");
-				qspi_enable();
-				qspi_enter_cmd_xip();
-				qspi_init_qspi(true);
 
-				// psram_set_cs2(1);
-				
+				qspi_restore_to_startup_config();
+
+				// qspi_enable();
+				// qspi_enter_cmd_xip();
+				// qspi_init_qspi(true);
+				xip_ctrl_hw->flush = 1;
+    			// Read blocks until flush completion
+    			(void) xip_ctrl_hw->flush;
+    			// Enable the cache
+    			hw_set_bits(&xip_ctrl_hw->ctrl, XIP_CTRL_EN_BITS);
+
 				// THIS IS FOR FLASH READING
-				// current_mcu_enable_demux(true);
-    			// psram_set_cs(2);
+				current_mcu_enable_demux(true);
+    			psram_set_cs(2);
 				// program_connect_internal_flash();
     			// program_flash_exit_xip();
 				// program_flash_flush_cache();
     			// picocart_flash_enable_xip_via_boot2();
-				// qspi_oeover_normal(false);
-
-				// volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;//0x10000000;
-				// printf("Access at [0x10000000]\n");
-				// uint32_t totalTime = 0;
-				// for(int i = 0; i < 1024; i++) {
-				// 	now = time_us_32();
-				// 	uint32_t address_32 = i;
-				// 	uint32_t word = ptr[address_32];
-				// 	totalTime += time_us_32() - now;
-
-				// 	if (i < 32) {
-				// 		printf("PSRAM-MCU1[%d] = %08x\n", address_32, word);
-				// 	}
-				// }
-				// printf("xip access for 1024 (32bit values)(4k bytes total) took %d us\n", totalTime);
-
-				// volatile uint16_t *ptr16 = (volatile uint16_t *)0x10000000;//0x10000000;
-				// printf("Access using 16bit pointer at [0x10000000]\n");
-				// totalTime = 0;
-				// for(int i = 0; i < 4096; i+=2) {
-				// 	now = time_us_32();
-				// 	uint32_t address_16 = i >> 1;
-				// 	uint16_t word = ptr16[address_16];
-				// 	totalTime += time_us_32() - now;
-
-				// 	if (i % 8 == 0) {
-				// 		printf("\n%08x: ", i);
-						
-				// 	}
-				// 	printf("%04x ", word);
-					
-				// }
-				// printf("\nxip access for 4096 (16bit values) took %d us\n", totalTime);
 
 				volatile uint16_t *ptr16 = (volatile uint16_t *)0x10000000;
-				volatile uint32_t *ptr32 = (volatile uint32_t *)0x10000000;
+				// volatile uint32_t *ptr32 = (volatile uint32_t *)0x10000000;
 				printf("Access using 16bit pointer at [0x10000000]\n");
 				uint32_t totalTime = 0;
 				for(int i = 0; i < 4096; i+=2) {
-					now = time_us_32();
-					
-					// psram_set_cs(1);
-					// sio_hw->gpio_out = 0x04800000; // chip 2
-					sio_hw->gpio_out = 0x04000000; // chip 1
-					
+					now = time_us_32();	
 					uint16_t word = ptr16[i >> 1];
-					// uint32_t word32 = ptr32[i >> 1];
-
-					// psram_set_cs(0);
-					sio_hw->gpio_out = 0x00000000;
-					
 					totalTime += time_us_32() - now;
 
 					if (i < 64) {
@@ -311,7 +271,7 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 	// const int freq_khz = 230000;
 	// const int freq_khz = 240000;
 	// const int freq_khz = 266000;
-	// const int freq_khz = 300000;
+	// const int freq_khz = 166000 * 2;
 
 	bool clockWasSet = set_sys_clock_khz(freq_khz, false);
 

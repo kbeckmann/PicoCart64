@@ -23,12 +23,13 @@
 #include "pins_mcu2.h"
 #include "utils.h"
 #include "qspi_helper.h"
-// #include "stdio_async_uart.h"
 #include "gpio_helper.h"
 
 #include "sdcard/internal_sd_card.h"
 #include "pio_uart/pio_uart.h"
 #include "psram.h"
+#include "flash_array/flash_array.h"
+#include "flash_array/program_flash_array.h"
 
 #include "ff.h"
 #include <string.h>
@@ -107,26 +108,52 @@ void main_task_entry(__unused void *params)
 	int count = 0;
 	printf("MCU2 Main Entry\n");
 
-	// Mount the SD card
-	// mount_sd();
+	// qspi_restore_to_startup_config();
+	// xip_ctrl_hw->flush = 1;
+	// // Read blocks until flush completion
+	// (void) xip_ctrl_hw->flush;
+	// // Enable the cache
+	// hw_set_bits(&xip_ctrl_hw->ctrl, XIP_CTRL_EN_BITS);
+	picocart_flash_init_boot2_copyout();
 
-	// volatile uint16_t *rom16 = (uint16_t*)rom_chunks;
-	// uint32_t totalTime = 0;
-	// for(int i = 0; i < 4096; i+=2) {
-	// 	uint32_t s = time_us_32();
-	// 	uint16_t word = rom16[i >> 1];
-	// 	totalTime += time_us_32() - s;
-	// } takes ~200us
-	// printf("Total time for 4096 bytes %d us\n", totalTime);
+	current_mcu_enable_demux(true);
+	psram_set_cs(2);
 
+	program_connect_internal_flash();
+	program_flash_exit_xip();
+	program_flash_flush_cache();
+	picocart_flash_enable_xip_via_boot2();
+
+	psram_set_cs(2);
+
+	volatile uint16_t *ptr16 = (volatile uint16_t *)0x10000000;
+	printf("Access using 16bit pointer at [0x10000000]\n");
+	uint32_t totalTime = 0;
+	for(int i = 0; i < 4096; i+=2) {
+		uint32_t now = time_us_32();	
+		uint16_t word = ptr16[i >> 1];
+		totalTime += time_us_32() - now;
+
+		if (i < 64) {
+			if (i % 8 == 0) {
+				printf("\n%08x: ", i);
+				
+			}
+			printf("%04x ", word);
+		}
+	}
+	float elapsed_time_s = 1e-6f * totalTime;
+	printf("\nxip access for 4kB via 16bit pointer took %d us. %.3f MB/s\n", totalTime, ((4096 / 1e6f) / elapsed_time_s));
+
+	psram_set_cs(1);
+	current_mcu_enable_demux(false);
+
+	vTaskDelay(100);
 	printf("Booting MCU1...\n");
 	gpio_put(PIN_MCU1_RUN, 1);
 
-	vTaskDelay(1000);
-
 	// boot mcu1 before loading rom so it can actually read out of flash to boot
-	if (NEED_LOAD_ROM == 1) {
-		vTaskDelay(1000);
+	if (NEED_LOAD_ROM == 0) {
 		printf("Loading rom...\n");
 		// load_rom("Doom 64 (USA) (Rev 1).z64");
 		load_rom("testrom.z64"); 
@@ -139,7 +166,7 @@ void main_task_entry(__unused void *params)
 	// pio_uart_init(PIN_SPI1_CS, PIN_SPI1_RX);
 	// printf("pio uart inited\n");
 
-	uint32_t t = 0;
+	volatile uint32_t t = 0;
 	while (true) {
 		tight_loop_contents();
 
