@@ -10,8 +10,8 @@ volatile int current_mcu_demux_pin_1 =  -1;
 volatile int current_mcu_demux_pin_2 =  -1;
 volatile int current_mcu_demux_pin_ie = -1;
 
-static gpio_config_t current_demux_disabled_config[4];
-static gpio_config_t current_demux_enabled_config[4];
+static gpio_config_t current_demux_disabled_config[3];
+static gpio_config_t current_demux_enabled_config[3];
 
 void set_demux_mcu_variables(int demux_pin0, int demux_pin1, int demux_pin2, int demux_pinIE) {
     current_mcu_demux_pin_0 = demux_pin0;
@@ -22,12 +22,12 @@ void set_demux_mcu_variables(int demux_pin0, int demux_pin1, int demux_pin2, int
     current_demux_disabled_config[0] = (gpio_config_t){demux_pin0, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO};   
     current_demux_disabled_config[1] = (gpio_config_t){demux_pin1, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO};
     current_demux_disabled_config[2] = (gpio_config_t){demux_pin2, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO};
-    current_demux_disabled_config[3] = (gpio_config_t){demux_pinIE, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO};
+    // current_demux_disabled_config[3] = (gpio_config_t){demux_pinIE, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO};
 
     current_demux_enabled_config[0] = (gpio_config_t){demux_pin0, GPIO_OUT, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO};   
     current_demux_enabled_config[1] = (gpio_config_t){demux_pin1, GPIO_OUT, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO};
     current_demux_enabled_config[2] = (gpio_config_t){demux_pin2, GPIO_OUT, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO};
-    current_demux_enabled_config[3] = (gpio_config_t){demux_pinIE, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO};
+    // current_demux_enabled_config[3] = (gpio_config_t){demux_pinIE, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO};
 }
 
 uint8_t psram_addr_to_chip(uint32_t address)

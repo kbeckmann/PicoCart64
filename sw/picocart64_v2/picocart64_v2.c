@@ -70,10 +70,10 @@ int main(void)
 	picocart_boot2_copy();
 
 	// // Turn off SSI
-	// ssi_hw->ssienr = 0;
+	ssi_hw->ssienr = 0;
 
-	// // // Disable output enable (OE) on all QSPI IO pins
-	// qspi_oeover_disable();
+	// // Disable output enable (OE) on all QSPI IO pins
+	qspi_oeover_disable();
 
 	if (mcu_id == MCU1_ID) {
 		mcu1_main();

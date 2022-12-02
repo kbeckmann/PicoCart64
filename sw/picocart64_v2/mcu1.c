@@ -30,6 +30,8 @@
 #include "flash_array/flash_array.h"
 #include "flash_array/program_flash_array.h"
 
+#include "rom_vars.h"
+
 static const gpio_config_t mcu1_gpio_config[] = {
 	// PIO0 pins
 	{PIN_N64_AD0, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO0},
@@ -114,7 +116,7 @@ volatile int compactedSequensialValues = 0;
 void add_log_to_buffer(uint32_t value) {
 	log_buffer[log_head++] = value;
 	if (log_head >= 128) {
-		log_head = 128;
+		log_head = 0;
 	}
 }
 
@@ -126,21 +128,26 @@ void process_log_buffer() {
 
 	uint32_t value = log_buffer[log_tail++];
 
-	if (lastLoggedValue+2 == value) {
-		compactedSequensialValues++;
-	} else if (value > lastLoggedValue) {
-		printf("!%08x ", lastLoggedValue);
-		if (compactedSequensialValues > 0) {
-			printf("!%d ||", compactedSequensialValues);
-		}
-		compactedSequensialValues = 0;
-	}
-	lastLoggedValue = value;
+	// if (lastLoggedValue+2 == value) {
+	// 	compactedSequensialValues++;
+	// } else if (value > lastLoggedValue) {
+	// 	printf("!%08x ", lastLoggedValue);
+	// 	if (compactedSequensialValues > 0) {
+	// 		printf("!%d ||", compactedSequensialValues);
+	// 	}
+	// 	compactedSequensialValues = 0;
+	// }
+	// lastLoggedValue = value;
 
-	printf(".%08x ", value);
+	if (log_tail == 64) {
+		printf("\n");
+	}
+
+	printf("0x%08x ", value);
+	// printf("u%d ", value);
 	if (log_tail >= 128) {
 		log_tail = 0;
-		printf("\n");
+		// printf("\n");
 	}
 }
 
@@ -314,18 +321,18 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 	printf("MCU1: Was%s able to set clock to %d MHz\n", clockWasSet ? "" : " not", freq_khz/1000);
 
 	// IF READING FROM FROM FLASH... (works for compressed roms)
-	// qspi_oeover_normal(true);
-	// ssi_hw->ssienr = 1;
-	// // Set up ROM mapping table
-	// if (memcmp(picocart_header, "picocartcompress", 16) == 0) {
-	// 	// Copy rom compressed map from flash into RAM
-	// 	// uart_tx_program_puts("Found a compressed ROM\n");
-	// 	memcpy(rom_mapping, flash_rom_mapping, MAPPING_TABLE_LEN * sizeof(uint16_t));
-	// } else {
-	// 	for (int i = 0; i < MAPPING_TABLE_LEN; i++) {
-	// 		rom_mapping[i] = i;
-	// 	}
-	// }
+	qspi_oeover_normal(true);
+	ssi_hw->ssienr = 1;
+	// Set up ROM mapping table
+	if (memcmp(picocart_header, "picocartcompress", 16) == 0) {
+		// Copy rom compressed map from flash into RAM
+		// uart_tx_program_puts("Found a compressed ROM\n");
+		memcpy(rom_mapping, flash_rom_mapping, MAPPING_TABLE_LEN * sizeof(uint16_t));
+	} else {
+		for (int i = 0; i < MAPPING_TABLE_LEN; i++) {
+			rom_mapping[i] = i;
+		}
+	}
 
 
 	// Put something in this array for sanity testing
@@ -337,12 +344,12 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 
 	printf("launching n64_pi_run...\n");
 
-	current_mcu_enable_demux(true);
-	psram_set_cs(2);
-	program_connect_internal_flash();
-	program_flash_exit_xip();
-	program_flash_flush_cache();
-	picocart_boot2_enable();
+	// current_mcu_enable_demux(true);
+	// psram_set_cs(2);
+	// program_connect_internal_flash();
+	// program_flash_exit_xip();
+	// program_flash_flush_cache();
+	// picocart_boot2_enable();
 
 	n64_pi_run();
 

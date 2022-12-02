@@ -147,11 +147,11 @@ void main_task_entry(__unused void *params)
 	// 	printf("Skipping rom load this time. Rom should already be in flash.\n");
 	// }
 
-	psram_set_cs(1);
-	current_mcu_enable_demux(false);
+	// psram_set_cs(1);
+	// current_mcu_enable_demux(false);
 	
-	ssi_hw->ssienr = 0;
-	qspi_oeover_disable();
+	// ssi_hw->ssienr = 0;
+	// qspi_oeover_disable();
 
 	// vTaskDelay(100);
 	printf("Booting MCU1...\n");

@@ -26,6 +26,10 @@
 
 #include "sdcard/internal_sd_card.h"
 #include "psram.h"
+#include "qspi_helper.h"
+
+#include "rom.h"
+#include "rom_vars.h"
 
 #define USE_ROM_CACHE 0
 #define DMA_READ_CMD 0x0B
@@ -44,8 +48,17 @@ static volatile uint32_t back_cache_startingAddress = 0;
 static volatile uint32_t back_cache_endingAddress = 0;
 #endif
 
-volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
-volatile uint16_t *ptr16 = (volatile uint16_t *)0x10000000;
+// volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+// static const uint16_t *rom_file_16 = (uint16_t *) rom_chunks;
+
+uint16_t rom_mapping[MAPPING_TABLE_LEN];
+
+#if COMPRESSED_ROM
+// do something
+#else
+static const uint16_t *rom_file_16 = (uint16_t *) rom_chunks;
+#endif
+
 
 static inline void psram_set_cs2(uint8_t chip)
 {
@@ -97,53 +110,53 @@ static inline void swap_rom_cache() {
 	#endif
 }
 
-static inline uint16_t read_from_psram(uint32_t rom_address) {
-	// convert the rom_address into an address we can use for getting data out of the cache
-	// rom_address should be 2 byte aligned, which means we are likely to get address 0,2,4
-	// and what we really want are 4 byte aligned addresses
+// static inline uint16_t read_from_psram(uint32_t rom_address) {
+// 	// convert the rom_address into an address we can use for getting data out of the cache
+// 	// rom_address should be 2 byte aligned, which means we are likely to get address 0,2,4
+// 	// and what we really want are 4 byte aligned addresses
 	
-	uint32_t index = (rom_address & 0xFFFFFF) >> 1; // address / 2 (works when storing 16bit values per index)
-	// uint32_t index = (rom_address & 0xFFFFFF) >> 2; // address / 4 (works when storing 32bit values per index)
-	#if USE_ROM_CACHE == 1
-	/* If we are already have way through the current cache, start updating for the next set of values */
-	if (index >= cache_startingAddress && index <= cache_endingAddress && index >= cache_endingAddress >> 2) {
-		if (update_rom_cache_for_address != cache_endingAddress) {
-			update_rom_cache_for_address = cache_endingAddress;
-			multicore_fifo_push_blocking(CORE1_UPDATE_ROM_CACHE);
-		}
+// 	uint32_t index = (rom_address & 0xFFFFFF) >> 1; // address / 2 (works when storing 16bit values per index)
+// 	// uint32_t index = (rom_address & 0xFFFFFF) >> 2; // address / 4 (works when storing 32bit values per index)
+// 	#if USE_ROM_CACHE == 1
+// 	/* If we are already have way through the current cache, start updating for the next set of values */
+// 	if (index >= cache_startingAddress && index <= cache_endingAddress && index >= cache_endingAddress >> 2) {
+// 		if (update_rom_cache_for_address != cache_endingAddress) {
+// 			update_rom_cache_for_address = cache_endingAddress;
+// 			multicore_fifo_push_blocking(CORE1_UPDATE_ROM_CACHE);
+// 		}
 
-		// Calculate the index into the cache
-		uint32_t cache_index = index - cache_startingAddress;
-		return swap16(rom_cache[cache_index]);
+// 		// Calculate the index into the cache
+// 		uint32_t cache_index = index - cache_startingAddress;
+// 		return swap16(rom_cache[cache_index]);
 
-	/* Use the cached value*/
-	} else if (index >= cache_startingAddress && index <= cache_endingAddress) {
-		// Calculate the index into the cache
-		uint32_t cache_index = index - cache_startingAddress;
-		return swap16(rom_cache[cache_index]);
+// 	/* Use the cached value*/
+// 	} else if (index >= cache_startingAddress && index <= cache_endingAddress) {
+// 		// Calculate the index into the cache
+// 		uint32_t cache_index = index - cache_startingAddress;
+// 		return swap16(rom_cache[cache_index]);
 
-	/* If we have cached these values, use those*/
-	} else if 
-	(
-		index >= cache_endingAddress || index <= cache_startingAddress &&
-		index >= back_cache_startingAddress && index <= back_cache_endingAddress
-	) {
-		swap_rom_cache();
+// 	/* If we have cached these values, use those*/
+// 	} else if 
+// 	(
+// 		index >= cache_endingAddress || index <= cache_startingAddress &&
+// 		index >= back_cache_startingAddress && index <= back_cache_endingAddress
+// 	) {
+// 		swap_rom_cache();
 
-		uint32_t cache_index = index - cache_startingAddress;
-		return swap16(rom_cache[cache_index]);
+// 		uint32_t cache_index = index - cache_startingAddress;
+// 		return swap16(rom_cache[cache_index]);
 
-	} else {
-		// A total cache miss, update
-		add_log_to_buffer(rom_address);
-		update_rom_cache_for_address = index;
-		multicore_fifo_push_blocking(CORE1_UPDATE_ROM_CACHE);
-	}
-	#endif
+// 	} else {
+// 		// A total cache miss, update
+// 		add_log_to_buffer(rom_address);
+// 		update_rom_cache_for_address = index;
+// 		multicore_fifo_push_blocking(CORE1_UPDATE_ROM_CACHE);
+// 	}
+// 	#endif
 	
-	uint16_t word = ptr16[index];
-	return word;
-}
+// 	uint16_t word = ptr16[index];
+// 	return word;
+// }
 
 void load_rom_cache(uint32_t startingAt) {
 	#if USE_ROM_CACHE == 1
@@ -202,6 +215,7 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 		tight_loop_contents();
 	}
 
+	volatile uint16_t *ptr16 = (volatile uint16_t *)0x10000000;
 	uint32_t last_addr;
 	uint32_t addr;
 	uint32_t next_word;
@@ -259,8 +273,9 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 			// next_word = read_from_psram(last_addr);
 			
 #else
-			// next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
-			next_word = ptr16[(last_addr & 0xFFFFFF) >> 1];
+			next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
+			// next_word = ptr16[(last_addr & 0xFFFFFF) >> 1];
+			// add_log_to_buffer((last_addr & 0xFFFFFF));
 #endif
 
 			// ROM patching done
@@ -309,8 +324,9 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 					// Using the compressed from from the header
 				// next_word = read_from_psram(last_addr);
 #else
-				// next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
-				next_word = ptr16[(last_addr & 0xFFFFFF) >> 1];
+				next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
+				// next_word = ptr16[(last_addr & 0xFFFFFF) >> 1];
+				// add_log_to_buffer((last_addr & 0xFFFFFF));
 #endif
 
 				// Read command/address
@@ -327,6 +343,7 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 					last_addr += 2;
 				} else {
 					// New address
+					
 					break;
 				}
 			} while (1);
@@ -533,6 +550,8 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 #if 0
 			uart_print_hex_u32(last_addr);
 #endif
+			add_log_to_buffer(0xAAAAAAAA);
+			add_log_to_buffer(last_addr);
 
 			// Read to empty fifo
 			addr = n64_pi_get_value(pio);
