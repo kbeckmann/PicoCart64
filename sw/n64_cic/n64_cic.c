@@ -37,15 +37,15 @@ Data Line, Bidir (DIO):  CIC Pin 15
 // #define DEBUG
 
 #define REGION_NTSC (0)
-#define REGION_PAL  (1)
-
-#if CONFIG_REGION_NTSC == 1
+// #define REGION_PAL  (1)
 #define GET_REGION() (REGION_NTSC)
-#elif CONFIG_REGION_PAL == 1
-#define GET_REGION() (REGION_PAL)
-#else
-#error Please pass -DREGION=PAL or NTSC to your cmake command line.
-#endif
+// #if CONFIG_REGION_NTSC == 1
+// #define GET_REGION() (REGION_NTSC)
+// #elif CONFIG_REGION_PAL == 1
+// #define GET_REGION() (REGION_PAL)
+// #else
+// #error Please pass -DREGION=PAL or NTSC to your cmake command line.
+// #endif
 
 #if !defined(CONFIG_CIC_YIELD)
 #error CONFIG_YIELD must be defined.

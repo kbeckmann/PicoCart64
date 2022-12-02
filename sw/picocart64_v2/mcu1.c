@@ -10,6 +10,8 @@
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 #include "hardware/structs/ssi.h"
+#include "hardware/structs/systick.h"
+#include "pico/time.h"
 
 #include "pins_mcu1.h"
 #include "n64_pi_task.h"
@@ -155,70 +157,97 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 	while (1) {
 		tight_loop_contents();
 		
-		if(time_us_32() - t > 1000000) {
-			t = time_us_32();
-			it++;
+		// if(time_us_32() - t > 1000000) {
+		// 	t = time_us_32();
+		// 	it++;
 
-			if (it < 8 && it > 3) {
-				printf("MCU1!\n");
-			}
+		// 	if (it > 3 && !hasInit) {
+		// 		hasInit = true;
 
-			if (it > 8 && !hasInit) {
-				hasInit = true;
-				uint32_t now = time_us_32();
+		// 		printf("\nMCU1 try to read with ptr\n");
 
-				printf("\nMCU1 try to read with ptr\n");
+		// 		// THIS IS FOR FLASH READING
+		// 		// current_mcu_enable_demux(true);
+    	// 		// psram_set_cs(2);
+		// 		// program_connect_internal_flash();
+		// 		// program_flash_exit_xip();
+		// 		// program_flash_flush_cache();
+		// 		// picocart_boot2_enable();
 
-				qspi_restore_to_startup_config();
+		// 		uint32_t largestAccessTime = 0;
+		// 		uint32_t smallestAccessTime = 100000;
 
-				// qspi_enable();
-				// qspi_enter_cmd_xip();
-				// qspi_init_qspi(true);
-				xip_ctrl_hw->flush = 1;
-    			// Read blocks until flush completion
-    			(void) xip_ctrl_hw->flush;
-    			// Enable the cache
-    			hw_set_bits(&xip_ctrl_hw->ctrl, XIP_CTRL_EN_BITS);
+		// 		// systick_hw->csr = 0x5;
+    	// 		// systick_hw->rvr = 0x00FFFFFF;
 
-				// THIS IS FOR FLASH READING
-				current_mcu_enable_demux(true);
-    			psram_set_cs(2);
-				// program_connect_internal_flash();
-    			// program_flash_exit_xip();
-				// program_flash_flush_cache();
-    			// picocart_flash_enable_xip_via_boot2();
+		// 		volatile uint16_t *ptr16 = (volatile uint16_t *)0x10000000;
+		// 		printf("Access using 16bit pointer at [0x10000000]\n");
+		// 		volatile uint16_t buffer[2048];
+		// 		uint32_t totalTime = 0;	
+		// 		for(int i = 0; i < 4096; i+=2) {
+		// 			uint32_t startTime = time_us_32();	
+		// 			volatile uint16_t word = ptr16[i >> 1];
+		// 			buffer[i >> 1] = word;
+		// 			uint32_t accessTime = time_us_32() - startTime;
+		// 			totalTime += accessTime;
 
-				volatile uint16_t *ptr16 = (volatile uint16_t *)0x10000000;
-				// volatile uint32_t *ptr32 = (volatile uint32_t *)0x10000000;
-				printf("Access using 16bit pointer at [0x10000000]\n");
-				uint32_t totalTime = 0;
-				for(int i = 0; i < 4096; i+=2) {
-					now = time_us_32();	
-					uint16_t word = ptr16[i >> 1];
-					totalTime += time_us_32() - now;
+		// 			if (largestAccessTime < accessTime) {
+		// 				largestAccessTime = accessTime;
+		// 			} 
 
-					if (i < 64) {
-						if (i % 8 == 0) {
-							printf("\n%08x: ", i);
+		// 			if (smallestAccessTime > accessTime) {
+		// 				smallestAccessTime = accessTime;
+		// 			}
+
+		// 			if (i < 64) {
+		// 				if (i % 8 == 0) {
+		// 					printf("\n%08x: ", i);
 							
-						}
-						printf("%04x ", word);
-					}
+		// 				}
+		// 				printf("%04x ", word);
+		// 			}
+		// 		}
+		// 		// totalTime = time_us_32() - startTime;
+		// 		float elapsed_time_s = (1e-6f * totalTime);
+		// 		printf("\nxip access for 4kB via 16bit pointer took %d us. %.3f MB/s\n", totalTime, ((4096 / 1e6f) / elapsed_time_s));
+		// 		printf("Variance-> Longest Access: %d, Shortest: %d\n", largestAccessTime, smallestAccessTime);
 
-					// if (i < 64) {
-					// 	if (i % 8 == 0) {
-					// 		printf("\n%08x: ", i);
+		// 		// systick_hw->csr = 0x5;
+    	// 		// systick_hw->rvr = 0x00FFFFFF;
+
+		// 		// printf("\n\nTake 2\n");
+		// 		// totalTime = 0;
+		// 		// for(int i = 0; i < 4096; i+=2) {
+		// 		// 	// now = time_us_32();	
+		// 		// 	uint32_t startTime_ns = systick_hw->cvr;
+		// 		// 	uint16_t word = ptr16[i >> 1];
+		// 		// 	uint32_t endTime_ns = systick_hw->cvr;
+		// 		// 	float accessTime = startTime_ns - endTime_ns;//time_us_32() - now;
+		// 		// 	totalTime += accessTime;
+
+		// 		// 	if (largestAccessTime < accessTime) {
+		// 		// 		largestAccessTime = accessTime;
+		// 		// 	} 
+
+		// 		// 	if (smallestAccessTime > accessTime) {
+		// 		// 		smallestAccessTime = accessTime;
+		// 		// 	}
+
+		// 		// 	if (i < 64) {
+		// 		// 		if (i % 8 == 0) {
+		// 		// 			printf("\n%08x: ", i);
 							
-					// 	}
-					// 	printf("%08x ", word32);
-					// }
-				}
-				float elapsed_time_s = 1e-6f * totalTime;
-				printf("\nxip access for 4kB via 16bit pointer took %d us. %.3f MB/s\n", totalTime, ((4096 / 1e6f) / elapsed_time_s));
+		// 		// 		}
+		// 		// 		printf("%04x ", word);
+		// 		// 	}
+		// 		// }
+		// 		// elapsed_time_s = (1e-6f * totalTime) * 5;
+		// 		// printf("\nxip(via boot2) access for 4kB via 16bit pointer took %f cycles. %.3f MB/s\n", totalTime, ((4096 / 1e6f) / elapsed_time_s));
+		// 		// printf("Variance-> Longest Access: %d, Shortest: %d\n", largestAccessTime, smallestAccessTime);
 
-				//load_rom_cache(0);
-			}
-		}
+		// 		//load_rom_cache(0);
+		// 	}
+		// }
 
 		process_log_buffer();
 
@@ -263,8 +292,8 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 void __no_inline_not_in_flash_func(mcu1_main)(void)
 {
 	int count = 0;
-	// const int freq_khz = 133000;
-	const int freq_khz = 166000;
+	const int freq_khz = 133000;
+	// const int freq_khz = 166000;
 	// const int freq_khz = 200000;
 	// const int freq_khz = 210000;
 	// const int freq_khz = 220000;
@@ -307,6 +336,13 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 	multicore_launch_core1(mcu1_core1_entry);
 
 	printf("launching n64_pi_run...\n");
+
+	current_mcu_enable_demux(true);
+	psram_set_cs(2);
+	program_connect_internal_flash();
+	program_flash_exit_xip();
+	program_flash_flush_cache();
+	picocart_boot2_enable();
 
 	n64_pi_run();
 

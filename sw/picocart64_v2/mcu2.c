@@ -108,59 +108,54 @@ void main_task_entry(__unused void *params)
 	int count = 0;
 	printf("MCU2 Main Entry\n");
 
-	// qspi_restore_to_startup_config();
-	// xip_ctrl_hw->flush = 1;
-	// // Read blocks until flush completion
-	// (void) xip_ctrl_hw->flush;
-	// // Enable the cache
-	// hw_set_bits(&xip_ctrl_hw->ctrl, XIP_CTRL_EN_BITS);
-	picocart_flash_init_boot2_copyout();
+	// current_mcu_enable_demux(true);
+	// psram_set_cs(2);
 
-	current_mcu_enable_demux(true);
-	psram_set_cs(2);
+	// program_connect_internal_flash();
+	// program_flash_exit_xip();
+	// program_flash_flush_cache();
+	// picocart_boot2_enable();
 
-	program_connect_internal_flash();
-	program_flash_exit_xip();
-	program_flash_flush_cache();
-	picocart_flash_enable_xip_via_boot2();
+	// volatile uint16_t *ptr16 = (volatile uint16_t *)0x10000000;
+	// printf("Access using 16bit pointer at [0x10000000]\n");
+	// uint32_t startTime = time_us_32();
+	// uint32_t totalTime = 0;
+	// for(int i = 0; i < 4096; i+=2) {
+	// 	// uint32_t now = time_us_32();	
+	// 	volatile uint16_t word = ptr16[i >> 1];
 
-	psram_set_cs(2);
-
-	volatile uint16_t *ptr16 = (volatile uint16_t *)0x10000000;
-	printf("Access using 16bit pointer at [0x10000000]\n");
-	uint32_t totalTime = 0;
-	for(int i = 0; i < 4096; i+=2) {
-		uint32_t now = time_us_32();	
-		uint16_t word = ptr16[i >> 1];
-		totalTime += time_us_32() - now;
-
-		if (i < 64) {
-			if (i % 8 == 0) {
-				printf("\n%08x: ", i);
+	// 	// totalTime += time_us_32() - now;
+	// 	// if (i < 64) {
+	// 	// 	if (i % 8 == 0) {
+	// 	// 		printf("\n%08x: ", i);
 				
-			}
-			printf("%04x ", word);
-		}
-	}
-	float elapsed_time_s = 1e-6f * totalTime;
-	printf("\nxip access for 4kB via 16bit pointer took %d us. %.3f MB/s\n", totalTime, ((4096 / 1e6f) / elapsed_time_s));
+	// 	// 	}
+	// 	// 	printf("%04x ", word);
+	// 	// }
+	// }
+	// totalTime = time_us_32() - startTime;
+	// float elapsed_time_s = 1e-6f * totalTime;
+	// printf("\nxip access via boot2 for 4kB using 16bit pointer took %d us. %.3f MB/s\n", totalTime, ((4096 / 1e6f) / elapsed_time_s));
+
+	// // boot mcu1 before loading rom so it can actually read out of flash to boot
+	// if (NEED_LOAD_ROM == 0) {
+	// 	printf("Loading rom...\n");
+	// 	load_rom("Doom 64 (USA) (Rev 1).z64");
+	// 	// load_rom("testrom.z64"); 
+	// 	printf("\nfinished loading rom.\n");
+	// } else {
+	// 	printf("Skipping rom load this time. Rom should already be in flash.\n");
+	// }
 
 	psram_set_cs(1);
 	current_mcu_enable_demux(false);
+	
+	ssi_hw->ssienr = 0;
+	qspi_oeover_disable();
 
-	vTaskDelay(100);
+	// vTaskDelay(100);
 	printf("Booting MCU1...\n");
 	gpio_put(PIN_MCU1_RUN, 1);
-
-	// boot mcu1 before loading rom so it can actually read out of flash to boot
-	if (NEED_LOAD_ROM == 0) {
-		printf("Loading rom...\n");
-		// load_rom("Doom 64 (USA) (Rev 1).z64");
-		load_rom("testrom.z64"); 
-		printf("\nfinished loading rom.\n");
-	} else {
-		printf("Skipping rom load this time. Rom should already be in flash.\n");
-	}
 	
 	// Setup PIO UART
 	// pio_uart_init(PIN_SPI1_CS, PIN_SPI1_RX);

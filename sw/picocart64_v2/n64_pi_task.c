@@ -25,7 +25,6 @@
 #include "utils.h"
 
 #include "sdcard/internal_sd_card.h"
-#include "qspi_helper.h"
 #include "psram.h"
 
 #define USE_ROM_CACHE 0
@@ -190,7 +189,6 @@ static inline uint32_t n64_pi_get_value(PIO pio)
 	return value;
 }
 
-char buf2[64];
 void __no_inline_not_in_flash_func(n64_pi_run)(void)
 {
 	// Init PIO

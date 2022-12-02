@@ -9,7 +9,6 @@
 
 #include "pico/stdlib.h"
 #include "hardware/structs/systick.h"
-// #include "hardware/flash.h"
 
 #include "ff.h" /* Obtains integer types */
 #include "diskio.h" /* Declarations of disk functions */
@@ -370,7 +369,7 @@ void __no_inline_not_in_flash_func(load_rom)(const char* filename) {
     psram_set_cs(2);
     printf("DONE!\n");
 
-#if ERASE_AND_WRITE_TO_FLASH_ARRAY == 1
+#if ERASE_AND_WRITE_TO_FLASH_ARRAY == 0
     printf("Conecting internal flash.\n");
     program_connect_internal_flash();
     printf("Exiting flash xip.\n");
@@ -378,7 +377,7 @@ void __no_inline_not_in_flash_func(load_rom)(const char* filename) {
 
     int len = 0;
 	int total = 0;
-    uint32_t numBlocksToErase = filinfo.fsize / FLASH_SECTOR_SIZE;
+    uint32_t numBlocksToErase = (filinfo.fsize / FLASH_SECTOR_SIZE) + 1;
     uint32_t erasedBlocks = 0;
     printf("Erasing %d %dKB blocks flash...\n", numBlocksToErase, FLASH_SECTOR_SIZE/1024);
     do {
@@ -417,6 +416,12 @@ void __no_inline_not_in_flash_func(load_rom)(const char* filename) {
 
     program_flash_flush_cache();
     picocart_flash_enable_xip_via_boot2();
+    //picocart_boot2_enable();
+    if (isBoot2Valid) {
+        printf("\n\nBoot2 is copied!\n\n");
+    } else {
+        printf("\n\n!!!BOOT2 NOT COPIED!!!\n\n");
+    }
 #else
     program_connect_internal_flash();
     program_flash_exit_xip();
@@ -455,25 +460,43 @@ void __no_inline_not_in_flash_func(load_rom)(const char* filename) {
 
     printf("PTR (xip mode?) reads\n");
     volatile uint16_t *ptr16 = (volatile uint16_t *)0x10000000;
-    cycleCountStart = 0;
-    totalReadTime = 0;
-    for (int i = 0; i < 4096; i+=2) {
-        uint32_t startTime_us = time_us_32();
+	printf("Access using 16bit pointer at [0x10000000]\n");
+	uint32_t totalTime = 0;
+	for(int i = 0; i < 4096; i+=2) {
+		uint32_t now = time_us_32();	
+		uint16_t word = ptr16[i >> 1];
+		totalTime += time_us_32() - now;
 
-        uint16_t word = ptr16[i >> 1];
-        
-        totalReadTime += time_us_32() - startTime_us;
+		if (i < 64) {
+			if (i % 8 == 0) {
+				printf("\n%08x: ", i);
+				
+			}
+			printf("%04x ", word);
+		}
+	}
+	float elapsed_time_s = 1e-6f * totalTime;
+	printf("\nxip access for 4kB via 16bit pointer took %d us. %.3f MB/s\n", totalTime, ((4096 / 1e6f) / elapsed_time_s));
 
-        if (i < 64) {
-            if (i % 8 == 0) {
-                printf("\n%08x: ", i);
-                
-            }
-            printf("%04x ", word);
-        }
-    }
+    picocart_boot2_enable();
+    printf("\nAccess with boot2 using 16bit pointer at [0x10000000]\n");
+	totalTime = 0;
+	for(int i = 0; i < 4096; i+=2) {
+		uint32_t now = time_us_32();	
+		uint16_t word = ptr16[i >> 1];
+		totalTime += time_us_32() - now;
 
-    printf("\n4kB using 16bit ptr @ 0x10000000 took %d us\n", totalReadTime);
+		if (i < 64) {
+			if (i % 8 == 0) {
+				printf("\n%08x: ", i);
+				
+			}
+			printf("%04x ", word);
+		}
+	}
+	elapsed_time_s = 1e-6f * totalTime;
+	printf("\nxip(via boot2) access for 4kB via 16bit pointer took %d us. %.3f MB/s\n", totalTime, ((4096 / 1e6f) / elapsed_time_s));
+
 }
 
 #elif LOAD_TO_PSRAM_ARRAY == 1

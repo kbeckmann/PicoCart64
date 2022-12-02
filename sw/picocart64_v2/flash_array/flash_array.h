@@ -53,6 +53,11 @@ extern "C" {
 void picocart_flash_init_boot2_copyout();
 void picocart_flash_enable_xip_via_boot2();
 
+void picocart_boot2_copy();
+void picocart_boot2_enable();
+bool isBoot2Valid();
+void dump_boot2();
+
 /*! \brief  Erase areas of flash
  *  \ingroup hardware_flash
  *

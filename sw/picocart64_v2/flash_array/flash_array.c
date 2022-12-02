@@ -28,12 +28,12 @@
 // it accepts a return vector in LR (and doesn't trash r4-r7). Bootrom passes
 // NULL in LR, instructing boot2 to enter flash vector table's reset handler.
 
-#if FALSE //!PICO_NO_FLASH
-
 #define BOOT2_SIZE_WORDS 64
 
 static uint32_t boot2_copyout[BOOT2_SIZE_WORDS];
 static bool boot2_copyout_valid = false;
+
+#if FALSE //!PICO_NO_FLASH
 
 void __no_inline_not_in_flash_func(picocart_flash_init_boot2_copyout)(void) {
     if (boot2_copyout_valid)
@@ -61,6 +61,32 @@ void __no_inline_not_in_flash_func(picocart_flash_enable_xip_via_boot2)(void) {
 }
 
 #endif
+
+void __no_inline_not_in_flash_func(picocart_boot2_copy)(void) {
+    if (boot2_copyout_valid)
+        return;
+    for (int i = 0; i < BOOT2_SIZE_WORDS; ++i)
+        boot2_copyout[i] = ((uint32_t *)XIP_BASE)[i];
+    __compiler_memory_barrier();
+    boot2_copyout_valid = true;
+}
+
+void __no_inline_not_in_flash_func(picocart_boot2_enable)(void) {
+    ((void (*)(void))boot2_copyout+1)();
+}
+
+bool isBoot2Valid() {
+    return boot2_copyout_valid;
+}
+
+void dump_boot2() {
+    for (int i = 0; i < BOOT2_SIZE_WORDS; i++) {
+        if (i % 8 == 0) {
+            printf("\n");
+        }
+        printf("%08x ", boot2_copyout[i]);
+    }
+}
 
 //-----------------------------------------------------------------------------
 // Actual flash programming shims (work whether or not PICO_NO_FLASH==1)
