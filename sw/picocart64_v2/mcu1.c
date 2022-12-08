@@ -107,7 +107,7 @@ static inline uint32_t read_from_psram2(uint32_t address) {
 	return swap16(word);
 }
 
-uint32_t log_buffer[128]; // store addresses
+uint32_t log_buffer[LOG_BUFFER_SIZE]; // store addresses
 volatile int log_head = 0;
 volatile int log_tail = 0;
 
@@ -115,11 +115,12 @@ volatile uint32_t lastLoggedValue = 0;
 volatile int compactedSequensialValues = 0;
 void add_log_to_buffer(uint32_t value) {
 	log_buffer[log_head++] = value;
-	if (log_head >= 128) {
+	if (log_head >= LOG_BUFFER_SIZE) {
 		log_head = 0;
 	}
 }
 
+static uint32_t last_log_value = 0;
 void process_log_buffer() {
 	if (log_tail == log_head) {
 		// noting to pring
@@ -139,13 +140,14 @@ void process_log_buffer() {
 	// }
 	// lastLoggedValue = value;
 
-	if (log_tail == 64) {
+	if (log_tail % 64 == 0) {
 		printf("\n");
 	}
 
-	printf("0x%08x ", value);
-	// printf("u%d ", value);
-	if (log_tail >= 128) {
+	// printf("0x%08x ", value);
+	printf("%d ", value - last_log_value);
+	last_log_value = value;
+	if (log_tail >= LOG_BUFFER_SIZE) {
 		log_tail = 0;
 		// printf("\n");
 	}
@@ -299,9 +301,9 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 void __no_inline_not_in_flash_func(mcu1_main)(void)
 {
 	int count = 0;
-	const int freq_khz = 133000;
+	// const int freq_khz = 133000;
 	// const int freq_khz = 166000;
-	// const int freq_khz = 200000;
+	const int freq_khz = 200000;
 	// const int freq_khz = 210000;
 	// const int freq_khz = 220000;
 	// const int freq_khz = 230000;
@@ -318,7 +320,7 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 	// stdio_async_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
 	stdio_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
 
-	printf("MCU1: Was%s able to set clock to %d MHz\n", clockWasSet ? "" : " not", freq_khz/1000);
+	printf("\n\nMCU1: Was%s able to set clock to %d MHz\n", clockWasSet ? "" : " not", freq_khz/1000);
 
 	// IF READING FROM FROM FLASH... (works for compressed roms)
 	qspi_oeover_normal(true);

@@ -34,7 +34,8 @@
 
 #define DEBUG_CS_CHIP_USE 2
 
-extern uint32_t log_buffer[128]; // store addresses
+#define LOG_BUFFER_SIZE 2048
+extern uint32_t log_buffer[LOG_BUFFER_SIZE]; // store addresses
 void add_log_to_buffer(uint32_t value);
 
 extern volatile uint32_t update_rom_cache_for_address;

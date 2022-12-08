@@ -13,6 +13,7 @@
 // #include "pico/stdio.h"
 #include "pico/multicore.h"
 #include "hardware/irq.h"
+#include "hardware/structs/systick.h"
 
 #include "n64_defs.h"
 #include "n64_pi_task.h"
@@ -204,6 +205,9 @@ static inline uint32_t n64_pi_get_value(PIO pio)
 
 void __no_inline_not_in_flash_func(n64_pi_run)(void)
 {
+	systick_hw->csr = 0x5;
+    systick_hw->rvr = 0x00FFFFFF;
+
 	// Init PIO
 	PIO pio = pio0;
 	uint offset = pio_add_program(pio, &n64_pi_program);
@@ -215,13 +219,15 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 		tight_loop_contents();
 	}
 
-	volatile uint16_t *ptr16 = (volatile uint16_t *)0x10000000;
-	uint32_t last_addr;
-	uint32_t addr;
-	uint32_t next_word;
+	// volatile uint16_t *ptr16 = (volatile uint16_t *)0x10000000;
+	volatile uint32_t last_addr;
+	volatile uint32_t addr;
+	volatile uint32_t next_word;
 
 	// Read addr manually before the loop
 	addr = n64_pi_get_value(pio);
+
+	// add_log_to_buffer(addr);
 
 	uint32_t lastUpdate = 0;
 	while (1) {
@@ -232,6 +238,7 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 
 		// We got a start address
 		last_addr = addr;
+		// add_log_to_buffer(last_addr);
 
 		// Handle access based on memory region
 		// Note that the if-cases are ordered in priority from
@@ -329,6 +336,9 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 				// add_log_to_buffer((last_addr & 0xFFFFFF));
 #endif
 
+				uint32_t c = systick_hw->cvr;
+				add_log_to_buffer(c);
+
 				// Read command/address
 				addr = n64_pi_get_value(pio);
 
@@ -337,6 +347,10 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
  handle_d1a2_read:
 					pio_sm_put(pio, 0, swap8(next_word));
 					last_addr += 2;
+					
+					// c = systick_hw->cvr;
+					// add_log_to_buffer(c);
+
 				} else if (addr & 0x00000001) {
 					// WRITE
 					// Ignore data since we're asked to write to the ROM.
@@ -550,9 +564,6 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 #if 0
 			uart_print_hex_u32(last_addr);
 #endif
-			add_log_to_buffer(0xAAAAAAAA);
-			add_log_to_buffer(last_addr);
-
 			// Read to empty fifo
 			addr = n64_pi_get_value(pio);
 

@@ -11,6 +11,7 @@
 #include "hardware/structs/ssi.h"
 #include "hardware/structs/ioqspi.h"
 #include "hardware/clocks.h"
+#include "hardware/structs/systick.h"
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -153,7 +154,7 @@ void main_task_entry(__unused void *params)
 	// ssi_hw->ssienr = 0;
 	// qspi_oeover_disable();
 
-	// vTaskDelay(100);
+	vTaskDelay(100);
 	printf("Booting MCU1...\n");
 	gpio_put(PIN_MCU1_RUN, 1);
 	
@@ -263,6 +264,21 @@ void mcu2_main(void)
 	printf("clk_sys: %d Hz\n", clock_get_hz(clk_sys));
 	printf("clk_peri: %d Hz\n", clock_get_hz(clk_peri));
 	printf("----------------------------------------\n\n");
+
+	// printf("\n\n");
+	// uint32_t timeBuffer[32];
+	// systick_hw->csr = 0x5;
+    // systick_hw->rvr = 0x00FFFFFF;
+	// for(int i = 0; i < 32; i++) {
+	// 	uint32_t startTime_ns = systick_hw->cvr;
+	// 	timeBuffer[i] = startTime_ns;
+	// }
+
+	// for(int i = 0; i < 32; i++) {
+	// 	printf("%d\n", timeBuffer[i]);	
+	// }
+
+	// printf("\n\n");
 
 	multicore_launch_core1(mcu2_core1_entry);
 

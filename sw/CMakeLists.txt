@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.12)
 add_definitions(-DPICO_FLASH_SIZE_BYTES=16777216)
 
 # Build as release but with debug symbols
-set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE RelWithDebInfo)
 
 # Pull in SDK (must be before project)
 include(pico_sdk_import.cmake)
