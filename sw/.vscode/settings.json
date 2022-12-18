@@ -1,0 +1,6 @@
+{
+    "cmake.configureOnOpen": true,
+    "files.associations": {
+        "rom_vars.h": "c"
+    }
+}
