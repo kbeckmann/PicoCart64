@@ -144,9 +144,9 @@ void process_log_buffer() {
 		printf("\n");
 	}
 
-	// printf("0x%08x ", value);
-	printf("%d ", value - last_log_value);
-	last_log_value = value;
+	printf("0x%08x ", value);
+	// printf("%d ", value - last_log_value);
+	// last_log_value = value;
 	if (log_tail >= LOG_BUFFER_SIZE) {
 		log_tail = 0;
 		// printf("\n");
@@ -302,8 +302,8 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 {
 	int count = 0;
 	// const int freq_khz = 133000;
-	// const int freq_khz = 166000;
-	const int freq_khz = 200000;
+	const int freq_khz = 166000;
+	// const int freq_khz = 200000;
 	// const int freq_khz = 210000;
 	// const int freq_khz = 220000;
 	// const int freq_khz = 230000;
@@ -314,7 +314,7 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 	bool clockWasSet = set_sys_clock_khz(freq_khz, false);
 
 	gpio_configure(mcu1_gpio_config, ARRAY_SIZE(mcu1_gpio_config));
-	set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
+	// set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
 
 	// Enable STDIO
 	// stdio_async_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
@@ -329,13 +329,13 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 	if (memcmp(picocart_header, "picocartcompress", 16) == 0) {
 		// Copy rom compressed map from flash into RAM
 		// uart_tx_program_puts("Found a compressed ROM\n");
+		printf("Found a compressed ROM\n");
 		memcpy(rom_mapping, flash_rom_mapping, MAPPING_TABLE_LEN * sizeof(uint16_t));
 	} else {
 		for (int i = 0; i < MAPPING_TABLE_LEN; i++) {
 			rom_mapping[i] = i;
 		}
 	}
-
 
 	// Put something in this array for sanity testing
 	for(int i = 0; i < 256; i++) {

@@ -251,7 +251,7 @@ void mcu2_main(void)
 	stdio_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
 	gpio_configure(mcu2_gpio_config, ARRAY_SIZE(mcu2_gpio_config));
 
-	set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
+	// set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
 
 	printf("MCU2: Was%s able to set clock to %d MHz\n", clockWasSet ? "" : " not", freq_khz/1000);
 
