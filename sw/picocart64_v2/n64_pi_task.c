@@ -342,10 +342,10 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 				if (addr == 0) {
 					// READ
  handle_d1a2_read:
-//  add_log_to_buffer(0xAAA);
+ add_log_to_buffer(0xABAB);
  add_log_to_buffer(last_addr);
 					// pio_sm_put(pio, 0, swap8(next_word));
-					pio_sm_put(pio, 0, 0x1234);
+					pio_sm_put(pio, 0, 0xFFFF);
 					last_addr += 2;
 					
 					// c = systick_hw->cvr;

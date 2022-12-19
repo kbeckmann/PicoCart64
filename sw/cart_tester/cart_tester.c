@@ -52,9 +52,9 @@ void main() {
      * READ DATA
      * * READ LOW
      * * aleH LOW
-     *      get high 16 bits data
-     * * aleL LOW 
-     *      get low 16 bits data
+     * * aleL LOW
+     *      get 16 bits data
+     * * READ HIGH
      */
 
     stdio_init_all();
@@ -63,8 +63,8 @@ void main() {
     gpio_init(PICO_DEFAULT_LED_PIN);
     gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
     
+    // Flash the led
     volatile int t = 0;
-    // while(!tud_cdc_connected()) {
     while(t < 3) {
         gpio_put(PICO_DEFAULT_LED_PIN, true);
         sleep_ms(100);
@@ -102,66 +102,8 @@ void main() {
         address_pin_mask |= 1 << i;
     }
 
-    // // wait for serial input before starting
-    // gpio_put(PICO_DEFAULT_LED_PIN, false);
-    // int buffer[64];
-    // int count = 0;
-    // volatile bool waiting = true;
-    // while(waiting) {
-    //     process_serial_command:
-    //     tight_loop_contents();
-
-    //     volatile int c = getchar();
-    //     buffer[count++] = c;
-
-    //     if (c == '\n') {
-    //         // process input
-    //         switch (buffer[0]) {
-    //         case '1': 
-    //             printf("Start read\n");
-    //             sleep_ms(100);
-    //             waiting = false;
-    //             break;
-                
-    //         case '2':
-    //             printf("%c\n", buffer[0]);
-    //             break;
-
-    //         case '3':
-    //             gpio_put(PICO_DEFAULT_LED_PIN, false);
-    //             sleep_ms(100);
-    //             gpio_put(PICO_DEFAULT_LED_PIN, true);
-    //             sleep_ms(100);
-    //             gpio_put(PICO_DEFAULT_LED_PIN, false);
-    //             sleep_ms(100);
-    //             gpio_put(PICO_DEFAULT_LED_PIN, true);
-    //             // printf("Boop\n");
-    //             break;
-
-    //         default: 
-    //             gpio_put(PICO_DEFAULT_LED_PIN, false);
-    //             sleep_ms(30);
-    //             gpio_put(PICO_DEFAULT_LED_PIN, true);
-    //             sleep_ms(30);
-    //             gpio_put(PICO_DEFAULT_LED_PIN, false);
-    //             sleep_ms(30);
-    //             gpio_put(PICO_DEFAULT_LED_PIN, true);
-    //             break;
-    //         }
-    //         buffer[0] = -1;
-    //         count = 0;
-    //     }
-
-    //     if (count >= 64) {
-    //         count = 0;
-    //     }
-    // }
-
     sleep_ms(100);
-    
     printf("READ_START\n");
-
-    sleep_ms(100);
 
     gpio_put(PICO_DEFAULT_LED_PIN, false);
 
@@ -221,12 +163,6 @@ void main() {
     }
 }
 
-static inline uint32_t swap8(uint16_t value)
-{
-	// 0x1122 => 0x2211
-	return (value << 8) | (value >> 8);
-}
-
 void send_address(uint32_t address) {
     // Clear mask?
     gpio_clr_mask(address_pin_mask);
@@ -272,19 +208,6 @@ uint16_t start_read() {
 
     // sample gpio for high16
     uint32_t high16 = gpio_get_all();
-
-    // debug code to sample forever since picocart seems to not be returning anything
-    // volatile int looping = 1;
-    // while(looping > 0) {
-    //     looping++;
-
-    //     uint16_t sample = (uint16_t)gpio_get_all();
-    //     if (sample != 0) {
-    //         high16 = sample;
-    //         printf("non zero\n");
-    //         looping = 0;
-    //     }
-    // }
 
     // Finished reading
     gpio_put(N64_READ, true);
