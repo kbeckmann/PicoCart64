@@ -15,11 +15,23 @@
 #define LATCH_DELAY_US 4 // Used for reads
 #define LATCH_DELAY_NS (110 / 7) * LATCH_DELAY_MULTIPLYER // Used for sending addresses. 133mhz is 7.5NS, let's just use int math though
 
-#define CART_ADDRESS_START 0x10000000
+#define CART_ADDRESS_START 0x10000008
 #define CART_ADDRESS_UPPER_RANGE 0x1FBFFFFF
 
 uint32_t finalReadAddress = CART_ADDRESS_START + 0x10; //0x200000;
 uint32_t address_pin_mask = 0;
+
+void set_ad_input() {
+    for(int i = 0; i < 16; i++) {
+        gpio_set_dir(i, false);
+    }
+}
+
+void set_ad_output() {
+    for(int i = 0; i < 16; i++) {
+        gpio_set_dir(i, true);
+    }
+}
 
 void main() {
     /*
@@ -163,11 +175,13 @@ void main() {
         // Send address, sends high 16 for LATCH_DELAY_US, sends low 16
         send_address(address);
 
-        // sleep_ms(100);
+        sleep_ms(10);
 
+        // Clear mask?
+        gpio_clr_mask(address_pin_mask);
         send_address(0); // Tell it we want to read
 
-        // sleep_ms(100);
+        sleep_ms(10);
 
         // Not sure if we need another latch delay but the timing diagram has 7us between read going high and 
         busy_wait_us(LATCH_DELAY_US);
@@ -175,13 +189,13 @@ void main() {
         // Clear mask?
         gpio_clr_mask(address_pin_mask);
 
-        uint32_t data = start_read();
+        uint16_t data = start_read();
 
-        // sleep_ms(100);
+        sleep_ms(10);
 
         verify_data(data, address);
         
-        address += 4; // increment address by 4 bytes
+        address += 2; // increment address by 2 bytes
 
         // make sure we don't go out of bounds
         if (address > finalReadAddress) {
@@ -248,42 +262,42 @@ void send_address(uint32_t address) {
     gpio_put(N64_ALEL, false);
 }
 
-uint32_t start_read() {
+uint16_t start_read() {
     
-    // sample gpio 
-    uint16_t high16 = 0;
-    for(int i = 0; i < 16; i++) {
-        gpio_set_dir(i, false);  // set to input
-        // high16 |= gpio_get(i) << i;
-    }
+    // Set to input
+    set_ad_input();
 
     gpio_put(N64_READ, false);
     busy_wait_us(LATCH_DELAY_US);
-    high16 = gpio_get_all();
 
-    // Pulse the read pin to signal we want the next 16 bits
-    gpio_put(N64_READ, true);
-    // READ_PULSE_DELAY?
-    gpio_put(N64_READ, false);
+    // sample gpio for high16
+    uint32_t high16 = gpio_get_all();
 
-    // Latch delay and then sample the lower 16 bits
-    busy_wait_us(LATCH_DELAY_US);
-    uint16_t low16 = gpio_get_all();
+    // debug code to sample forever since picocart seems to not be returning anything
+    // volatile int looping = 1;
+    // while(looping > 0) {
+    //     looping++;
 
-    for(int i = 0; i < 16; i++) {
-        // low16 |= gpio_get(i) << i;
-        gpio_set_dir(i, true); // set back to output so we can send another address
-    }
+    //     uint16_t sample = (uint16_t)gpio_get_all();
+    //     if (sample != 0) {
+    //         high16 = sample;
+    //         printf("non zero\n");
+    //         looping = 0;
+    //     }
+    // }
 
     // Finished reading
     gpio_put(N64_READ, true);
+    busy_wait_us(LATCH_DELAY_US);
 
-    printf("%04x %04x\n", high16, low16);
+    printf("%08x\n", high16);
+
+    set_ad_output();
 
     // return the value
-    return (uint32_t)(high16 << 16) | low16;
+    return (uint16_t)high16;
 }
 
-void verify_data(uint32_t data, uint32_t address) {
-    printf("[%08x] %08x\n");
+void verify_data(uint16_t data, uint32_t address) {
+    printf("[%08x] %04x\n");
 }
