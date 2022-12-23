@@ -12,10 +12,10 @@
 #include "cart_tester.h"
 
 #define LATCH_DELAY_MULTIPLYER 10
-#define LATCH_DELAY_US 4 // Used for reads
+#define LATCH_DELAY_US 4 * LATCH_DELAY_MULTIPLYER // Used for reads
 #define LATCH_DELAY_NS (110 / 7) * LATCH_DELAY_MULTIPLYER // Used for sending addresses. 133mhz is 7.5NS, let's just use int math though
 
-#define CART_ADDRESS_START 0x10000008
+#define CART_ADDRESS_START 0x10000010
 #define CART_ADDRESS_UPPER_RANGE 0x1FBFFFFF
 
 uint32_t finalReadAddress = CART_ADDRESS_START + 0x10; //0x200000;
@@ -23,14 +23,140 @@ uint32_t address_pin_mask = 0;
 
 void set_ad_input() {
     for(int i = 0; i < 16; i++) {
+        gpio_init(i);
         gpio_set_dir(i, false);
     }
 }
 
 void set_ad_output() {
     for(int i = 0; i < 16; i++) {
+        gpio_init(i);
         gpio_set_dir(i, true);
     }
+}
+
+void dump_rom_test() {
+    sleep_ms(100);
+    printf("\nDUMP READ TEST START\n");
+    sleep_ms(100);
+
+    gpio_put(PICO_DEFAULT_LED_PIN, false);
+
+    // Start sending addresses and getting data
+    gpio_put(N64_COLD_RESET, true);
+    
+    uint32_t address = CART_ADDRESS_START; // Starting address
+    while(1) {
+        gpio_put(PICO_DEFAULT_LED_PIN, true);
+        
+        printf("\nSTART SEND ADDRESS\n");
+        // Send address, sends high 16 for LATCH_DELAY_US, sends low 16
+        send_address(address);
+        sleep_ms(10);
+
+        gpio_clr_mask(address_pin_mask);
+        send_address(0); // read command
+        sleep_ms(10);
+
+        // Not sure if we need another latch delay but the timing diagram has 7us between read going high and 
+        busy_wait_us(LATCH_DELAY_US);
+
+        uint16_t data = start_read();
+
+        // Make sure that the cart is held in a waiting patter until we verify the data
+        gpio_put(N64_READ, true);
+        gpio_put(N64_ALEH, true);
+        gpio_put(N64_ALEL, true);
+
+        sleep_ms(10);
+
+        verify_data(data, address);
+        
+        address += 2; // increment address by 2 bytes
+
+        // make sure we don't go out of bounds
+        if (address > finalReadAddress) {
+            // FINISHED
+            break;
+        }
+        gpio_put(PICO_DEFAULT_LED_PIN, false);
+    }
+
+    printf("END\n");
+
+    gpio_put(PICO_DEFAULT_LED_PIN, true);
+    gpio_put(N64_COLD_RESET, false); // roms won't read until this is true
+    gpio_put(PICO_DEFAULT_LED_PIN, true);
+
+    while(1) {
+        tight_loop_contents();
+    }
+}
+
+void board_test() {
+    sleep_ms(100);
+    printf("Stating in 3...");
+    sleep_ms(1000);
+    printf("2...");
+    sleep_ms(1000);
+    printf("1...\n");
+    sleep_ms(1000);
+    printf("START board_test\n");
+
+    // Set true to start test
+    gpio_put(N64_COLD_RESET, true);
+
+    // send values over each gpio line
+    for(int i = 0; i < 16; i++) {
+        printf("Sending value on AD [%d]\n", i);
+		gpio_put(i, true);
+        sleep_ms(50);
+    }
+
+    gpio_put(N64_ALEH, true);
+    sleep_ms(50);
+
+    gpio_put(N64_ALEL, true);
+    sleep_ms(50);
+
+    gpio_put(N64_READ, true);
+    sleep_ms(50);
+
+    bool goodLines[16];
+    int numBadLines = 0;
+    printf("START Read data lines from cart...\n");
+    sleep_ms(10);
+
+    for(int i = 0; i < 16; i++) {
+        gpio_set_dir(i, false);
+    }
+
+    uint32_t allPins = gpio_get_all();
+    printf("All pins sample: %08x\n", allPins);
+
+    for(int i = 0; i < 16; i++) {
+        printf("Checking AD [%d]... ");
+
+        int value = 0;
+        do {
+            value = gpio_get(i);
+        } while (value == false); 
+
+        if (value == true) {
+            printf("AD [%d] good!\n", i);
+            sleep_ms(10);
+        } else {
+            numBadLines++;
+        }
+
+        goodLines[i] = value;
+    }
+
+    gpio_put(N64_READ, true);// leave high once finished
+    gpio_put(N64_COLD_RESET, false); // reset for the next run
+
+    printf("Num bad lines found = %d\n", numBadLines);
+    printf("Testing finished!\n");
 }
 
 void main() {
@@ -92,6 +218,11 @@ void main() {
     
     gpio_init(N64_READ);
     gpio_set_dir(N64_READ, true); // set output initially
+    gpio_put(N64_READ, true);
+
+    gpio_init(N64_WRITE);
+    gpio_set_dir(N64_WRITE, true);
+    gpio_put(N64_WRITE, true); // 
     
     gpio_init(N64_COLD_RESET);
     gpio_set_dir(N64_COLD_RESET, true); // set output initially
@@ -102,65 +233,12 @@ void main() {
         address_pin_mask |= 1 << i;
     }
 
-    sleep_ms(100);
-    printf("READ_START\n");
+    // board_test();
 
-    gpio_put(PICO_DEFAULT_LED_PIN, false);
+    dump_rom_test();
 
-    // Start sending addresses and getting data
-    gpio_put(N64_COLD_RESET, true);
-    
-    uint32_t address = CART_ADDRESS_START; // Starting address
-    while(1) {
-        gpio_put(PICO_DEFAULT_LED_PIN, true);
-        
-        // Send address, sends high 16 for LATCH_DELAY_US, sends low 16
-        send_address(address);
-
-        sleep_ms(10);
-
-        // Clear mask?
-        gpio_clr_mask(address_pin_mask);
-        send_address(0); // Tell it we want to read
-
-        sleep_ms(10);
-
-        // Not sure if we need another latch delay but the timing diagram has 7us between read going high and 
-        busy_wait_us(LATCH_DELAY_US);
-        
-        // Clear mask?
-        gpio_clr_mask(address_pin_mask);
-
-        uint16_t data = start_read();
-
-        sleep_ms(10);
-
-        verify_data(data, address);
-        
-        address += 2; // increment address by 2 bytes
-
-        // make sure we don't go out of bounds
-        if (address > finalReadAddress) {
-            // FINISHED
-            break;
-        }
-        gpio_put(PICO_DEFAULT_LED_PIN, false);
-    }
-
-    printf("END\n");
-
-    gpio_put(PICO_DEFAULT_LED_PIN, true);
-    
-    // Go back to waiting for serial input, in case we want to run again
-    // waiting = true;
-    gpio_put(N64_COLD_RESET, false); // roms won't read until this is true
-    // printf("RESTARTING\n");
-    // goto process_serial_command;
-    sleep_ms(1000);
-    gpio_put(PICO_DEFAULT_LED_PIN, true);
-    while(1) {
-        tight_loop_contents();
-    }
+    // Run forever
+    while(1);;
 }
 
 void send_address(uint32_t address) {
@@ -176,6 +254,9 @@ void send_address(uint32_t address) {
     
     // printf("High16(%08x): %08x\n", high16, (sio_hw->gpio_out ^ high16) & address_pin_mask);
     gpio_put_masked(address_pin_mask, high16);
+    if (address != 0) {
+        printf("ADDR HIGH gpio = %08x ", sio_hw->gpio_out);
+    }
     
     // Leave the high 16 bits on the line for at least this long
     busy_wait_at_least_cycles(LATCH_DELAY_NS); 
@@ -190,6 +271,9 @@ void send_address(uint32_t address) {
     uint16_t low16 = address;
     // printf("Low16(%08x): %08x\n", low16, (sio_hw->gpio_out ^ low16) & address_pin_mask);
     gpio_put_masked(address_pin_mask, low16);
+    if (address != 0) {
+        printf("ADDR LOW gpio = %08x\n", sio_hw->gpio_out);
+    }
 
     // Leave the low 16 bits on the line for at least this long
     busy_wait_at_least_cycles(LATCH_DELAY_NS);
@@ -200,20 +284,21 @@ void send_address(uint32_t address) {
 
 uint16_t start_read() {
     
+    printf("START READ\n");
     // Set to input
     set_ad_input();
 
     gpio_put(N64_READ, false);
-    busy_wait_us(LATCH_DELAY_US);
+    sleep_us(LATCH_DELAY_US);
 
     // sample gpio for high16
     uint32_t high16 = gpio_get_all();
 
     // Finished reading
     gpio_put(N64_READ, true);
-    busy_wait_us(LATCH_DELAY_US);
+    sleep_us(LATCH_DELAY_US);
 
-    printf("%08x\n", high16);
+    printf("%04x\n", (uint16_t)high16);
 
     set_ad_output();
 

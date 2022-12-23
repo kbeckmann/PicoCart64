@@ -227,7 +227,7 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 	// Read addr manually before the loop
 	addr = n64_pi_get_value(pio);
 
-	add_log_to_buffer(addr);
+	// add_log_to_buffer(addr);
 	uint32_t lastUpdate = 0;
 	while (1) {
 		// addr must not be a WRITE or READ request here,
@@ -324,40 +324,26 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 				const uint16_t *chunk_16 = (const uint16_t *)rom_chunks[chunk_index];
 				next_word = chunk_16[(last_addr & COMPRESSION_MASK) >> 1];
 				
-					// Using the compressed from from the header
+				// Using the compressed from from the header
 				// next_word = read_from_psram(last_addr);
 #else
 				next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
 				// next_word = ptr16[(last_addr & 0xFFFFFF) >> 1];
 				// add_log_to_buffer((last_addr & 0xFFFFFF));
 #endif
-
-				// uint32_t c = systick_hw->cvr;
-				
-				// add_log_to_buffer(0xBBB);
-				// add_log_to_buffer(next_word);
-				// Read command/address
 				addr = n64_pi_get_value(pio);
 
 				if (addr == 0) {
 					// READ
  handle_d1a2_read:
- add_log_to_buffer(0xABAB);
- add_log_to_buffer(last_addr);
-					// pio_sm_put(pio, 0, swap8(next_word));
-					pio_sm_put(pio, 0, 0xFFFF);
+					pio_sm_put(pio, 0, swap8(next_word));
 					last_addr += 2;
-					
-					// c = systick_hw->cvr;
-					// add_log_to_buffer(c);
-
 				} else if (addr & 0x00000001) {
 					// WRITE
 					// Ignore data since we're asked to write to the ROM.
 					last_addr += 2;
 				} else {
 					// New address
-					
 					break;
 				}
 			} while (1);

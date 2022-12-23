@@ -140,9 +140,9 @@ void process_log_buffer() {
 	// }
 	// lastLoggedValue = value;
 
-	if (log_tail % 64 == 0) {
-		printf("\n");
-	}
+	// if (log_tail % 64 == 0) {
+	// 	printf("\n");
+	// }
 
 	printf("0x%08x ", value);
 	// printf("%d ", value - last_log_value);
@@ -298,6 +298,98 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 	}
 }
 
+const uint32_t timeout_us = 10000 * 1000; // 10 seconds
+int test_line_read(int gpio, char* name) {
+	uint32_t start_time = time_us_32();
+	// uint32_t current_time = start_time;
+	int value = gpio_get(gpio);
+	while(value == false) {
+		tight_loop_contents();
+		if ((time_us_32()-start_time) >= timeout_us) {
+			printf("Timeout waiting for %s [gpio %d] to return value\n", name, gpio);
+			break;
+		}
+		// current_time += time_us_32() - start_time;
+
+		value = gpio_get(gpio);
+	}
+
+	if (value) {
+		printf("%s [GPIO %d] good!\n", name, gpio);
+	}
+
+	return value;
+}
+
+void boardTest() {
+
+	// Init the pins and set them all to input
+
+	// init the address/data pins
+	for(int i = 0; i < 16; i++) {
+		gpio_init(i);
+		gpio_set_dir(i, false);
+	}
+
+	gpio_init(PIN_N64_ALEH);
+    gpio_set_dir(PIN_N64_ALEH, false);
+    
+    gpio_init(PIN_N64_ALEL);
+    gpio_set_dir(PIN_N64_ALEL, false);
+    
+    gpio_init(PIN_N64_READ);
+    gpio_set_dir(PIN_N64_READ, false);
+    
+    gpio_init(PIN_N64_COLD_RESET);
+    gpio_set_dir(PIN_N64_COLD_RESET, false);
+
+	// Wait until the cold reset is true
+	while(gpio_get(PIN_N64_COLD_RESET) == false) {
+		tight_loop_contents();
+	}
+
+	uint32_t start_time = time_us_32();
+	uint32_t current_time = start_time;
+	// Test data line get values
+	printf("\n\nTesting data lines\n");
+	for(int i = 0; i < 16; i++) {
+		int value = gpio_get(i);
+
+		start_time = time_us_32();
+		// current_time = start_time;
+		while(!value) {
+			if ((time_us_32()-start_time) >= timeout_us) {
+				printf("Timeout waiting for gpio %d to return value\n", i);
+				break;
+			}
+
+			value = gpio_get(i);
+		}
+
+		if (value) {
+			printf("GPIO/AD [%d] good!\n", i);
+		}
+	}
+
+	printf("\n\nTesting control lines\n");
+	int aleh_good = test_line_read(PIN_N64_ALEH, "ALEH");
+	int alel_good = test_line_read(PIN_N64_ALEL, "ALEL");
+	int read_good = test_line_read(PIN_N64_READ, "READ");
+
+	// Now test writing to each of the data lines
+	for(int i = 0; i < 16; i++) {
+		gpio_set_dir(i, true);
+		gpio_put(i, true);
+	}
+
+	sleep_ms(10);
+	// Wait for the read line to go high and signal the end of the test
+	test_line_read(PIN_N64_READ, "READ");
+
+	printf("board_test finished!\n");
+
+}
+
 void __no_inline_not_in_flash_func(mcu1_main)(void)
 {
 	int count = 0;
@@ -337,6 +429,10 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 		}
 	}
 
+#if 0
+	printf("Start board test\n");
+	boardTest();
+#else
 	// Put something in this array for sanity testing
 	for(int i = 0; i < 256; i++) {
 		pc64_uart_tx_buf[i] = 0xFFFF - i;
@@ -358,5 +454,6 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 	while (true) {
 
 	}
+#endif
 
 }
