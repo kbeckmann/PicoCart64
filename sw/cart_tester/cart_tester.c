@@ -53,6 +53,7 @@ void dump_rom_test() {
         
         printf("\nSTART SEND ADDRESS\n");
         sleep_ms(30);
+
         // Send address, sends high 16 for LATCH_DELAY_US, sends low 16
         send_address(address);
         
@@ -68,6 +69,7 @@ void dump_rom_test() {
         
         address += 2; // increment address by 2 bytes
 
+        // Delay to make sure USB prints all the data. If it goes too fast sometimes it won't print properly.
         sleep_ms(100);
 
         // make sure we don't go out of bounds
@@ -246,7 +248,7 @@ void main() {
 }
 
 void send_address(uint32_t address) {
-    // Clear mask?
+    // Clear mask
     gpio_clr_mask(address_pin_mask);
 
     gpio_put(N64_READ, true);
@@ -255,12 +257,7 @@ void send_address(uint32_t address) {
 
     // translate upper 16 bits to gpio 
     uint16_t high16 = address >> 16;
-    
-    // printf("High16(%08x): %08x\n", high16, (sio_hw->gpio_out ^ high16) & address_pin_mask);
     gpio_put_masked(address_pin_mask, high16);
-    if (address != 0) {
-        printf("ADDR HIGH gpio = %08x ", sio_hw->gpio_out);
-    }
 
     // Leave the high 16 bits on the line for at least this long
     busy_wait_at_least_cycles(LATCH_DELAY_NS); 
@@ -273,11 +270,7 @@ void send_address(uint32_t address) {
 
     // now the lower 16 bits 
     uint16_t low16 = address;
-    // printf("Low16(%08x): %08x\n", low16, (sio_hw->gpio_out ^ low16) & address_pin_mask);
     gpio_put_masked(address_pin_mask, low16);
-    if (address != 0) {
-        printf("ADDR LOW gpio = %08x\n", sio_hw->gpio_out);
-    }
 
     // Leave the low 16 bits on the line for at least this long
     busy_wait_at_least_cycles(LATCH_DELAY_NS);
@@ -287,6 +280,7 @@ void send_address(uint32_t address) {
 
     busy_wait_at_least_cycles(40); // wait ~600ns
 
+    // clear the mask so there is nothing on the lines
     gpio_clr_mask(address_pin_mask);
 }
 
