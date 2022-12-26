@@ -332,13 +332,21 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 				// add_log_to_buffer((last_addr & 0xFFFFFF));
 #endif
 				addr = n64_pi_get_value(pio);
+			add_log_to_buffer(0xbbbbAAAA);
+			add_log_to_buffer(addr);
+			add_log_to_buffer(0xbbbbBBBB);
+			add_log_to_buffer(last_addr);
 
 				if (addr == 0) {
 					// READ
  handle_d1a2_read:
+			add_log_to_buffer(0xaaaaaaaa);
 					pio_sm_put(pio, 0, swap8(next_word));
 					last_addr += 2;
 				} else if (addr & 0x00000001) {
+			add_log_to_buffer(0xbbbbCCCC);
+			add_log_to_buffer(addr);
+			add_log_to_buffer(0xbbbbDDDD);
 					// WRITE
 					// Ignore data since we're asked to write to the ROM.
 					last_addr += 2;
