@@ -32,7 +32,9 @@ Load selected rom into memory and start
 
  // TODO: It is likely a directory may contain thousands of files
  // Modify the ls function to only buffer a portion of files (up to some MAX)
-char g_fileEntries[256][256];
+ #define FILE_ENTRIES_BUFFER_SIZE 256
+ #define FILE_NAME_MAX_LENGTH 256
+char** g_fileEntries; // Buffer for file entries
 int NUM_ENTRIES = 21;
 bool g_sendingSelectedRom = false;
 
@@ -157,6 +159,12 @@ static void draw_bottom_bar(display_context_t display) {
     graphics_draw_sprite_trans(display, MARGIN_PADDING, BOTTOM_BAR_Y, a_button_icon);
     graphics_draw_text(display, MARGIN_PADDING + 32, BOTTOM_BAR_Y + BOTTOM_BAR_HEIGHT/2 - 4, "Load ROM");
 }
+/*
+GoldenEye 007 (U) [!].z64 [size=12582912]
+Super Mario 64 (U) [!].z64 [size=8388608]
+Doom 64 (USA) (Rev 1).z64 [size=8388608]
+Mario Tennis (USA).z64 [size=16777216]
+*/
 
 int ls(const char *dir) {
     FRESULT fr; /* Return value */
@@ -193,6 +201,7 @@ int ls(const char *dir) {
          attributes string. */
 
         printf("%s [%s] [size=%llu]\n", fno.fname, pcAttrib, fno.fsize);
+        g_fileEntries[num_entries] = malloc(sizeof(char*) * FILE_NAME_MAX_LENGTH);
 		sprintf(g_fileEntries[num_entries++], "%s [size=%llu]\n", fno.fname, fno.fsize);
 
         fr = f_findnext(&dj, &fno); /* Search for next item */
@@ -210,7 +219,10 @@ int ls(const char *dir) {
 static void show_list(void) {    
 
     // Fetch the root contents
+    g_fileEntries = malloc(sizeof(char*) * FILE_ENTRIES_BUFFER_SIZE); // alloc the buffer
 	NUM_ENTRIES = ls("/");
+
+    waitForStart();
 
     display_init(RESOLUTION_512x240, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE);
 

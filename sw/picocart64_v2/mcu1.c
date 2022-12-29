@@ -70,7 +70,7 @@ static const gpio_config_t mcu1_gpio_config[] = {
     // PIN_MCU2_SCK        (27) // MCU2 GPIO pin 26: PIN_SPI1_SCK
     // PIN_MCU2_CS         (28) // MCU2 GPIO pin 29: PIN_SPI1_CS
     // PIN_MCU2_DIO        (29) // MCU2 GPIO pin 28: PIN_SPI1_RX
-	{PIN_MCU2_SCK, GPIO_IN, true, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
+	// {PIN_MCU2_SCK, GPIO_IN, true, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO},
 	// {PIN_MCU2_SCK, GPIO_OUT, true, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO1}, // used when spi master
 	{PIN_MCU2_CS, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO1},
 	// {PIN_MCU2_CS, GPIO_OUT, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_UART},	// UART for now
@@ -155,7 +155,7 @@ void process_log_buffer() {
 
 uint32_t last_rom_cache_update_address = 0;
 void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
-	// pio_uart_init(PIN_MCU2_DIO, PIN_MCU2_CS);
+	pio_uart_init(PIN_MCU2_DIO, PIN_MCU2_CS);
 
 	printf("MCU1 core1 booted!\n");
 	
@@ -258,7 +258,7 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 		// 	}
 		// }
 
-		process_log_buffer();
+		// process_log_buffer();
 
 		if (readingData) {
 			// Process anything that might be on the uart buffer
@@ -410,7 +410,7 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 
 	// Enable STDIO
 	// stdio_async_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
-	stdio_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
+	// stdio_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
 
 	printf("\n\nMCU1: Was%s able to set clock to %d MHz\n", clockWasSet ? "" : " not", freq_khz/1000);
 

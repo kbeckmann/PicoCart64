@@ -157,9 +157,15 @@ void main_task_entry(__unused void *params)
 	vTaskDelay(100);
 	printf("Booting MCU1...\n");
 	gpio_put(PIN_MCU1_RUN, 1);
-	
+
+	printf("Mounting SD Card...");
+	mount_sd();
+	printf("Finished!\n");
+
 	// Setup PIO UART
-	// pio_uart_init(PIN_SPI1_CS, PIN_SPI1_RX);
+	printf("Initing MCU1<->MCU2 serial bridge...");
+	pio_uart_init(PIN_SPI1_CS, PIN_SPI1_RX);
+	printf("Finshed!\n");
 	// printf("pio uart inited\n");
 
 	volatile uint32_t t = 0;
