@@ -60,7 +60,7 @@ int g_currentPage = 0; // variable for file list pagination
 
 // Some arrays for testing layout while using the emulator
 // Thumbnails need to be cached for snappier menu feel
-#if BUILD_FOR_EMULATOR 1
+#if BUILD_FOR_EMULATOR == 1
 /**/
 char* g_thumbnail_table[] = {
     "goldeneye.sprite", 
@@ -87,7 +87,7 @@ char* g_fileInfo[] = {
 // TODO implement a more generic implementation of the file info stuff
 #endif
 
-int NUM_ENTRIES = 21;
+int NUM_ENTRIES = 0;
 bool g_sendingSelectedRom = false;
 
 /* Layout */
