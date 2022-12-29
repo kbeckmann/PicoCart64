@@ -25,6 +25,25 @@ Make the more files above/below indicator a sprite or something besides '...'
 Figure out why it feels laggy? The example code feels the same way, not sure it runs at full speed in the emulator
 Load entries from an SD card
 Load selected rom into memory and start
+
+Discussion about what the menu feature set::
+**Must haves**
+1. Support for over 1k files per dir. 
+2. Fast browsing skip to next set of alpha ordered letter. 
+3. Title scrolling for long names. 
+4. Select save type, select cic type or auto detect. 
+5. Title images. 
+
+**Should have**
+1. Animation for the selector. 
+2. Splash screen.
+
+**Could have**
+1. Title video. 
+2. Cheat support 
+3. Inplace byteswap. 
+4. Save game revisions.
+
 */
 
 #define SCREEN_WIDTH 512
@@ -40,6 +59,8 @@ sprite_t** g_thumbnail_cache;
 int g_currentPage = 0; // variable for file list pagination
 
 // Some arrays for testing layout while using the emulator
+// Thumbnails need to be cached for snappier menu feel
+#if BUILD_FOR_EMULATOR 1
 /**/
 char* g_thumbnail_table[] = {
     "goldeneye.sprite", 
@@ -62,6 +83,9 @@ char* g_fileInfo[] = {
     "Super Mario 64"  
 };
 /**/
+#else
+// TODO implement a more generic implementation of the file info stuff
+#endif
 
 int NUM_ENTRIES = 21;
 bool g_sendingSelectedRom = false;
@@ -78,7 +102,7 @@ bool g_sendingSelectedRom = false;
 #define BOTTOM_BAR_HEIGHT (32)
 #define BOTTOM_BAR_Y (SCREEN_HEIGHT - BOTTOM_BAR_HEIGHT)
 
-// Sprites
+// Menu sprites
 sprite_t *a_button_icon;
 
 /* Colors */
@@ -294,6 +318,7 @@ static void show_list(void) {
 
     // Fetch the root contents
     g_fileEntries = malloc(sizeof(char*) * FILE_ENTRIES_BUFFER_SIZE); // alloc the buffer
+    // TODO alloc any other buffers here as well
 	NUM_ENTRIES = ls("/");
 
     // display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
@@ -344,6 +369,10 @@ static void show_list(void) {
 		} else if (keys.c[0].A) {
             // Load the selected from
             loadRomAtSelection(currently_selected);
+        } else if (keys.c[0].right) {
+            // page forward
+        } else if (keys.c[0].left) {
+            // page backward
         }
 
 		if ((mag > 0 && currently_selected + mag < NUM_ENTRIES) || (mag < 0 && currently_selected > 0)) {
