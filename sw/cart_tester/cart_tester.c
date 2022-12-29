@@ -11,6 +11,8 @@
 #include "cart_tester_pins.h"
 #include "cart_tester.h"
 
+#define DEBUG_PRINT_RAW_READ_DATA 0
+
 #define LATCH_DELAY_MULTIPLYER 1
 #define LATCH_DELAY_US 4 * LATCH_DELAY_MULTIPLYER // Used for reads
 #define LATCH_DELAY_NS (110 / 7) * LATCH_DELAY_MULTIPLYER // Used for sending addresses. 133mhz is 7.5NS, let's just use int math though
@@ -25,7 +27,7 @@ void set_ad_input() {
     for(int i = 0; i < 16; i++) {
         gpio_init(i);
         gpio_set_dir(i, GPIO_IN);
-        gpio_set_pulls(i, false, true);
+        // gpio_set_pulls(i, false, true);
     }
 }
 
@@ -33,7 +35,7 @@ void set_ad_output() {
     for(int i = 0; i < 16; i++) {
         gpio_init(i);
         gpio_set_dir(i, GPIO_OUT);
-        gpio_set_pulls(i, false, true);
+        // gpio_set_pulls(i, false, true);
     }
 }
 
@@ -46,28 +48,33 @@ void dump_rom_test() {
 
     // Start sending addresses and getting data
     gpio_put(N64_COLD_RESET, true);
-    
+
+    uint32_t buf_start_address = CART_ADDRESS_START;    
     uint32_t address = CART_ADDRESS_START; // Starting address
+    int addressIncrement = 2;
     while(1) {
         gpio_put(PICO_DEFAULT_LED_PIN, true);
         
-        printf("\nSTART SEND ADDRESS\n");
-        sleep_ms(30);
+        // printf("\nSTART SEND ADDRESS\n");
+        // sleep_ms(30);
 
         // Send address, sends high 16 for LATCH_DELAY_US, sends low 16
         send_address(address);
         
         // Read data
-        uint16_t data = start_read();
+        // volatile uint32_t data = read32();
+        volatile uint16_t data = read16();
 
         // Make sure that the cart is held in a waiting patter until we verify the data
         gpio_put(N64_READ, true);
         gpio_put(N64_ALEH, true);
         gpio_put(N64_ALEL, true);
 
-        verify_data(data, address);
+        // verify_data(data, address);
+        // printf("[%08x] %08x\n", address, data);
+        printf("[%08x] %04x\n", address, data);
         
-        address += 2; // increment address by 2 bytes
+        address += addressIncrement; // increment address by 2 bytes
 
         // Delay to make sure USB prints all the data. If it goes too fast sometimes it won't print properly.
         sleep_ms(100);
@@ -199,8 +206,8 @@ void main() {
     }
 
     gpio_put(PICO_DEFAULT_LED_PIN, true);
-    sleep_ms(100);
     printf("\n\nSetting up cart tester\n");
+    sleep_ms(500);
 
     // setup data/address lines
     for (int i = 0; i < 16; i++) {
@@ -284,38 +291,61 @@ void send_address(uint32_t address) {
     gpio_clr_mask(address_pin_mask);
 }
 
-uint16_t start_read() {
+uint32_t read32() {
     
-    printf("START READ\n");
+    // printf("START READ\n");
     // Set to input
     set_ad_input();
 
     gpio_put(N64_READ, false);
-    sleep_us(LATCH_DELAY_US);
+    sleep_us(310 / 7);
 
     // sample gpio for high16
     uint32_t high16 = gpio_get_all();
-    // while(1) {
-    //     tight_loop_contents();
-    //     uint16_t word = (uint16_t)gpio_get_all();
-    //     if (word != 0) {
-    //         printf("Data received %04x\n", word);
-    //         break;
-    //     }
-    // }
 
-    // Finished reading
-    gpio_put(N64_READ, true);
+    // Pulse the read pin
     busy_wait_at_least_cycles(LATCH_DELAY_NS);
+    gpio_put(N64_READ, true);    
+    gpio_put(N64_READ, false);
 
-    printf("%04x\n", (uint16_t)high16);
+    // Grab the next 16bits
+    uint32_t low16 = gpio_get_all();
+
+    #if DEBUG_PRINT_RAW_READ_DATA == 1
+    printf("%04x %04x\n", (uint16_t)high16, (uint16_t)low16);
+    #endif
 
     set_ad_output();
 
     // return the value
-    return (uint16_t)high16;
+    return ((high16 & 0xFFFF) << 16) | (low16 & 0xFFFF);
 }
 
-void verify_data(uint16_t data, uint32_t address) {
-    printf("[%08x] %04x\n");
+uint16_t read16() {
+    // Set to input
+    set_ad_input();
+
+    gpio_put(N64_READ, false);
+    sleep_us(310 / 7);
+
+    // sample gpio for high16
+    uint16_t high16 = (uint16_t)gpio_get_all();
+
+    // Pulse the read pin
+    busy_wait_at_least_cycles(LATCH_DELAY_NS);
+    gpio_put(N64_READ, true);    
+
+    #if DEBUG_PRINT_RAW_READ_DATA == 1
+    printf("%04x\n", (uint16_t)high16);
+    #endif
+
+    // Set AD pins back to output
+    set_ad_output();
+
+    // return the value
+    return high16;
+}
+
+void verify_data(uint32_t data, uint32_t address) {
+    printf("[%08x] %08x\n", address, data);
 }

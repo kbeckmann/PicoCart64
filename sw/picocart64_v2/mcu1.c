@@ -393,8 +393,8 @@ void boardTest() {
 void __no_inline_not_in_flash_func(mcu1_main)(void)
 {
 	int count = 0;
-	// const int freq_khz = 133000;
-	const int freq_khz = 166000;
+	const int freq_khz = 133000;
+	// const int freq_khz = 166000;
 	// const int freq_khz = 200000;
 	// const int freq_khz = 210000;
 	// const int freq_khz = 220000;
