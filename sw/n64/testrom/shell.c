@@ -27,7 +27,7 @@ Load entries from an SD card
 Load selected rom into memory and start
 */
 
-#define SCREEN_WIDTH 512
+#define SCREEN_WIDTH 320
 #define SCREEN_HEIGHT 240
 
  // TODO: It is likely a directory may contain thousands of files
@@ -35,6 +35,15 @@ Load selected rom into memory and start
  #define FILE_ENTRIES_BUFFER_SIZE 256
  #define FILE_NAME_MAX_LENGTH 256
 char** g_fileEntries; // Buffer for file entries
+char* g_thumbnail_table[] = {
+    //"goldeneye.sprite", 
+    "007_boxart.sprite",
+    "doom.sprite", 
+    "mario_tennis.sprite", 
+    "mario64.sprite"
+};
+sprite_t** g_thumbnail_cache;
+
 int NUM_ENTRIES = 21;
 bool g_sendingSelectedRom = false;
 
@@ -145,6 +154,13 @@ static void render_list(display_context_t display, char **list, int currently_se
 	}
 }
 
+static void render_info_panel(display_context_t display, int currently_selected) {
+    // int x = SCREEN_WIDTH - 128, y = MENU_BAR_HEIGHT;
+    int x = 0, y = MENU_BAR_HEIGHT;
+    
+    graphics_draw_sprite(display, x, y, g_thumbnail_cache[currently_selected]);
+}
+
 static void draw_header_bar(display_context_t display, int fileCount) {
     int x = 0, y = 0, width = SCREEN_WIDTH, height = MENU_BAR_HEIGHT;
     graphics_draw_box(display, x, y, width, height, graphics_convert_color(MENU_BAR_COLOR));
@@ -159,13 +175,21 @@ static void draw_bottom_bar(display_context_t display) {
     graphics_draw_sprite_trans(display, MARGIN_PADDING, BOTTOM_BAR_Y, a_button_icon);
     graphics_draw_text(display, MARGIN_PADDING + 32, BOTTOM_BAR_Y + BOTTOM_BAR_HEIGHT/2 - 4, "Load ROM");
 }
-/*
-GoldenEye 007 (U) [!].z64 [size=12582912]
-Super Mario 64 (U) [!].z64 [size=8388608]
-Doom 64 (USA) (Rev 1).z64 [size=8388608]
-Mario Tennis (USA).z64 [size=16777216]
-*/
 
+#if BUILD_FOR_EMULATOR == 1
+
+int ls(const char *dir) {
+
+    int num_entries = 0;
+    g_fileEntries[num_entries++] = "GoldenEye 007 (U) [!].z64 [size=12582912]";
+    g_fileEntries[num_entries++] = "Doom 64 (USA) (Rev 1).z64 [size=8388608]";
+    g_fileEntries[num_entries++] = "Mario Tennis (USA).z64 [size=16777216]";
+    g_fileEntries[num_entries++] = "Super Mario 64 (U) [!].z64 [size=8388608]";
+
+    return num_entries;
+}
+
+#else
 int ls(const char *dir) {
     FRESULT fr; /* Return value */
     char const *p_dir = dir;
@@ -200,6 +224,8 @@ int ls(const char *dir) {
         /* Create a string that includes the file name, the file size and the
          attributes string. */
 
+        if (fno.fname)
+
         printf("%s [%s] [size=%llu]\n", fno.fname, pcAttrib, fno.fsize);
         g_fileEntries[num_entries] = malloc(sizeof(char*) * FILE_NAME_MAX_LENGTH);
 		sprintf(g_fileEntries[num_entries++], "%s [size=%llu]\n", fno.fname, fno.fsize);
@@ -212,6 +238,7 @@ int ls(const char *dir) {
 
 	return num_entries;
 }
+#endif
 
 /*
  * Init display and controller input then render a list of strings, showing currently selected
@@ -224,7 +251,9 @@ static void show_list(void) {
 
     waitForStart();
 
+    // display_init(RESOLUTION_320x240, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE);
     display_init(RESOLUTION_512x240, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE);
+    // display_init(RESOLUTION_512x480, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE); //Jumpy and janky, do not use
 
     char debugTextBuffer[100];
 	int currently_selected = 0;
@@ -243,7 +272,10 @@ static void show_list(void) {
 		draw_header_bar(display, NUM_ENTRIES);
 
 		/* Render the list of file */
-		render_list(display, g_fileEntries, currently_selected, first_visible, max_on_screen);
+		//render_list(display, g_fileEntries, currently_selected, first_visible, max_on_screen);
+
+        /* Render info about the currently selected rom including box art */
+        render_info_panel(display, currently_selected);
 
 		/* Grab controller input and move the selection up or down */
 		controller_scan();
@@ -278,15 +310,123 @@ static void show_list(void) {
     }
 }
 
+typedef struct
+{
+    uint32_t type;
+    char filename[MAX_FILENAME_LEN+1];
+} direntry_t;
+
+char dir[512] = "rom://";
+
+direntry_t *populate_dir(int *count)
+{
+    /* Grab a slot */
+    direntry_t *list = malloc(sizeof(direntry_t));
+    *count = 1;
+
+    /* Grab first */
+    dir_t buf;
+    int ret = dir_findfirst(dir, &buf);
+
+    if( ret != 0 ) 
+    {
+        /* Free stuff */
+        free(list);
+        *count = 0;
+
+        /* Dir was bad! */
+        return 0;
+    }
+
+    /* Copy in loop */
+    while( ret == 0 )
+    {
+        list[(*count)-1].type = buf.d_type;
+        strcpy(list[(*count)-1].filename, buf.d_name);
+
+        printf("%s\n", list[(*count)-1].filename);
+
+        /* Grab next */
+        ret = dir_findnext(dir,&buf);
+
+        if( ret == 0 )
+        {
+            (*count)++;
+            list = realloc(list, sizeof(direntry_t) * (*count));
+        }
+    }
+
+    // if(*count > 0)
+    // {
+    //     /* Should sort! */
+    //     qsort(list, *count, sizeof(direntry_t), compare);
+    // }
+
+    return list;
+}
+
+int filesize( FILE *pFile )
+{
+    fseek( pFile, 0, SEEK_END );
+    int lSize = ftell( pFile );
+    rewind( pFile );
+
+    return lSize;
+}
+
+sprite_t *read_sprite( const char * const spritename )
+{
+    FILE *fp = dfs_open(spritename);
+
+    if( fp )
+    {
+        sprite_t *sp = malloc( dfs_size( fp ) );
+        printf("height: %d, width: %d\n", sp->height, sp->width);
+        dfs_read( sp, 1, dfs_size( fp ), fp );
+        dfs_close( fp );
+
+        return sp;
+    }
+    else
+    {
+        printf("Missing FP[%d] for file %s\n", fp, spritename);
+        return 0;
+    }
+}
+
 static void init_sprites(void) {
+    // int count = 0;
+    // populate_dir(&count);
+
     printf("init sprites\n");
-    int fp = dfs_open("/a_button_icon.sprite");
+    int fp = dfs_open("/a-button-icon.png");
     a_button_icon = malloc( dfs_size( fp ) );
     dfs_read( a_button_icon, 1, dfs_size( fp ), fp );
     dfs_close( fp );
-    printf("done!\n");
 
     //api_write_raw_button_icon = read_sprite( "rom://a_button_icon.sprite" );
+
+    g_thumbnail_cache = malloc(sizeof(sprite_t*) * 4); // alloc the buffer
+
+    #if BUILD_FOR_EMULATOR == 1
+    int thumbnailCount = sizeof(g_thumbnail_table) / sizeof(*g_thumbnail_table);
+    for(int i = 0; i < thumbnailCount; i++) {
+        // fp = dfs_open(g_thumbnail_table[i]);
+        // printf("%s opened? %d\n", g_thumbnail_table[i], fp);
+
+        // sprite_t* sprite = malloc( dfs_size( fp ) );
+        // dfs_read(sprite, 1, dfs_size(fp), fp);
+        // g_thumbnail_cache[i] = sprite;
+
+        // dfs_close( fp );
+
+        printf("Loading thumbnail: %s\n", g_thumbnail_table[i]);
+        g_thumbnail_cache[i] = read_sprite(g_thumbnail_table[i]);
+        // printf("height: %d, width: %d\n", g_thumbnail_cache[i]->height, g_thumbnail_cache[i]->width);
+    }
+    #endif
+
+    printf("done!\n");
 }
 
 void start_shell(void) {
@@ -295,6 +435,25 @@ void start_shell(void) {
     // display_init(RESOLUTION_512x480, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE); // jitters in cen64
     controller_init();
     
+    #if BUILD_FOR_EMULATOR == 1
+
+    int ret = dfs_init(DFS_DEFAULT_LOCATION);
+    if (ret != DFS_ESUCCESS) {
+        printf("Unable to init filesystem. ret: %d\n", ret);
+		printf("git rev %08x\n", GIT_REV);
+
+        waitForStart();
+    }
+
+    /* Load sprites for shell from the filesystem */
+    init_sprites();
+    waitForStart();
+
+    /* Starts the shell by rendering the list of files from the SD card*/
+    show_list();
+
+    #else
+
     int ret = dfs_init(DFS_DEFAULT_LOCATION);
     if (ret != DFS_ESUCCESS) {
         printf("Unable to init filesystem. ret: %d\n", ret);
@@ -343,4 +502,5 @@ void start_shell(void) {
         /* Starts the shell by rendering the list of files from the SD card*/
         show_list();
     }
+    #endif
 }

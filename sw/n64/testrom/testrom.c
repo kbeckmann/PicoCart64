@@ -45,17 +45,6 @@ static uint8_t pc64_sd_wait() {
     return 0;
 }
 
-// void test_sector_count_send(uint32_t sectorCount) {
-// 	//pc_write(PC64_CIBASE_ADDRESS_START + PC64_REGISTER_SD_READ_NUM_SECTORS, 1);
-// 	uint32_t buf2[] = { sectorCount };
-// 	data_cache_hit_writeback_invalidate(buf2, sizeof(buf2));
-// 	pi_write_raw(buf2, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_READ_NUM_SECTORS, sizeof(buf2));
-
-// 	//uint32_t buf[] = { value };
-// 	// data_cache_hit_writeback_invalidate(buf, sizeof(buf));
-// 	// pi_write_raw(buf, base, offset, sizeof(buf));
-// }
-
 uint32_t SECTOR_READ_SIZE = 512;
 void test_tx_buffer_read(uint8_t *buff, uint64_t sector, uint32_t dmaReadSize) {
 
@@ -196,6 +185,11 @@ void test_sd_read_reg() {
 
 int main(void)
 {
+
+	//#if BUILD_FOR_EMULATOR == 1
+	//start_shell();
+	//#else
+
 	uint32_t *facit_buf32 = (uint32_t *) facit_buf;
 	uint32_t *read_buf32 = (uint32_t *) read_buf;
 	uint16_t *read_buf16 = (uint16_t *) read_buf;
@@ -210,6 +204,7 @@ int main(void)
 
 	printf("PicoCart64 Test ROM (git rev %08X)\n\n", GIT_REV);
 
+#if BUILD_FOR_EMULATOR == 0
 	///////////////////////////////////////////////////////////////////////////
 
 	// Verify PicoCart64 Magic
@@ -343,6 +338,10 @@ int main(void)
     //         break;
     //     }
     // }
+
+	#else
+	printf("Running on emulator... Skipping picocart tests.\n");
+	#endif
     
     /* Start the shell if the user presses start */
     printf("\n\nPress START to continue to the shell...\n");
@@ -356,4 +355,5 @@ int main(void)
     
     
     start_shell();
+	//#endif
 }
