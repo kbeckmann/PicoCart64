@@ -339,11 +339,7 @@ int main(void)
     //     }
     // }
 
-	#else
-	printf("Running on emulator... Skipping picocart tests.\n");
-	#endif
-    
-    /* Start the shell if the user presses start */
+	/* Start the shell if the user presses start */
     printf("\n\nPress START to continue to the shell...\n");
 	while (true) {
         controller_scan();
@@ -352,7 +348,10 @@ int main(void)
             break;
         }
     }
-    
+
+	#else
+	printf("Running on emulator... Skipping picocart tests.\n");
+	#endif
     
     start_shell();
 	//#endif

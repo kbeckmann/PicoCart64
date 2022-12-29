@@ -27,34 +27,56 @@ Load entries from an SD card
 Load selected rom into memory and start
 */
 
-#define SCREEN_WIDTH 320
+#define SCREEN_WIDTH 512
 #define SCREEN_HEIGHT 240
+#define COLOR_TRANSPARENCY_ENABLED 0
 
  // TODO: It is likely a directory may contain thousands of files
  // Modify the ls function to only buffer a portion of files (up to some MAX)
  #define FILE_ENTRIES_BUFFER_SIZE 256
  #define FILE_NAME_MAX_LENGTH 256
 char** g_fileEntries; // Buffer for file entries
+sprite_t** g_thumbnail_cache;
+int g_currentPage = 0; // variable for file list pagination
+
+// Some arrays for testing layout while using the emulator
+/**/
 char* g_thumbnail_table[] = {
-    //"goldeneye.sprite", 
-    "007_boxart.sprite",
+    "goldeneye.sprite", 
     "doom.sprite", 
     "mario_tennis.sprite", 
     "mario64.sprite"
 };
-sprite_t** g_thumbnail_cache;
+
+int g_fileSizes[] = {
+    12582912,
+    8388608,
+    16777216,
+    8388608  
+};
+
+char* g_fileInfo[] = {
+    "Goldeneye 007",
+    "DOOM 64",
+    "Mario Tennis",
+    "Super Mario 64"  
+};
+/**/
 
 int NUM_ENTRIES = 21;
 bool g_sendingSelectedRom = false;
 
 /* Layout */
-const int ROW_HEIGHT = 12;
-const int MARGIN_PADDING = 20;
-const int ROW_SELECTION_WIDTH = SCREEN_WIDTH;
-const int MENU_BAR_HEIGHT = 15;
-const int LIST_TOP_PADDING = MENU_BAR_HEIGHT + ROW_HEIGHT;
-const int BOTTOM_BAR_HEIGHT = 32;
-const int BOTTOM_BAR_Y = SCREEN_HEIGHT - BOTTOM_BAR_HEIGHT;
+#define INFO_PANEL_WIDTH (192 + (MARGIN_PADDING * 2)) // NEEDS PARENS!!! Seems the compiler doesn't evaluate the define before using it for other defines
+#define FILE_PANEL_WIDTH (SCREEN_WIDTH - INFO_PANEL_WIDTH)
+
+#define ROW_HEIGHT (12)
+#define MARGIN_PADDING (10)
+#define ROW_SELECTION_WIDTH (FILE_PANEL_WIDTH)
+#define MENU_BAR_HEIGHT (15)
+#define LIST_TOP_PADDING (MENU_BAR_HEIGHT + ROW_HEIGHT)
+#define BOTTOM_BAR_HEIGHT (32)
+#define BOTTOM_BAR_Y (SCREEN_HEIGHT - BOTTOM_BAR_HEIGHT)
 
 // Sprites
 sprite_t *a_button_icon;
@@ -136,10 +158,10 @@ static void render_list(display_context_t display, char **list, int currently_se
 			graphics_draw_box(display, 0, y - 2, ROW_SELECTION_WIDTH, 10, graphics_convert_color(SELECTION_COLOR));
 
 			/* Now render selection caret */
-			graphics_draw_text(display, MARGIN_PADDING / 2, y, "  >");
+			// graphics_draw_text(display, MARGIN_PADDING / 2, y, "  >");
 
 			/* Increase Margin Padding to account for added caret width */
-			x += MARGIN_PADDING;
+			// x += MARGIN_PADDING;
 		} else {
 			x += MARGIN_PADDING;
 		}
@@ -152,13 +174,32 @@ static void render_list(display_context_t display, char **list, int currently_se
 			graphics_draw_text(display, MARGIN_PADDING, y + 10, "...");
 		}
 	}
+
+    int x0 = FILE_PANEL_WIDTH-1, y0 = MENU_BAR_HEIGHT, x1 = FILE_PANEL_WIDTH-1, y1 = SCREEN_HEIGHT;
+    graphics_draw_line(display, x0, y0, x1, y1, graphics_convert_color(SELECTION_COLOR));
+    graphics_draw_line(display, x0+1, y0, x1+1, y1, graphics_convert_color(BOTTOM_BAR_COLOR));
 }
 
 static void render_info_panel(display_context_t display, int currently_selected) {
-    // int x = SCREEN_WIDTH - 128, y = MENU_BAR_HEIGHT;
-    int x = 0, y = MENU_BAR_HEIGHT;
+    /*
+    Discussion about things to display:
+    It would be great to also see the config. Eeprom type/size. The byte order of the rom, ipl checksums, crc hash,
+    */
+    int x = FILE_PANEL_WIDTH + MARGIN_PADDING, y = MENU_BAR_HEIGHT + MARGIN_PADDING;
     
     graphics_draw_sprite(display, x, y, g_thumbnail_cache[currently_selected]);
+
+    // Something might be wrong with this... Probably should use a global buffer and avoid creating new objects every time
+    //y += 192
+    // char buf[100];
+    // sprintf(buf, "%s\nSize: %dM", g_fileInfo[currently_selected], g_fileSizes[currently_selected] / 1024 / 1024);
+    // graphics_draw_text(display, x, 192, buf);
+    
+    // Display the currently selected rom info
+    graphics_draw_text(display, x, 100, "Goldeneye 007\nSize: 12M\nUSA\nReleased 1997");
+
+    /* Draw bottom menu bar for the info panel */
+    graphics_draw_box(display, x - MARGIN_PADDING, BOTTOM_BAR_Y, INFO_PANEL_WIDTH, BOTTOM_BAR_HEIGHT, graphics_convert_color(MENU_BAR_COLOR));
 }
 
 static void draw_header_bar(display_context_t display, int fileCount) {
@@ -171,7 +212,13 @@ static void draw_header_bar(display_context_t display, int fileCount) {
 }
 
 static void draw_bottom_bar(display_context_t display) {
-    graphics_draw_box_trans(display, 0, BOTTOM_BAR_Y, SCREEN_WIDTH, BOTTOM_BAR_HEIGHT, graphics_convert_color(BOTTOM_BAR_COLOR));
+    // NOTE: Transparency only works if color mode is set to 32bit
+    #if COLOR_TRANSPARENCY_ENABLED == 1
+    graphics_draw_box_trans(display, 0, BOTTOM_BAR_Y, SCREEN_WIDTH - INFO_PANEL_WIDTH, BOTTOM_BAR_HEIGHT, graphics_convert_color(BOTTOM_BAR_COLOR));
+    #else
+    graphics_draw_box(display, 0, BOTTOM_BAR_Y, SCREEN_WIDTH - INFO_PANEL_WIDTH, BOTTOM_BAR_HEIGHT, graphics_convert_color(BOTTOM_BAR_COLOR));
+    #endif
+    
     graphics_draw_sprite_trans(display, MARGIN_PADDING, BOTTOM_BAR_Y, a_button_icon);
     graphics_draw_text(display, MARGIN_PADDING + 32, BOTTOM_BAR_Y + BOTTOM_BAR_HEIGHT/2 - 4, "Load ROM");
 }
@@ -181,10 +228,10 @@ static void draw_bottom_bar(display_context_t display) {
 int ls(const char *dir) {
 
     int num_entries = 0;
-    g_fileEntries[num_entries++] = "GoldenEye 007 (U) [!].z64 [size=12582912]";
-    g_fileEntries[num_entries++] = "Doom 64 (USA) (Rev 1).z64 [size=8388608]";
-    g_fileEntries[num_entries++] = "Mario Tennis (USA).z64 [size=16777216]";
-    g_fileEntries[num_entries++] = "Super Mario 64 (U) [!].z64 [size=8388608]";
+    g_fileEntries[num_entries++] = "GoldenEye 007 (U) [!].z64";
+    g_fileEntries[num_entries++] = "Doom 64 (USA) (Rev 1).z64";
+    g_fileEntries[num_entries++] = "Mario Tennis (USA).z64";
+    g_fileEntries[num_entries++] = "Super Mario 64 (U) [!].z64";
 
     return num_entries;
 }
@@ -249,10 +296,10 @@ static void show_list(void) {
     g_fileEntries = malloc(sizeof(char*) * FILE_ENTRIES_BUFFER_SIZE); // alloc the buffer
 	NUM_ENTRIES = ls("/");
 
-    waitForStart();
-
+    // display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
+    display_init(RESOLUTION_512x240, DEPTH_16_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
     // display_init(RESOLUTION_320x240, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE);
-    display_init(RESOLUTION_512x240, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE);
+    // display_init(RESOLUTION_512x240, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE);
     // display_init(RESOLUTION_512x480, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE); //Jumpy and janky, do not use
 
     char debugTextBuffer[100];
@@ -272,10 +319,19 @@ static void show_list(void) {
 		draw_header_bar(display, NUM_ENTRIES);
 
 		/* Render the list of file */
-		//render_list(display, g_fileEntries, currently_selected, first_visible, max_on_screen);
+		render_list(display, g_fileEntries, currently_selected, first_visible, max_on_screen);
 
         /* Render info about the currently selected rom including box art */
         render_info_panel(display, currently_selected);
+
+        /* A little debug text at the bottom of the screen */
+        //snprintf(debugTextBuffer, 100, "currently_selected=%d, first_visible=%d, max_per_page=%d", currently_selected, first_visible, max_on_screen);
+        //graphics_draw_text(display, 5, 230, debugTextBuffer);
+
+        draw_bottom_bar(display);
+
+        /* Force the backbuffer flip */
+        display_show(display);
 
 		/* Grab controller input and move the selection up or down */
 		controller_scan();
@@ -298,15 +354,6 @@ static void show_list(void) {
         if ((mag > 0 && currently_selected >= (first_visible + max_on_screen)) || (mag < 0 && currently_selected < first_visible && currently_selected >= 0)) {
             first_visible += mag;
         }
-
-        /* A little debug text at the bottom of the screen */
-        snprintf(debugTextBuffer, 100, "currently_selected=%d, first_visible=%d, max_per_page=%d", currently_selected, first_visible, max_on_screen);
-        graphics_draw_text(display, 5, 230, debugTextBuffer);
-
-        draw_bottom_bar(display);
-
-        /* Force the backbuffer flip */
-        display_show(display);
     }
 }
 
@@ -376,14 +423,18 @@ int filesize( FILE *pFile )
 
 sprite_t *read_sprite( const char * const spritename )
 {
-    FILE *fp = dfs_open(spritename);
+    //FILE *fp = fopen(spritename, "r");
+    int fp = dfs_open(spritename);
 
     if( fp )
     {
         sprite_t *sp = malloc( dfs_size( fp ) );
+        // fread( sp, 1, filesize( fp ), fp );
+        // fclose( fp );
+        dfs_read(sp, 1, dfs_size(fp), fp);
+        dfs_close(fp);
+
         printf("height: %d, width: %d\n", sp->height, sp->width);
-        dfs_read( sp, 1, dfs_size( fp ), fp );
-        dfs_close( fp );
 
         return sp;
     }
@@ -397,12 +448,13 @@ sprite_t *read_sprite( const char * const spritename )
 static void init_sprites(void) {
     // int count = 0;
     // populate_dir(&count);
-
     printf("init sprites\n");
-    int fp = dfs_open("/a-button-icon.png");
-    a_button_icon = malloc( dfs_size( fp ) );
-    dfs_read( a_button_icon, 1, dfs_size( fp ), fp );
-    dfs_close( fp );
+    // int fp = dfs_open("/a-button-icon.png");
+    // a_button_icon = malloc( dfs_size( fp ) );
+    // dfs_read( a_button_icon, 1, dfs_size( fp ), fp );
+    // dfs_close( fp );
+
+    a_button_icon = read_sprite("a-button-icon.sprite");
 
     //api_write_raw_button_icon = read_sprite( "rom://a_button_icon.sprite" );
 
@@ -436,6 +488,11 @@ void start_shell(void) {
     controller_init();
     
     #if BUILD_FOR_EMULATOR == 1
+    bool debuggingOutputEnabled = debug_init_isviewer();
+
+    if (!debuggingOutputEnabled) {
+        printf("Unable to enable isviewer support.\n");
+    }
 
     int ret = dfs_init(DFS_DEFAULT_LOCATION);
     if (ret != DFS_ESUCCESS) {
@@ -447,7 +504,6 @@ void start_shell(void) {
 
     /* Load sprites for shell from the filesystem */
     init_sprites();
-    waitForStart();
 
     /* Starts the shell by rendering the list of files from the SD card*/
     show_list();
