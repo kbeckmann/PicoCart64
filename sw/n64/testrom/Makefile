@@ -35,7 +35,8 @@ vpath %.c $(sort $(dir $(C_SOURCES)))
 ASFLAGS = -mtune=vr4300 -march=vr4300
 CFLAGS = -std=gnu99 -march=vr4300 -mtune=vr4300 -Wall $(C_INCLUDES)
 LDFLAGS = -L$(ROOTDIR)/mips64-elf/lib -ldragon -lc -lm -ldragonsys -Tn64.ld --gc-sections
-N64TOOLFLAGS = -l 1536K -h $(ROOTDIR)/mips64-elf/lib/header -t "PicoCart64 Test ROM"
+#N64TOOLFLAGS = -l 1536K -h $(ROOTDIR)/mips64-elf/lib/header -t "PicoCart64 Test ROM"
+N64TOOLFLAGS = -h $(ROOTDIR)/mips64-elf/lib/header -t "PicoCart64 Test ROM"
 
 all: $(BUILD_DIR)/$(PROG_NAME).z64
 

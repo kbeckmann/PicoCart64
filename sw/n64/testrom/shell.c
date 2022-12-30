@@ -52,8 +52,8 @@ Discussion about what the menu feature set::
 
  // TODO: It is likely a directory may contain thousands of files
  // Modify the ls function to only buffer a portion of files (up to some MAX)
- #define FILE_ENTRIES_BUFFER_SIZE 256
- #define FILE_NAME_MAX_LENGTH 256
+ #define FILE_ENTRIES_BUFFER_SIZE 5000
+ #define FILE_NAME_MAX_LENGTH (MAX_FILENAME_LEN+1)
 
 /*
  * Need some kind of lookup table or function that can find a thumbnail from a rom name, including the correct region version of the boxart
@@ -69,7 +69,7 @@ typedef struct {
      * Probably better to use that to match thumbnails and display the title
      */
     char filename[MAX_FILENAME_LEN+1];
-    char title[256];
+    char title[64];
     int filesize;
     sprite_t* boxart;
     // region?
@@ -91,7 +91,8 @@ int g_currentPage = 0; // variable for file list pagination
 #if BUILD_FOR_EMULATOR == 1
 /**/
 char* g_thumbnail_table[] = {
-    "goldeneye.sprite", 
+    // "goldeneye.sprite", 
+    "NGEJ.sprite",
     "doom.sprite", 
     "mario_tennis.sprite", 
     "mario64.sprite"
@@ -117,10 +118,13 @@ char* g_fileInfo[] = {
 
 int NUM_ENTRIES = 0;
 bool g_sendingSelectedRom = false;
+int g_lastSelection = -1;
+char g_infoPanelTextBuf[256];
 
 /* Layout */
 #define INFO_PANEL_WIDTH (192 + (MARGIN_PADDING * 2)) // NEEDS PARENS!!! Seems the compiler doesn't evaluate the define before using it for other defines
 #define FILE_PANEL_WIDTH (SCREEN_WIDTH - INFO_PANEL_WIDTH)
+#define MAX_BOXART_HEIGHT (192)
 
 #define ROW_HEIGHT (12)
 #define MARGIN_PADDING (10)
@@ -208,12 +212,6 @@ static void render_list(display_context_t display, char **list, int currently_se
 		if (currently_selected == row) {
 			/* Render selection box */
 			graphics_draw_box(display, 0, y - 2, ROW_SELECTION_WIDTH, 10, graphics_convert_color(SELECTION_COLOR));
-
-			/* Now render selection caret */
-			// graphics_draw_text(display, MARGIN_PADDING / 2, y, "  >");
-
-			/* Increase Margin Padding to account for added caret width */
-			// x += MARGIN_PADDING;
 		} else {
 			x += MARGIN_PADDING;
 		}
@@ -229,7 +227,7 @@ static void render_list(display_context_t display, char **list, int currently_se
 
     int x0 = FILE_PANEL_WIDTH-1, y0 = MENU_BAR_HEIGHT, x1 = FILE_PANEL_WIDTH-1, y1 = SCREEN_HEIGHT;
     graphics_draw_line(display, x0, y0, x1, y1, graphics_convert_color(SELECTION_COLOR));
-    graphics_draw_line(display, x0+1, y0, x1+1, y1, graphics_convert_color(BOTTOM_BAR_COLOR));
+    graphics_draw_line(display, x0+1, y0, x1+1, y1, graphics_convert_color(MENU_BAR_COLOR));
 }
 
 static void render_info_panel(display_context_t display, int currently_selected) {
@@ -238,17 +236,29 @@ static void render_info_panel(display_context_t display, int currently_selected)
     It would be great to also see the config. Eeprom type/size. The byte order of the rom, ipl checksums, crc hash,
     */
     int x = FILE_PANEL_WIDTH + MARGIN_PADDING, y = MENU_BAR_HEIGHT + MARGIN_PADDING;
-    
-    graphics_draw_sprite(display, x, y, g_thumbnail_cache[currently_selected]);
 
-    // Something might be wrong with this... Probably should use a global buffer and avoid creating new objects every time
-    //y += 192
-    // char buf[100];
-    // sprintf(buf, "%s\nSize: %dM", g_fileInfo[currently_selected], g_fileSizes[currently_selected] / 1024 / 1024);
-    // graphics_draw_text(display, x, 192, buf);
+    int offset = ((INFO_PANEL_WIDTH / 2) + (g_thumbnail_cache[currently_selected]->width / 2));
+    
+    graphics_draw_sprite(display, SCREEN_WIDTH - offset, y, g_thumbnail_cache[currently_selected]);
+
+    y += g_thumbnail_cache[currently_selected]->height + MARGIN_PADDING;
+
+    // Only update the text string if we have changed selection
+    if (currently_selected != g_lastSelection) {
+        memset(g_infoPanelTextBuf, 0, 256);
+
+        // TODO fetch info from rom header
+        // Something might be wrong with this... Probably should use a global buffer and avoid creating new objects every time
+        //sprintf(g_infoPanelTextBuf, "%s\nSize: %dM", g_fileInfo[currently_selected], g_fileSizes[currently_selected] / 1024 / 1024);
+        // TODO if part of the string is longer than the number of characters that can fit in in the info panel width, split or clip it
+        sprintf(g_infoPanelTextBuf, "Goldeneye 007\nSize: 12M\nUSA\nReleased 1997\n%d", currently_selected);
+
+        g_lastSelection = currently_selected;
+    }
     
     // Display the currently selected rom info
-    graphics_draw_text(display, x, 100, "Goldeneye 007\nSize: 12M\nUSA\nReleased 1997");
+    graphics_draw_text(display, x, y, g_infoPanelTextBuf);
+    // graphics_draw_text(display, x, y, "Goldeneye 007\nSize: 12M\nUSA\nReleased 1997");
 
     /* Draw bottom menu bar for the info panel */
     graphics_draw_box(display, x - MARGIN_PADDING, BOTTOM_BAR_Y, INFO_PANEL_WIDTH, BOTTOM_BAR_HEIGHT, graphics_convert_color(MENU_BAR_COLOR));
@@ -431,6 +441,7 @@ direntry_t *populate_dir(int *count)
     /* Grab first */
     dir_t buf;
     int ret = dir_findfirst(dir, &buf);
+    
 
     if( ret != 0 ) 
     {
@@ -502,6 +513,40 @@ sprite_t *read_sprite( const char * const spritename )
     }
 }
 
+/*
+ *
+ * Read a rom's header and find its serial number
+ * 
+ * Example usage:
+    char* serialNumber[4];
+    int success = read_rom_header_serial_number(serialNumber, "rom://goldeneye.z64");
+    if (success == 0) {
+        success!
+    } else if (success == -1) {
+        not a rom file
+    }
+ *
+ */
+int read_rom_header_serial_number(char* buf, char* filename) {
+    FILE* rom = fopen(filename, "r");
+    if (filesize(rom) < 0x40) {
+        return -1;
+    }
+
+    int r = fseek(rom, 0x3B, SEEK_SET);
+    if (r != 0) {
+        printf("Unable to seek rom file.\n");
+    }
+
+    int numRead = fread(buf, 1, 4, rom);
+    if (numRead == 0) {
+        printf("Unable to read rom file header serial number.\n");
+    }
+    fclose(rom);
+    
+    return 0;
+}
+
 static void init_sprites(void) {
     // int count = 0;
     // populate_dir(&count);
@@ -512,8 +557,6 @@ static void init_sprites(void) {
     // dfs_close( fp );
 
     a_button_icon = read_sprite("a-button-icon.sprite");
-
-    //api_write_raw_button_icon = read_sprite( "rom://a_button_icon.sprite" );
 
     g_thumbnail_cache = malloc(sizeof(sprite_t*) * 4); // alloc the buffer
 
@@ -536,6 +579,7 @@ static void init_sprites(void) {
     #endif
 
     printf("done!\n");
+    waitForStart();
 }
 
 void start_shell(void) {
