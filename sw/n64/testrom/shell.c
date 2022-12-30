@@ -54,6 +54,34 @@ Discussion about what the menu feature set::
  // Modify the ls function to only buffer a portion of files (up to some MAX)
  #define FILE_ENTRIES_BUFFER_SIZE 256
  #define FILE_NAME_MAX_LENGTH 256
+
+/*
+ * Need some kind of lookup table or function that can find a thumbnail from a rom name, including the correct region version of the boxart
+ * SD Card should contain
+ * firmware folder
+ *      thumbnails
+ *          system(e.g. N64)
+ *              thumbnail.png (Maybe use the serial number?) -- Rename the thumbnails by cross referencing the titles to the serial from the dat file
+ *          
+ */
+typedef struct {
+    /* Rom name can be extracted from the rom header at address 0x20 
+     * Probably better to use that to match thumbnails and display the title
+     */
+    char filename[MAX_FILENAME_LEN+1];
+    char title[256];
+    int filesize;
+    sprite_t* boxart;
+    // region?
+    // release year?
+    // eeprom type/size?
+    // byte order?
+    // ipl checksums?
+    // crc hash?
+} rom_file_info_t;
+
+rom_file_info_t** g_romFileInfoBuffer;
+
 char** g_fileEntries; // Buffer for file entries
 sprite_t** g_thumbnail_cache;
 int g_currentPage = 0; // variable for file list pagination
