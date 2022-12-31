@@ -530,6 +530,15 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 						// then sends the command, so we can do things like open directories
 						// and traverse the filesystem
 
+						// Data is written into the pc64 buffer like below
+						// pc64_uart_tx_buf[(last_addr & (sizeof(pc64_uart_tx_buf) - 1)) >> 1] = swap8(addr >> 16);
+						// and once the select rom command is sent, accompanined by a length (or we always write 256 chars...)
+						// we can pull that data out of the buffer and find the requested file.
+						// Set SD BUSY to true so the rom can poll on it while we load
+
+						// Once the rom has been written to the storage array (ram/flash) release the SD BUSY flag and the rom can
+						// do whatever magic it is, to load that rom. TODO: waiting for that magic in the discord.
+
 						break;
 
 					default:

@@ -151,15 +151,18 @@ void loadRomAtSelection(int selection) {
 
     char fileToLoad[256];
     strcpy(fileToLoad, g_fileEntries[selection]);
-    int strIndex = 0;
-    uint8_t valueToSend;
-    do {
-        valueToSend = fileToLoad[strIndex++];
-        data_cache_hit_writeback_invalidate(&valueToSend, sizeof(valueToSend));
-	    pi_write_raw(&valueToSend, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_SELECT_ROM, sizeof(valueToSend));
-    } while (valueToSend != NULL);
 
-    g_sendingSelectedRom = false;
+    // Write the file name to the cart buffer
+    uint32_t len_aligned32 = (strlen(fileToLoad) + 3) & (-4);
+	data_cache_hit_writeback_invalidate((uint8_t *) fileToLoad, len_aligned32);
+	pi_write_raw(fileToLoad, PC64_BASE_ADDRESS_START, 0, len_aligned32);
+
+    uint16_t sdSelectRomFilenameLength[] = { strlen(fileToLoad) };
+    data_cache_hit_writeback_invalidate(&sdSelectRomFilenameLength, sizeof(sdSelectRomFilenameLength));
+    // Send command to start the load, the cart will check the pc64 buffer for the filename 
+    pi_write_raw(&sdSelectRomFilenameLength, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_SELECT_ROM, sizeof(sdSelectRomFilenameLength));
+
+    g_isLoading = true;
 }
 
 void waitForStart() {
@@ -461,6 +464,11 @@ static void show_list(void) {
 
         if (g_isLoading) {
             animate_progress_spinner(display);
+        }
+
+        if (g_sendingSelectedRom) {
+            // check the busy register
+            
         }
 
         /* Force the backbuffer flip */
