@@ -120,6 +120,7 @@ int NUM_ENTRIES = 0;
 bool g_sendingSelectedRom = false;
 int g_lastSelection = -1;
 char g_infoPanelTextBuf[256];
+bool g_isLoading = false;
 
 /* Layout */
 #define INFO_PANEL_WIDTH (192 + (MARGIN_PADDING * 2)) // NEEDS PARENS!!! Seems the compiler doesn't evaluate the define before using it for other defines
@@ -136,11 +137,14 @@ char g_infoPanelTextBuf[256];
 
 // Menu sprites
 sprite_t *a_button_icon;
-
+sprite_t* spinner;
+sprite_t** animated_spinner;
 /* Colors */
 color_t MENU_BAR_COLOR = { .r = 0x82, .g = 0x00, .b = 0x2E, .a = 0x00 }; // 0x82002E, Berry
 color_t BOTTOM_BAR_COLOR = { .r = 0x00, .g = 0x67, .b = 0xC7, .a = 0x55 }; // 0x82002E, Berry
 color_t SELECTION_COLOR = { .r = 0x00, .g = 0x67, .b = 0xC7, .a = 0x00 }; // 0x0067C7, Bright Blue
+color_t LOADING_BOX_COLOR = { .r = 0x00, .g = 0x67, .b = 0xC7, .a = 0x00 }; // 0x0067C7, Bright Blue
+color_t WHITE_COLOR = { .r = 0xCC, .g = 0xCC, .b = 0xCC, .a = 0x00 }; // 0xCCCCCC, White
 
 void loadRomAtSelection(int selection) {
     g_sendingSelectedRom = true;
@@ -249,7 +253,7 @@ static void render_info_panel(display_context_t display, int currently_selected)
 
         // TODO fetch info from rom header
         // Something might be wrong with this... Probably should use a global buffer and avoid creating new objects every time
-        //sprintf(g_infoPanelTextBuf, "%s\nSize: %dM", g_fileInfo[currently_selected], g_fileSizes[currently_selected] / 1024 / 1024);
+        // sprintf(g_infoPanelTextBuf, "%s\nSize: %dM", g_fileInfo[currently_selected], g_fileSizes[currently_selected] / 1024 / 1024);
         // TODO if part of the string is longer than the number of characters that can fit in in the info panel width, split or clip it
         sprintf(g_infoPanelTextBuf, "Goldeneye 007\nSize: 12M\nUSA\nReleased 1997\n%d", currently_selected);
 
@@ -258,7 +262,6 @@ static void render_info_panel(display_context_t display, int currently_selected)
     
     // Display the currently selected rom info
     graphics_draw_text(display, x, y, g_infoPanelTextBuf);
-    // graphics_draw_text(display, x, y, "Goldeneye 007\nSize: 12M\nUSA\nReleased 1997");
 
     /* Draw bottom menu bar for the info panel */
     graphics_draw_box(display, x - MARGIN_PADDING, BOTTOM_BAR_Y, INFO_PANEL_WIDTH, BOTTOM_BAR_HEIGHT, graphics_convert_color(MENU_BAR_COLOR));
@@ -283,6 +286,62 @@ static void draw_bottom_bar(display_context_t display) {
     
     graphics_draw_sprite_trans(display, MARGIN_PADDING, BOTTOM_BAR_Y, a_button_icon);
     graphics_draw_text(display, MARGIN_PADDING + 32, BOTTOM_BAR_Y + BOTTOM_BAR_HEIGHT/2 - 4, "Load ROM");
+}
+
+// Attempt at an animated loading spinner. Works but the sprites are messed up.
+// Make different sprites or just use the "Loading..." text animation
+// static volatile int spinner_index = 5;
+// void animate_progress_spinner(display_context_t display) {
+//     sprite_t* spinner = animated_spinner[spinner_index];
+//     graphics_draw_sprite_trans(display, 256, 120, spinner);
+// }
+
+// static volatile bool spinner_forward = true;
+// void update_spinner( int ovfl ) {
+//     spinner_index += spinner_forward ? 1: -1;
+
+//     if (spinner_index >= 13) {
+//         spinner_forward = !spinner_forward;
+//         spinner_index = 12;
+//     } else if (spinner_index < 5) {
+//         spinner_forward = !spinner_forward;
+//         spinner_index = 5;
+//     }
+// }
+
+// Janky lol
+char* loadingText[] = { "Loading", "Loading.", "Loading..", "Loading..." };
+int loadingTextIndex = 0;
+const loadingBoxWidth = 128;
+const loadingBoxHeight = 32;
+void animate_progress_spinner(display_context_t display) {
+    // Border
+    graphics_draw_box(display, 
+        SCREEN_WIDTH / 2 - (loadingBoxWidth+4) / 2, 
+        SCREEN_HEIGHT / 2 - (loadingBoxHeight+4) / 2, 
+        loadingBoxWidth+4, 
+        loadingBoxHeight+4, 
+        graphics_convert_color(WHITE_COLOR)
+    );
+
+    // Actual box
+    graphics_draw_box(display, 
+        SCREEN_WIDTH / 2 - loadingBoxWidth / 2, 
+        SCREEN_HEIGHT / 2 - loadingBoxHeight / 2, 
+        loadingBoxWidth, 
+        loadingBoxHeight, 
+        graphics_convert_color(LOADING_BOX_COLOR)
+    );
+
+    // Text
+    graphics_draw_text(display, (SCREEN_WIDTH / 2) - (MARGIN_PADDING * 4), SCREEN_HEIGHT / 2, loadingText[loadingTextIndex]);    
+}
+
+void update_spinner( int ovfl ) {
+    loadingTextIndex++;
+    if (loadingTextIndex >= 4) {
+        loadingTextIndex = 0;
+    }
 }
 
 #if BUILD_FOR_EMULATOR == 1
@@ -361,6 +420,8 @@ static void show_list(void) {
 
     // display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
     display_init(RESOLUTION_512x240, DEPTH_16_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
+    // display_init(RESOLUTION_512x240, DEPTH_32_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
+
     // display_init(RESOLUTION_320x240, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE);
     // display_init(RESOLUTION_512x240, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE);
     // display_init(RESOLUTION_512x480, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE); //Jumpy and janky, do not use
@@ -369,8 +430,13 @@ static void show_list(void) {
 	int currently_selected = 0;
 	int first_visible = 0;
 	int max_on_screen = calculate_num_rows_per_page();
+
+    timer_init();
+    new_timer(TIMER_TICKS(1000000 / 10), TF_CONTINUOUS, update_spinner);
+
 	while (1) {
 		static display_context_t display = 0;
+        
 
 		/* Grab a render buffer */
 		while (!(display = display_lock())) ;
@@ -393,6 +459,10 @@ static void show_list(void) {
 
         draw_bottom_bar(display);
 
+        if (g_isLoading) {
+            animate_progress_spinner(display);
+        }
+
         /* Force the backbuffer flip */
         display_show(display);
 
@@ -409,8 +479,10 @@ static void show_list(void) {
             loadRomAtSelection(currently_selected);
         } else if (keys.c[0].right) {
             // page forward
+            //mag = max_on_screen; // TODO something more sophisticated than this, because we need to handle partial
         } else if (keys.c[0].left) {
             // page backward
+            //mag = -max_on_screen; // TODO something more sophisticated than this, because we need to handle partial
         }
 
 		if ((mag > 0 && currently_selected + mag < NUM_ENTRIES) || (mag < 0 && currently_selected > 0)) {
@@ -491,6 +563,7 @@ int filesize( FILE *pFile )
 
 sprite_t *read_sprite( const char * const spritename )
 {
+    printf("reading sprite %s", spritename);
     //FILE *fp = fopen(spritename, "r");
     int fp = dfs_open(spritename);
 
@@ -559,6 +632,14 @@ static void init_sprites(void) {
     a_button_icon = read_sprite("a-button-icon.sprite");
 
     g_thumbnail_cache = malloc(sizeof(sprite_t*) * 4); // alloc the buffer
+
+    // animated_spinner = malloc(sizeof(sprite_t*) * 13); // alloc space for the aniated spinner
+    // animated_spinner[0] = read_sprite("spinner.sprite");
+    // for (int i = 1; i < 13; i++) {
+    //     char* n[24];
+    //     sprintf(n, "spinner%d.sprite", i);
+    //     animated_spinner[i] = read_sprite(n);
+    // }
 
     #if BUILD_FOR_EMULATOR == 1
     int thumbnailCount = sizeof(g_thumbnail_table) / sizeof(*g_thumbnail_table);
