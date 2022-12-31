@@ -19,6 +19,8 @@
 #include "n64_defs.h"
 #include "pc64_utils.h"
 
+#include "rom_defs.h"
+
 /*
 TODO
 Make the more files above/below indicator a sprite or something besides '...'
@@ -165,6 +167,85 @@ void loadRomAtSelection(int selection) {
     g_isLoading = true;
 }
 
+static uint16_t pc64_sd_wait() {
+    uint16_t read_buf[] = { 1 };
+    
+    // returns 1 while sd card is busy
+    data_cache_hit_writeback_invalidate(read_buf, sizeof(read_buf));
+    pi_read_raw(read_buf, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_BUSY, sizeof(uint16_t));
+
+    // Return status
+    return read_buf[0];
+}
+
+int boot_cic = 2;
+// int boot_save = 0;
+void bootRom(display_context_t disp, int silent) {
+    if (boot_cic != 0)
+    {
+        // if (boot_save != 0)
+        // {
+        //     TCHAR cfg_file[32];
+
+        //     //set cfg file with last loaded cart info and save-type
+        //     sprintf(cfg_file, "/"ED64_FIRMWARE_PATH"/%s/LASTROM.CFG", save_path);
+
+        //     FRESULT result;
+        //     FIL file;
+        //     result = f_open(&file, cfg_file, FA_WRITE | FA_CREATE_ALWAYS);
+
+        //     if (result == FR_OK)
+        //     {
+        //         uint8_t cfg_data[2] = {boot_save, boot_cic};
+
+
+        //         UINT bw;
+        //         result = f_write (
+        //             &file,          /* [IN] Pointer to the file object structure */
+        //             &cfg_data, /* [IN] Pointer to the data to be written */
+        //             2,         /* [IN] Number of bytes to write */
+        //             &bw          /* [OUT] Pointer to the variable to return number of bytes written */
+        //           );
+
+        //         f_puts(rom_filename, &file);
+
+        //         f_close(&file);
+
+        //         //set the fpga cart-save type
+        //         evd_setSaveType(boot_save);
+
+        //         saveTypeFromSd(disp, rom_filename, boot_save);
+        //     }
+        // }
+
+        volatile uint32_t cart, country;
+        volatile uint32_t info = *(volatile uint32_t *)0xB000003C;
+        cart = info >> 16;
+        country = (info >> 8) & 0xFF;
+
+        disable_interrupts();
+        int bios_cic = 2; //getCicType(1);
+
+        // if (checksum_fix_on)
+        // {
+        //     checksum_sdram();
+        // }
+
+        // evd_lockRegs();
+        // sleep(10);
+
+        while (!(disp = display_lock()));
+        //blank screen to avoid glitches
+
+        graphics_fill_screen(disp, 0x000000FF);
+        display_show(disp);
+
+        // f_mount(0, "", 0);                     /* Unmount the default drive */
+        // free(fs);                              /* Here the work area can be discarded */
+        simulate_boot(boot_cic); // boot_cic
+    }
+}
+
 void waitForStart() {
     printf("Start to continue...\n");
     while (true) {
@@ -244,11 +325,14 @@ static void render_info_panel(display_context_t display, int currently_selected)
     */
     int x = FILE_PANEL_WIDTH + MARGIN_PADDING, y = MENU_BAR_HEIGHT + MARGIN_PADDING;
 
+#if LOAD_BOX_ART_ENABLED == 1
     int offset = ((INFO_PANEL_WIDTH / 2) + (g_thumbnail_cache[currently_selected]->width / 2));
-    
     graphics_draw_sprite(display, SCREEN_WIDTH - offset, y, g_thumbnail_cache[currently_selected]);
 
     y += g_thumbnail_cache[currently_selected]->height + MARGIN_PADDING;
+#else
+    y += 100;
+#endif
 
     // Only update the text string if we have changed selection
     if (currently_selected != g_lastSelection) {
@@ -315,8 +399,8 @@ static void draw_bottom_bar(display_context_t display) {
 // Janky lol
 char* loadingText[] = { "Loading", "Loading.", "Loading..", "Loading..." };
 int loadingTextIndex = 0;
-const loadingBoxWidth = 128;
-const loadingBoxHeight = 32;
+const int loadingBoxWidth = 128;
+const int loadingBoxHeight = 32;
 void animate_progress_spinner(display_context_t display) {
     // Border
     graphics_draw_box(display, 
@@ -395,7 +479,9 @@ int ls(const char *dir) {
         /* Create a string that includes the file name, the file size and the
          attributes string. */
 
-        if (fno.fname)
+        if (fno.fname[0] == '.') {
+            continue; // skip hidden files
+        }
 
         printf("%s [%s] [size=%llu]\n", fno.fname, pcAttrib, fno.fsize);
         g_fileEntries[num_entries] = malloc(sizeof(char*) * FILE_NAME_MAX_LENGTH);
@@ -468,7 +554,13 @@ static void show_list(void) {
 
         if (g_sendingSelectedRom) {
             // check the busy register
-            
+            uint16_t sdBusy = pc64_sd_wait();
+            if (sdBusy == 0) {
+                g_isLoading = false;
+                g_sendingSelectedRom = false;
+                // start boot
+                bootRom(display, 1);
+            }
         }
 
         /* Force the backbuffer flip */

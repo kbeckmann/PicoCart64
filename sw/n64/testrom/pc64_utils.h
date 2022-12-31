@@ -6,7 +6,8 @@
 
 #pragma once
 
-#define BUILD_FOR_EMULATOR 1
+#define BUILD_FOR_EMULATOR 0
+#define LOAD_BOX_ART_ENABLED 0
 
 // SRAM constants
 #define SRAM_256KBIT_SIZE         0x00008000
