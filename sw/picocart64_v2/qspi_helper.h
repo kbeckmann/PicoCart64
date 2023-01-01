@@ -32,7 +32,7 @@
 #define QSPI_SD3_PAD   (4)
 #define QSPI_SS_PAD    (5)
 
-#define DEBUG_CS_CHIP_USE 2
+#define DEBUG_CS_CHIP_USE 3
 
 #define LOG_BUFFER_SIZE 2048
 extern uint32_t log_buffer[LOG_BUFFER_SIZE]; // store addresses

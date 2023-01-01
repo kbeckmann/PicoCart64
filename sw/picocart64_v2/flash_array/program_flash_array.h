@@ -32,4 +32,6 @@ void program_flash_disable();
 io_rw_32 grab_ctrlr0();
 io_rw_32 grab_spi_ctrlr_0();
 
+void program_write_buf(uint32_t addr, const uint8_t* data, uint32_t len);
+
 #endif // _PROGRAM_FLASH_ARRAY_H

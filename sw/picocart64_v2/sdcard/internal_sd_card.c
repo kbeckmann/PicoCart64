@@ -41,6 +41,7 @@
 #define COMMAND_FINISH2  0xEF
 #define COMMAND_SD_READ  0x72 // literally the r char
 #define COMMAND_SD_WRITE 0x77 // literally the w char
+#define COMMAND_LOAD_ROM 0x6C // literally the l char
 #define DISK_READ_BUFFER_SIZE 512
 
 #define PRINT_BUFFER_AFTER_SEND 0
@@ -56,13 +57,15 @@ volatile uint16_t pc64_uart_tx_buf[PC64_BASE_ADDRESS_LENGTH];
 volatile uint16_t sd_sector_registers[4];
 volatile uint32_t sd_read_sector_start;
 volatile uint32_t sd_read_sector_count;
-volatile char sd_selected_rom_title[256];
+char sd_selected_rom_title[256];
 volatile bool sd_is_busy = true;
 
 // Variables used for signalling sd data send 
 volatile bool sendDataReady = false;
 volatile uint32_t sectorToSend = 0;
 volatile uint32_t numSectorsToSend = 0;
+volatile bool startRomLoad = false;
+volatile bool romLoading = false;
 
 // void pc64_set_sd_read_sector(uint64_t sector) {
 //     #if SD_CARD_RX_READ_DEBUG == 1
@@ -91,10 +94,11 @@ void pc64_set_sd_read_sector_count(uint32_t count) {
     sd_read_sector_count = count;
 }
 
-void pc64_set_sd_rom_selection(char* title) {
-    for (int i = 0; i < 256; i++) {
-        sd_selected_rom_title[i] = title[i];
-    }
+void pc64_set_sd_rom_selection(char* titleBuffer, uint16_t len) {
+    // for (int i = 0; i < 256; i++) {
+    //     sd_selected_rom_title[i] = title[i];
+    // }
+    strcpy(sd_selected_rom_title, titleBuffer);
 }
 
 int tempSector = 0;
@@ -137,6 +141,137 @@ void pc64_send_sd_read_command(void) {
     uart_tx_program_putc(COMMAND_FINISH2);
 }
 
+// Send command from MCU1 to MCU2 to start loading a rom
+void pc64_send_load_new_rom_command() {
+        // Block cart while waiting for data
+    sd_is_busy = true;
+    sendDataReady = false;
+    bufferIndex = 0;
+    bufferByteIndex = 0;
+
+    // Signal start
+    uart_tx_program_putc(COMMAND_START);
+    uart_tx_program_putc(COMMAND_START2);
+
+    // command
+    uart_tx_program_putc(COMMAND_LOAD_ROM);
+
+    // // sector
+    // uart_tx_program_putc(0);
+    // uart_tx_program_putc(0);
+    // uart_tx_program_putc(0);
+    // uart_tx_program_putc(0);
+
+    // uart_tx_program_putc((char)((sector & 0xFF000000) >> 24));
+    // uart_tx_program_putc((char)((sector & 0x00FF0000) >> 16));
+    // uart_tx_program_putc((char)((sector & 0x0000FF00) >> 8));
+    // uart_tx_program_putc((char)(sector  & 0x000000FF));
+
+    // // num sectors
+    // uart_tx_program_putc((char)((sectorCount & 0xFF000000) >> 24));
+    // uart_tx_program_putc((char)((sectorCount & 0x00FF0000) >> 16));
+    // uart_tx_program_putc((char)((sectorCount & 0x0000FF00) >> 8));
+    // uart_tx_program_putc((char)(sectorCount & 0x000000FF));
+
+    // Signal finish
+    uart_tx_program_putc(COMMAND_FINISH);
+    uart_tx_program_putc(COMMAND_FINISH2);
+}
+
+void load_new_rom(char* filename) {
+    sd_is_busy = true;
+    char buf[1024 / 2 / 2 / 2 / 2];
+    sd_card_t *pSD = sd_get_by_num(0);
+	FRESULT fr = f_mount(&pSD->fatfs, pSD->pcName, 1);
+	if (FR_OK != fr) {
+		panic("f_mount error: %s (%d)\n", FRESULT_str(fr), fr);
+	}
+
+	FIL fil;
+
+	printf("\n\n---- read /%s -----\n", filename);
+
+	fr = f_open(&fil, filename, FA_OPEN_EXISTING | FA_READ);
+	if (FR_OK != fr && FR_EXIST != fr) {
+		panic("f_open(%s) error: %s (%d)\n", filename, FRESULT_str(fr), fr);
+	}
+
+	FILINFO filinfo;
+	fr = f_stat(filename, &filinfo);
+	printf("%s [size=%llu]\n", filinfo.fname, filinfo.fsize);
+
+    for(int i = 0; i < 10000; i++) { tight_loop_contents(); }
+
+    // Set output enable (OE) to normal mode on all QSPI IO pins
+	// qspi_enable();
+    current_mcu_enable_demux(true);
+    psram_set_cs(3); // Use the PSRAM chip
+    program_connect_internal_flash();
+    program_flash_exit_xip();
+
+	int len = 0;
+	int total = 0;
+	uint64_t t0 = to_us_since_boot(get_absolute_time());
+	do {
+        fr = f_read(&fil, buf, sizeof(buf), &len);
+		//qspi_write(total, buf, len);
+
+        program_write_buf(total, buf, len);
+
+		total += len;
+	} while (len > 0 && total < 0x007C8240); //007C8240 just lets us cut off some empty space
+	uint64_t t1 = to_us_since_boot(get_absolute_time());
+	uint32_t delta = (t1 - t0) / 1000;
+	uint32_t kBps = (uint32_t) ((float)(total / 1024.0f) / (float)(delta / 1000.0f));
+
+	printf("Read %d bytes and programmed PSRAM in %d ms (%d kB/s)\n\n\n", total, delta, kBps);
+
+	fr = f_close(&fil);
+	if (FR_OK != fr) {
+		printf("f_close error: %s (%d)\n", FRESULT_str(fr), fr);
+	}
+	printf("---- read file done -----\n\n\n");
+
+
+    //psram_set_cs(3); // Use the PSRAM chip
+     // Now see if regular reads work
+    // qspi_enable();
+    program_flash_read_data(0, buf, 32);
+
+    for(int i = 0; i < 16; i++) {
+        printf("%02x\n", buf[i]);
+    }
+
+    // Now enable xip and try to read
+    program_flash_flush_cache();
+    program_flash_enter_cmd_xip();
+    printf("\n\nWITH qspi_enter_cmd_xip\n");
+    volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+    uint32_t cycleCountStart = 0;
+    uint32_t totalTime = 0;
+    int psram_csToggleTime = 0;
+    int total_memoryAccessTime = 0;
+    int totalReadTime = 0;
+    for (int i = 0; i < 128; i++) {
+        uint32_t modifiedAddress = i;
+        
+        uint32_t startTime_us = time_us_32();
+        psram_set_cs(3);
+        uint32_t word = ptr[modifiedAddress];
+        psram_set_cs(0);
+
+        totalReadTime += time_us_32() - startTime_us;
+        if (i < 16) { // only print the first 16 words
+            printf("PSRAM-MCU2[%d]: %08x\n",i, word);
+        }
+    }
+
+    printf("\n128 32bit reads @ 0x10000000 reads took %d us\n", totalReadTime);
+
+    // Now turn off the hardware
+    current_mcu_enable_demux(false);
+    ssi_hw->ssienr = 0;
+}
 
 void mcu1_process_rx_buffer() {
     while (rx_uart_buffer_has_data()) {
@@ -213,6 +348,8 @@ void mcu2_process_rx_buffer() {
                 numSectorsToSend = 1;
                 sendDataReady = true;
                 //printf("Parsed! sector_front:%d sector_back: %d\n", sector_front, sector_back);
+            } else if (command == COMMAND_LOAD_ROM) {
+                startRomLoad = true;
             } else {
                 // not supported yet
                 printf("\nUnknown command: %x\n", command);

@@ -9,3 +9,5 @@ extern uint16_t rom_mapping[MAPPING_TABLE_LEN];
 extern const uint16_t flash_rom_mapping[];
 
 extern const unsigned char rom_chunks[][1024];
+
+extern bool g_loadRomFromMemoryArray;

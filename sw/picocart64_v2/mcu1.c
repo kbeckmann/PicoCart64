@@ -158,9 +158,13 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 	pio_uart_init(PIN_MCU2_DIO, PIN_MCU2_CS);
 
 	printf("MCU1 core1 booted!\n");
+	uart_tx_program_putc(0xA);
+	uart_tx_program_putc(0xB);
+	uart_tx_program_putc(0xC);
 	
 	bool readingData = false;
 	volatile bool hasInit = false;
+	volatile bool waitingForRomLoad = false;
 	volatile uint32_t t = 0;
 	volatile uint32_t it = 0;
 	while (1) {
@@ -260,6 +264,25 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 
 		// process_log_buffer();
 
+		if (waitingForRomLoad) {
+			if(time_us_32() - t > 1000000) {
+				t = time_us_32();
+				it++;
+			
+				// wait 30 seconds then release
+				if (it > 30 && !hasInit) {
+					hasInit = true;
+					current_mcu_enable_demux(true);
+					psram_set_cs2(3); // use the psram chip
+					
+					// Reads should be enabled now
+					g_loadRomFromMemoryArray = true; // read from psram
+					waitingForRomLoad = false;
+					sd_is_busy = false;
+				}
+			}
+		}
+
 		if (readingData) {
 			// Process anything that might be on the uart buffer
 			mcu1_process_rx_buffer();
@@ -291,6 +314,10 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 					// 	printf("Cache update %08x\n", update_rom_cache_for_address);
 					// }
 					break;
+				case CORE1_LOAD_NEW_ROM_CMD:
+					waitingForRomLoad = true;
+					pc64_send_load_new_rom_command();
+
 				default:
 					break;
 			}
@@ -406,7 +433,7 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 	bool clockWasSet = set_sys_clock_khz(freq_khz, false);
 
 	gpio_configure(mcu1_gpio_config, ARRAY_SIZE(mcu1_gpio_config));
-	// set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
+	set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
 
 	// Enable STDIO
 	// stdio_async_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);

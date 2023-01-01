@@ -13,11 +13,13 @@
 #include "pio_uart/pio_uart.h"
 
 #define ERASE_AND_WRITE_TO_FLASH_ARRAY 0
-#define LOAD_TO_PSRAM_ARRAY 0 // 1 if use psram, 0 to use flash
+#define LOAD_TO_PSRAM_ARRAY 2 // 1 if use psram, 0 to use flash, 2 = do nothing?
 #define SD_CARD_SECTOR_SIZE 512 // 512 bytes
 
 extern int PC64_MCU_ID;
 extern volatile bool sendDataReady;
+extern volatile bool startRomLoad;
+extern volatile bool romLoading;
 
 // UART TX buffer
 extern volatile uint16_t pc64_uart_tx_buf[PC64_BASE_ADDRESS_LENGTH];
@@ -31,7 +33,7 @@ void pc64_set_sd_read_sector_part(int index, uint16_t value);
 void pc64_set_sd_read_sector_count(uint32_t count);
 
 // Set selected rom title, max 256 characters
-void pc64_set_sd_rom_selection(char* title);
+void pc64_set_sd_rom_selection(char* titleBuffer, uint16_t len);
 
 void pc64_send_sd_read_command(void);
 
@@ -51,3 +53,6 @@ void mount_sd(void);
 
 // sd/rom/psram stuff
 void load_rom(const char *filename);
+
+void pc64_send_load_new_rom_command();
+void load_new_rom(char* filename);

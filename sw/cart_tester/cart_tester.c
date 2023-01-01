@@ -20,7 +20,7 @@
 #define CART_ADDRESS_START 0x10000000
 #define CART_ADDRESS_UPPER_RANGE 0x1FBFFFFF
 
-uint32_t finalReadAddress = CART_ADDRESS_START + 0x8; //0x200000;
+uint32_t finalReadAddress = CART_ADDRESS_START + 0x16; //0x200000;
 uint32_t address_pin_mask = 0;
 
 void set_ad_input() {

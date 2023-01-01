@@ -289,6 +289,11 @@ void program_flash_page_program(uint32_t addr, const uint8_t *data) {
     program_flash_wait_ready();
 }
 
+void program_write_buf(uint32_t addr, const uint8_t* data, uint32_t len) {
+    program_flash_put_cmd_addr(FLASHCMD_PAGE_PROGRAM, addr);
+    program_flash_put_get(data, NULL, len, 4);
+}
+
 // Program a range of flash with some data from memory.
 // Size is rounded up to nearest 256 bytes.
 void __noinline program_flash_range_program(uint32_t addr, const uint8_t *data, size_t count) {
@@ -453,18 +458,18 @@ void __noinline program_flash_flush_cache() {
 // state, so will still respond to other commands.
 void __noinline program_flash_enter_cmd_xip() {
     // DEFAULT THAT WAS HERE
-    // ssi->ssienr = 0;
-    // ssi->ctrlr0 =
-    //         (SSI_CTRLR0_SPI_FRF_VALUE_STD << SSI_CTRLR0_SPI_FRF_LSB) |  // Standard 1-bit SPI serial frames
-    //         (31 << SSI_CTRLR0_DFS_32_LSB) |                             // 32 clocks per data frame
-    //         (SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB); // Send instr + addr, receive data
-    // ssi->spi_ctrlr0 =
-    //         (FLASHCMD_READ_DATA << SSI_SPI_CTRLR0_XIP_CMD_LSB) | // Standard 03h read
-    //         (2u << SSI_SPI_CTRLR0_INST_L_LSB) |    // 8-bit instruction prefix
-    //         (6u << SSI_SPI_CTRLR0_ADDR_L_LSB) |    // 24-bit addressing for 03h commands
-    //         (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C1A  // Command and address both in serial format
-    //                 << SSI_SPI_CTRLR0_TRANS_TYPE_LSB);
-    // ssi->ssienr = 1;
+    ssi->ssienr = 0;
+    ssi->ctrlr0 =
+            (SSI_CTRLR0_SPI_FRF_VALUE_STD << SSI_CTRLR0_SPI_FRF_LSB) |  // Standard 1-bit SPI serial frames
+            (31 << SSI_CTRLR0_DFS_32_LSB) |                             // 32 clocks per data frame
+            (SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB); // Send instr + addr, receive data
+    ssi->spi_ctrlr0 =
+            (FLASHCMD_READ_DATA << SSI_SPI_CTRLR0_XIP_CMD_LSB) | // Standard 03h read
+            (2u << SSI_SPI_CTRLR0_INST_L_LSB) |    // 8-bit instruction prefix
+            (6u << SSI_SPI_CTRLR0_ADDR_L_LSB) |    // 24-bit addressing for 03h commands
+            (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C1A  // Command and address both in serial format
+                    << SSI_SPI_CTRLR0_TRANS_TYPE_LSB);
+    ssi->ssienr = 1;
 
 // THIS WORKS!
     // ssi->ssienr = 0;
@@ -482,42 +487,44 @@ void __noinline program_flash_enter_cmd_xip() {
     //                 << SSI_SPI_CTRLR0_TRANS_TYPE_LSB);
     // ssi->ssienr = 1;
 
-    printf("Configure xip...\n");
 
-    ssi->ssienr = 0;
-    ssi->baudr = 2;
-    ssi->ctrlr0 =
-            (SSI_CTRLR0_SPI_FRF_VALUE_QUAD << SSI_CTRLR0_SPI_FRF_LSB) |  // Standard 1-bit SPI serial frames
-            (31 << SSI_CTRLR0_DFS_32_LSB) |                             // 32 clocks per data frame
-            (SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB); // Send instr + addr, receive data
-    ssi->spi_ctrlr0 =
-            (4u << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |
-            (2u << SSI_SPI_CTRLR0_INST_L_LSB) |    // 8-bit instruction prefix
-            (8u << SSI_SPI_CTRLR0_ADDR_L_LSB) |    // 24-bit addressing for 03h commands
-            (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C2A  // Command in serial format address in quad
-                    << SSI_SPI_CTRLR0_TRANS_TYPE_LSB);
-    ssi->ssienr = 1;
+// FLASH QUAD MODE XIP - works
+    // printf("Configure xip...\n");
 
-    ssi->dr0 = 0xEB;
-    ssi->dr0 = 0x000000a0;
+    // ssi->ssienr = 0;
+    // ssi->baudr = 2;
+    // ssi->ctrlr0 =
+    //         (SSI_CTRLR0_SPI_FRF_VALUE_QUAD << SSI_CTRLR0_SPI_FRF_LSB) |  // Standard 1-bit SPI serial frames
+    //         (31 << SSI_CTRLR0_DFS_32_LSB) |                             // 32 clocks per data frame
+    //         (SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB); // Send instr + addr, receive data
+    // ssi->spi_ctrlr0 =
+    //         (4u << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |
+    //         (2u << SSI_SPI_CTRLR0_INST_L_LSB) |    // 8-bit instruction prefix
+    //         (8u << SSI_SPI_CTRLR0_ADDR_L_LSB) |    // 24-bit addressing for 03h commands
+    //         (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C2A  // Command in serial format address in quad
+    //                 << SSI_SPI_CTRLR0_TRANS_TYPE_LSB);
+    // ssi->ssienr = 1;
 
-    while ((ssi_hw->sr & SSI_SR_BUSY_BITS) != 0) { tight_loop_contents(); }  
-    printf("Sent read commands now setting up continous read mode\n");  
+    // ssi->dr0 = 0xEB;
+    // ssi->dr0 = 0x000000a0;
 
-    ssi->ssienr = 0;
-    ssi->baudr = 2;
-    ssi->ctrlr0 =
-            (SSI_CTRLR0_SPI_FRF_VALUE_QUAD << SSI_CTRLR0_SPI_FRF_LSB) |  // Standard 1-bit SPI serial frames
-            (31 << SSI_CTRLR0_DFS_32_LSB) |                             // 32 clocks per data frame
-            (SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB); // Send instr + addr, receive data
-    ssi->spi_ctrlr0 =
-            (0xa0 << SSI_SPI_CTRLR0_XIP_CMD_LSB) | // Standard 03h read
-            (4u << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |
-            (SSI_SPI_CTRLR0_INST_L_VALUE_NONE << SSI_SPI_CTRLR0_INST_L_LSB) |    // 
-            (8u << SSI_SPI_CTRLR0_ADDR_L_LSB) |    // 24-bit addressing for 03h commands
-            (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_2C2A  // Command and address both in serial format
-                    << SSI_SPI_CTRLR0_TRANS_TYPE_LSB);
-    ssi->ssienr = 1;
+    // while ((ssi_hw->sr & SSI_SR_BUSY_BITS) != 0) { tight_loop_contents(); }  
+    // printf("Sent read commands now setting up continous read mode\n");  
 
-    printf("DONE!\n");
+    // ssi->ssienr = 0;
+    // ssi->baudr = 2;
+    // ssi->ctrlr0 =
+    //         (SSI_CTRLR0_SPI_FRF_VALUE_QUAD << SSI_CTRLR0_SPI_FRF_LSB) |  // Standard 1-bit SPI serial frames
+    //         (31 << SSI_CTRLR0_DFS_32_LSB) |                             // 32 clocks per data frame
+    //         (SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB); // Send instr + addr, receive data
+    // ssi->spi_ctrlr0 =
+    //         (0xa0 << SSI_SPI_CTRLR0_XIP_CMD_LSB) | // Standard 03h read
+    //         (4u << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |
+    //         (SSI_SPI_CTRLR0_INST_L_VALUE_NONE << SSI_SPI_CTRLR0_INST_L_LSB) |    // 
+    //         (8u << SSI_SPI_CTRLR0_ADDR_L_LSB) |    // 24-bit addressing for 03h commands
+    //         (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_2C2A  // Command and address both in serial format
+    //                 << SSI_SPI_CTRLR0_TRANS_TYPE_LSB);
+    // ssi->ssienr = 1;
+
+    // printf("DONE!\n");
 }

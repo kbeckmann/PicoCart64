@@ -49,7 +49,8 @@ static volatile uint32_t back_cache_startingAddress = 0;
 static volatile uint32_t back_cache_endingAddress = 0;
 #endif
 
-// volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+bool g_loadRomFromMemoryArray = false;
+volatile uint16_t *ptr16 = (volatile uint16_t *)0x10000000;
 // static const uint16_t *rom_file_16 = (uint16_t *) rom_chunks;
 
 uint16_t rom_mapping[MAPPING_TABLE_LEN];
@@ -109,6 +110,23 @@ static inline void swap_rom_cache() {
 		rom_cache_index = 0;
 	}
 	#endif
+}
+
+static inline uint32_t rom_read(uint32_t rom_address) {
+	uint32_t next_word;
+#if COMPRESSED_ROM
+	if (!g_loadRomFromMemoryArray) {
+		uint32_t chunk_index = rom_mapping[(rom_address & 0xFFFFFF) >> COMPRESSION_SHIFT_AMOUNT];
+		const uint16_t *chunk_16 = (const uint16_t *)rom_chunks[chunk_index];
+		next_word = chunk_16[(rom_address & COMPRESSION_MASK) >> 1];
+	} else {
+		next_word = ptr16[(rom_address & 0xFFFFFF) >> 1];
+	}
+#else
+	next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
+#endif
+
+	return next_word;
 }
 
 // static inline uint16_t read_from_psram(uint32_t rom_address) {
@@ -271,15 +289,7 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 			last_addr += 2;
 
 			// Pre-fetch
-#if COMPRESSED_ROM
-			uint32_t chunk_index = rom_mapping[(last_addr & 0xFFFFFF) >> COMPRESSION_SHIFT_AMOUNT];
-			const uint16_t *chunk_16 = (const uint16_t *)rom_chunks[chunk_index];
-			next_word = chunk_16[(last_addr & COMPRESSION_MASK) >> 1];
-#else
-			next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
-			// next_word = ptr16[(last_addr & 0xFFFFFF) >> 1];
-			// add_log_to_buffer((last_addr & 0xFFFFFF));
-#endif
+			next_word = rom_read(last_addr);
 
 			// ROM patching done
 			addr = n64_pi_get_value(pio);
@@ -319,18 +329,8 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 			// Domain 1, Address 2 Cartridge ROM
 			do {
 				// Pre-fetch from the address
-#if COMPRESSED_ROM
-				uint32_t chunk_index = rom_mapping[(last_addr & 0xFFFFFF) >> COMPRESSION_SHIFT_AMOUNT];
-				const uint16_t *chunk_16 = (const uint16_t *)rom_chunks[chunk_index];
-				next_word = chunk_16[(last_addr & COMPRESSION_MASK) >> 1];
-				
-				// Using the compressed from from the header
-				// next_word = read_from_psram(last_addr);
-#else
-				next_word = rom_file_16[(last_addr & 0xFFFFFF) >> 1];
-				// next_word = ptr16[(last_addr & 0xFFFFFF) >> 1];
-				// add_log_to_buffer((last_addr & 0xFFFFFF));
-#endif
+				next_word = rom_read(last_addr);
+
 				addr = n64_pi_get_value(pio);
 
 				if (addr == 0) {
@@ -409,7 +409,7 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 				if (addr & 0x00000001) {
 					// We got a WRITE
 					// 0bxxxxxxxx_xxxxxxxx_11111111_11111111
-					//pc64_uart_tx_buf[(last_addr & (sizeof(pc64_uart_tx_buf) - 1)) >> 1] = swap8(addr >> 16);
+					pc64_uart_tx_buf[(last_addr & (sizeof(pc64_uart_tx_buf) - 1)) >> 1] = swap8(addr >> 16);
 					last_addr += 2;
 				} else if (addr == 0) {
 					// READ
@@ -538,6 +538,12 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 
 						// Once the rom has been written to the storage array (ram/flash) release the SD BUSY flag and the rom can
 						// do whatever magic it is, to load that rom. TODO: waiting for that magic in the discord.
+						
+						
+						//write_word |= n64_pi_get_value(pio) >> 16;
+						//stdio_uart_out_chars((const char *)pc64_uart_tx_buf, write_word & (sizeof(pc64_uart_tx_buf) - 1));
+						pc64_set_sd_rom_selection((char *)pc64_uart_tx_buf, half_word);
+						multicore_fifo_push_blocking(CORE1_LOAD_NEW_ROM_CMD);
 
 						break;
 

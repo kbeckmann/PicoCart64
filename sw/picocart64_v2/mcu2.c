@@ -166,7 +166,9 @@ void main_task_entry(__unused void *params)
 	printf("Initing MCU1<->MCU2 serial bridge...");
 	pio_uart_init(PIN_SPI1_CS, PIN_SPI1_RX);
 	printf("Finshed!\n");
-	// printf("pio uart inited\n");
+	
+	//pc64_load_new_rom_command("Doom 64 (USA) (Rev 1).z64");
+	// load_rom("Doom 64 (USA) (Rev 1).z64");
 
 	volatile uint32_t t = 0;
 	while (true) {
@@ -198,6 +200,14 @@ void main_task_entry(__unused void *params)
 
 		if(sendDataReady) {
 			send_sd_card_data();
+		}
+
+		if (startRomLoad && !romLoading) {
+			romLoading = true;
+			printf("Loading rom!\n");
+			load_new_rom("Doom 64 (USA) (Rev 1).z64");
+			romLoading = false;
+			startRomLoad = false;
 		}
 
 #if 0
@@ -257,7 +267,7 @@ void mcu2_main(void)
 	stdio_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
 	gpio_configure(mcu2_gpio_config, ARRAY_SIZE(mcu2_gpio_config));
 
-	// set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
+	set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
 
 	printf("MCU2: Was%s able to set clock to %d MHz\n", clockWasSet ? "" : " not", freq_khz/1000);
 
