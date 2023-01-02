@@ -54,7 +54,7 @@ Discussion about what the menu feature set::
 
  // TODO: It is likely a directory may contain thousands of files
  // Modify the ls function to only buffer a portion of files (up to some MAX)
- #define FILE_ENTRIES_BUFFER_SIZE 5000
+ #define FILE_ENTRIES_BUFFER_SIZE 256
  #define FILE_NAME_MAX_LENGTH (MAX_FILENAME_LEN+1)
 
 /*
@@ -90,33 +90,33 @@ int g_currentPage = 0; // variable for file list pagination
 
 // Some arrays for testing layout while using the emulator
 // Thumbnails need to be cached for snappier menu feel
-#if BUILD_FOR_EMULATOR == 1
-/**/
-char* g_thumbnail_table[] = {
-    // "goldeneye.sprite", 
-    "NGEJ.sprite",
-    "doom.sprite", 
-    "mario_tennis.sprite", 
-    "mario64.sprite"
-};
+// #if BUILD_FOR_EMULATOR == 1
+// /**/
+// char* g_thumbnail_table[] = {
+//     // "goldeneye.sprite", 
+//     "NGEJ.sprite",
+//     "doom.sprite", 
+//     "mario_tennis.sprite", 
+//     "mario64.sprite"
+// };
 
-int g_fileSizes[] = {
-    12582912,
-    8388608,
-    16777216,
-    8388608  
-};
+// int g_fileSizes[] = {
+//     12582912,
+//     8388608,
+//     16777216,
+//     8388608  
+// };
 
-char* g_fileInfo[] = {
-    "Goldeneye 007",
-    "DOOM 64",
-    "Mario Tennis",
-    "Super Mario 64"  
-};
-/**/
-#else
-// TODO implement a more generic implementation of the file info stuff
-#endif
+// char* g_fileInfo[] = {
+//     "Goldeneye 007",
+//     "DOOM 64",
+//     "Mario Tennis",
+//     "Super Mario 64"  
+// };
+// /**/
+// #else
+// // TODO implement a more generic implementation of the file info stuff
+// #endif
 
 int NUM_ENTRIES = 0;
 bool g_sendingSelectedRom = false;
@@ -151,8 +151,8 @@ color_t WHITE_COLOR = { .r = 0xCC, .g = 0xCC, .b = 0xCC, .a = 0x00 }; // 0xCCCCC
 void loadRomAtSelection(int selection) {
     g_sendingSelectedRom = true;
 
-    char fileToLoad[256];
-    strcpy(fileToLoad, g_fileEntries[selection]);
+    char fileToLoad[256] = "Doom 64 (USA) (Rev 1).z64";
+    //strcpy(fileToLoad, g_fileEntries[selection]);
 
     // Write the file name to the cart buffer
     uint32_t len_aligned32 = (strlen(fileToLoad) + 3) & (-4);
@@ -359,7 +359,7 @@ static void draw_header_bar(display_context_t display, int fileCount) {
     graphics_draw_box(display, x, y, width, height, graphics_convert_color(MENU_BAR_COLOR));
     
     char menuHeaderBuffer[100];
-    sprintf(menuHeaderBuffer, "PicoCart64 OS (git rev %08x)\t\t\t\t%d Files", GIT_REV, fileCount);
+    sprintf(menuHeaderBuffer, "DREAMDrive OS (git rev %08x)\t\t\t\t%d Files", GIT_REV, fileCount);
     graphics_draw_text(display, MARGIN_PADDING, y+6, menuHeaderBuffer);
 }
 
@@ -425,26 +425,28 @@ void animate_progress_spinner(display_context_t display) {
 }
 
 void update_spinner( int ovfl ) {
-    loadingTextIndex++;
-    if (loadingTextIndex >= 4) {
-        loadingTextIndex = 0;
+    if (g_isLoading) {
+        loadingTextIndex++;
+        if (loadingTextIndex >= 4) {
+            loadingTextIndex = 0;
+        }
     }
 }
 
-#if BUILD_FOR_EMULATOR == 1
+// #if BUILD_FOR_EMULATOR == 1
 
-int ls(const char *dir) {
+// int ls(const char *dir) {
 
-    int num_entries = 0;
-    g_fileEntries[num_entries++] = "GoldenEye 007 (U) [!].z64";
-    g_fileEntries[num_entries++] = "Doom 64 (USA) (Rev 1).z64";
-    g_fileEntries[num_entries++] = "Mario Tennis (USA).z64";
-    g_fileEntries[num_entries++] = "Super Mario 64 (U) [!].z64";
+//     int num_entries = 0;
+//     g_fileEntries[num_entries++] = "GoldenEye 007 (U) [!].z64";
+//     g_fileEntries[num_entries++] = "Doom 64 (USA) (Rev 1).z64";
+//     g_fileEntries[num_entries++] = "Mario Tennis (USA).z64";
+//     g_fileEntries[num_entries++] = "Super Mario 64 (U) [!].z64";
 
-    return num_entries;
-}
+//     return num_entries;
+// }
 
-#else
+// #else
 int ls(const char *dir) {
     FRESULT fr; /* Return value */
     char const *p_dir = dir;
@@ -479,13 +481,13 @@ int ls(const char *dir) {
         /* Create a string that includes the file name, the file size and the
          attributes string. */
 
-        if (fno.fname[0] == '.') {
-            continue; // skip hidden files
-        }
-
         printf("%s [%s] [size=%llu]\n", fno.fname, pcAttrib, fno.fsize);
-        g_fileEntries[num_entries] = malloc(sizeof(char*) * FILE_NAME_MAX_LENGTH);
-		sprintf(g_fileEntries[num_entries++], "%s [size=%llu]\n", fno.fname, fno.fsize);
+        if (fno.fname[0] != '.') {
+            g_fileEntries[num_entries] = malloc(sizeof(char*) * FILE_NAME_MAX_LENGTH);
+		    sprintf(g_fileEntries[num_entries++], "%s [size=%llu]\n", fno.fname, fno.fsize);
+        } else {
+            printf("Skipping file\n");
+        }
 
         fr = f_findnext(&dj, &fno); /* Search for next item */
     }
@@ -495,7 +497,7 @@ int ls(const char *dir) {
 
 	return num_entries;
 }
-#endif
+// #endif
 
 /*
  * Init display and controller input then render a list of strings, showing currently selected
@@ -515,10 +517,12 @@ static void show_list(void) {
     // display_init(RESOLUTION_512x240, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE);
     // display_init(RESOLUTION_512x480, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE); //Jumpy and janky, do not use
 
-    char debugTextBuffer[100];
+    // char debugTextBuffer[100];
 	int currently_selected = 0;
 	int first_visible = 0;
 	int max_on_screen = calculate_num_rows_per_page();
+
+    waitForStart();
 
     timer_init();
     new_timer(TIMER_TICKS(1000000 / 10), TF_CONTINUOUS, update_spinner);
@@ -526,7 +530,6 @@ static void show_list(void) {
 	while (1) {
 		static display_context_t display = 0;
         
-
 		/* Grab a render buffer */
 		while (!(display = display_lock())) ;
 
@@ -540,7 +543,7 @@ static void show_list(void) {
 		render_list(display, g_fileEntries, currently_selected, first_visible, max_on_screen);
 
         /* Render info about the currently selected rom including box art */
-        render_info_panel(display, currently_selected);
+        //render_info_panel(display, currently_selected);
 
         /* A little debug text at the bottom of the screen */
         //snprintf(debugTextBuffer, 100, "currently_selected=%d, first_visible=%d, max_per_page=%d", currently_selected, first_visible, max_on_screen);
@@ -741,23 +744,23 @@ static void init_sprites(void) {
     //     animated_spinner[i] = read_sprite(n);
     // }
 
-    #if BUILD_FOR_EMULATOR == 1
-    int thumbnailCount = sizeof(g_thumbnail_table) / sizeof(*g_thumbnail_table);
-    for(int i = 0; i < thumbnailCount; i++) {
-        // fp = dfs_open(g_thumbnail_table[i]);
-        // printf("%s opened? %d\n", g_thumbnail_table[i], fp);
+    // #if BUILD_FOR_EMULATOR == 1
+    // int thumbnailCount = sizeof(g_thumbnail_table) / sizeof(*g_thumbnail_table);
+    // for(int i = 0; i < thumbnailCount; i++) {
+    //     // fp = dfs_open(g_thumbnail_table[i]);
+    //     // printf("%s opened? %d\n", g_thumbnail_table[i], fp);
 
-        // sprite_t* sprite = malloc( dfs_size( fp ) );
-        // dfs_read(sprite, 1, dfs_size(fp), fp);
-        // g_thumbnail_cache[i] = sprite;
+    //     // sprite_t* sprite = malloc( dfs_size( fp ) );
+    //     // dfs_read(sprite, 1, dfs_size(fp), fp);
+    //     // g_thumbnail_cache[i] = sprite;
 
-        // dfs_close( fp );
+    //     // dfs_close( fp );
 
-        printf("Loading thumbnail: %s\n", g_thumbnail_table[i]);
-        g_thumbnail_cache[i] = read_sprite(g_thumbnail_table[i]);
-        // printf("height: %d, width: %d\n", g_thumbnail_cache[i]->height, g_thumbnail_cache[i]->width);
-    }
-    #endif
+    //     printf("Loading thumbnail: %s\n", g_thumbnail_table[i]);
+    //     g_thumbnail_cache[i] = read_sprite(g_thumbnail_table[i]);
+    //     // printf("height: %d, width: %d\n", g_thumbnail_cache[i]->height, g_thumbnail_cache[i]->width);
+    // }
+    // #endif
 
     printf("done!\n");
     waitForStart();
@@ -769,28 +772,28 @@ void start_shell(void) {
     // display_init(RESOLUTION_512x480, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE); // jitters in cen64
     controller_init();
     
-    #if BUILD_FOR_EMULATOR == 1
-    bool debuggingOutputEnabled = debug_init_isviewer();
+    // #if BUILD_FOR_EMULATOR == 1
+    // bool debuggingOutputEnabled = debug_init_isviewer();
 
-    if (!debuggingOutputEnabled) {
-        printf("Unable to enable isviewer support.\n");
-    }
+    // if (!debuggingOutputEnabled) {
+    //     printf("Unable to enable isviewer support.\n");
+    // }
 
-    int ret = dfs_init(DFS_DEFAULT_LOCATION);
-    if (ret != DFS_ESUCCESS) {
-        printf("Unable to init filesystem. ret: %d\n", ret);
-		printf("git rev %08x\n", GIT_REV);
+    // int ret = dfs_init(DFS_DEFAULT_LOCATION);
+    // if (ret != DFS_ESUCCESS) {
+    //     printf("Unable to init filesystem. ret: %d\n", ret);
+	// 	printf("git rev %08x\n", GIT_REV);
 
-        waitForStart();
-    }
+    //     waitForStart();
+    // }
 
-    /* Load sprites for shell from the filesystem */
-    init_sprites();
+    // /* Load sprites for shell from the filesystem */
+    // init_sprites();
 
-    /* Starts the shell by rendering the list of files from the SD card*/
-    show_list();
+    // /* Starts the shell by rendering the list of files from the SD card*/
+    // show_list();
 
-    #else
+    // #else
 
     int ret = dfs_init(DFS_DEFAULT_LOCATION);
     if (ret != DFS_ESUCCESS) {
@@ -837,8 +840,27 @@ void start_shell(void) {
         /* Load sprites for shell from the filesystem */
         init_sprites();
 
+
+        printf("Loading selected rom 'DOOM 64'\n");
+        loadRomAtSelection(0);
+        printf("Waiting for rom load...\n");
+        while(pc64_sd_wait());
+        printf("Done waiting...\n");
+        
+        g_isLoading = false;
+        g_sendingSelectedRom = false;
+
+        // start boot
+        display_init(RESOLUTION_512x240, DEPTH_16_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
+        static display_context_t display = 0;
+		/* Grab a render buffer */
+		while (!(display = display_lock())) ;
+        printf("Booting rom!\n");
+        bootRom(display, 1);
+    
+
         /* Starts the shell by rendering the list of files from the SD card*/
-        show_list();
+        // show_list();
     }
-    #endif
+    // #endif
 }

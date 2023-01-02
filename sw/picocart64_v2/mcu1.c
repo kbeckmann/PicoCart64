@@ -264,24 +264,64 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 
 		// process_log_buffer();
 
-		if (waitingForRomLoad) {
+		// if (waitingForRomLoad) {
 			if(time_us_32() - t > 1000000) {
 				t = time_us_32();
 				it++;
+
+				// printf(".");
 			
 				// wait 30 seconds then release
 				if (it > 30 && !hasInit) {
+					printf("Attempting to read from psram\n");
 					hasInit = true;
-					current_mcu_enable_demux(true);
-					psram_set_cs2(3); // use the psram chip
+					set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
 					
+					printf("Setting demux\n");
+					current_mcu_enable_demux(true);
+
+					printf("Using chip 3\n");
+					// psram_set_cs2(3); // use the psram chip
+					psram_set_cs(3);
+
+					program_connect_internal_flash();
+					program_flash_exit_xip();
+
+					printf("Reading from psram slow\n");
+					char buf[1024 / 2 / 2 / 2 / 2];
+					program_flash_read_data(0, buf, 32);
+					for(int i = 0; i < 16; i++) {
+						printf("%02x\n", buf[i]);
+					}
+
+					program_flash_flush_cache();
+					program_flash_enter_cmd_xip();
+					printf("Reading from psram fast\n");
 					// Reads should be enabled now
 					g_loadRomFromMemoryArray = true; // read from psram
 					waitingForRomLoad = false;
 					sd_is_busy = false;
+
+					volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+					uint32_t cycleCountStart = 0;
+					uint32_t totalTime = 0;
+					int psram_csToggleTime = 0;
+					int total_memoryAccessTime = 0;
+					int totalReadTime = 0;
+					for (int i = 0; i < 128; i++) {
+						uint32_t modifiedAddress = i;
+						
+						uint32_t startTime_us = time_us_32();
+						uint32_t word = ptr[modifiedAddress];
+
+						totalReadTime += time_us_32() - startTime_us;
+						if (i < 16) { // only print the first 16 words
+							printf("PSRAM-MCU1[%d]: %08x\n",i, word);
+						}
+					}
 				}
 			}
-		}
+		// }
 
 		if (readingData) {
 			// Process anything that might be on the uart buffer
@@ -442,19 +482,19 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 	printf("\n\nMCU1: Was%s able to set clock to %d MHz\n", clockWasSet ? "" : " not", freq_khz/1000);
 
 	// IF READING FROM FROM FLASH... (works for compressed roms)
-	qspi_oeover_normal(true);
-	ssi_hw->ssienr = 1;
+	// qspi_oeover_normal(true);
+	// ssi_hw->ssienr = 1;
 	// Set up ROM mapping table
-	if (memcmp(picocart_header, "picocartcompress", 16) == 0) {
-		// Copy rom compressed map from flash into RAM
-		// uart_tx_program_puts("Found a compressed ROM\n");
-		printf("Found a compressed ROM\n");
-		memcpy(rom_mapping, flash_rom_mapping, MAPPING_TABLE_LEN * sizeof(uint16_t));
-	} else {
-		for (int i = 0; i < MAPPING_TABLE_LEN; i++) {
-			rom_mapping[i] = i;
-		}
-	}
+	// if (memcmp(picocart_header, "picocartcompress", 16) == 0) {
+	// 	// Copy rom compressed map from flash into RAM
+	// 	// uart_tx_program_puts("Found a compressed ROM\n");
+	// 	printf("Found a compressed ROM\n");
+	// 	memcpy(rom_mapping, flash_rom_mapping, MAPPING_TABLE_LEN * sizeof(uint16_t));
+	// } else {
+	// 	for (int i = 0; i < MAPPING_TABLE_LEN; i++) {
+	// 		rom_mapping[i] = i;
+	// 	}
+	// }
 
 #if 0
 	printf("Start board test\n");

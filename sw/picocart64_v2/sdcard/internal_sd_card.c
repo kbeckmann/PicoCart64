@@ -256,9 +256,9 @@ void load_new_rom(char* filename) {
         uint32_t modifiedAddress = i;
         
         uint32_t startTime_us = time_us_32();
-        psram_set_cs(3);
+        // psram_set_cs(3);
         uint32_t word = ptr[modifiedAddress];
-        psram_set_cs(0);
+        // psram_set_cs(0);
 
         totalReadTime += time_us_32() - startTime_us;
         if (i < 16) { // only print the first 16 words
@@ -271,6 +271,8 @@ void load_new_rom(char* filename) {
     // Now turn off the hardware
     current_mcu_enable_demux(false);
     ssi_hw->ssienr = 0;
+
+    qspi_disable();
 }
 
 void mcu1_process_rx_buffer() {

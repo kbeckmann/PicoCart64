@@ -204,7 +204,7 @@ int main(void)
 
 	printf("PicoCart64 Test ROM (git rev %08X)\n\n", GIT_REV);
 
-#if BUILD_FOR_EMULATOR == 0
+// #if BUILD_FOR_EMULATOR == 0
 	///////////////////////////////////////////////////////////////////////////
 
 	// Verify PicoCart64 Magic
@@ -349,9 +349,9 @@ int main(void)
         }
     }
 
-	#else
-	printf("Running on emulator... Skipping picocart tests.\n");
-	#endif
+	// #else
+	// printf("Running on emulator... Skipping picocart tests.\n");
+	// #endif
     
     start_shell();
 	//#endif
