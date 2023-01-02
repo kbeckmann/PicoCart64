@@ -10,4 +10,5 @@ extern const uint16_t flash_rom_mapping[];
 
 extern const unsigned char rom_chunks[][1024];
 
-extern bool g_loadRomFromMemoryArray;
+extern volatile bool g_loadRomFromMemoryArray;
+extern volatile bool g_resetN64PILoop;

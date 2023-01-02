@@ -155,116 +155,37 @@ void process_log_buffer() {
 
 uint32_t last_rom_cache_update_address = 0;
 void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
-	// pio_uart_init(PIN_MCU2_DIO, PIN_MCU2_CS);
+	pio_uart_init(PIN_MCU2_DIO, PIN_MCU2_CS);
 
 	printf("MCU1 core1 booted!\n");
-	// uart_tx_program_putc(0xA);
-	// uart_tx_program_putc(0xB);
-	// uart_tx_program_putc(0xC);
+	uart_tx_program_putc(0xA);
+	uart_tx_program_putc(0xB);
+	uart_tx_program_putc(0xC);
 	
 	bool readingData = false;
 	volatile bool hasInit = false;
 	volatile bool waitingForRomLoad = false;
 	volatile uint32_t t = 0;
 	volatile uint32_t it = 0;
+	volatile uint32_t t2 = 0;
+	volatile bool test_load = true;
 	while (1) {
 		tight_loop_contents();
-		
-		// if(time_us_32() - t > 1000000) {
-		// 	t = time_us_32();
-		// 	it++;
 
-		// 	if (it > 3 && !hasInit) {
-		// 		hasInit = true;
+		// if (test_load && time_us_32() - t2 > (1000000 * 10)) {
+		// 	t2 = time_us_32();
+		// 	test_load = false;
 
-		// 		printf("\nMCU1 try to read with ptr\n");
+		// 	waitingForRomLoad = true;
+		// 	// Turn off the qspi hardware so mcu2 can use it
+		// 	current_mcu_enable_demux(false);
+		// 	ssi_hw->ssienr = 0;
+		// 	qspi_disable();
 
-		// 		// THIS IS FOR FLASH READING
-		// 		// current_mcu_enable_demux(true);
-    	// 		// psram_set_cs(2);
-		// 		// program_connect_internal_flash();
-		// 		// program_flash_exit_xip();
-		// 		// program_flash_flush_cache();
-		// 		// picocart_boot2_enable();
-
-		// 		uint32_t largestAccessTime = 0;
-		// 		uint32_t smallestAccessTime = 100000;
-
-		// 		// systick_hw->csr = 0x5;
-    	// 		// systick_hw->rvr = 0x00FFFFFF;
-
-		// 		volatile uint16_t *ptr16 = (volatile uint16_t *)0x10000000;
-		// 		printf("Access using 16bit pointer at [0x10000000]\n");
-		// 		volatile uint16_t buffer[2048];
-		// 		uint32_t totalTime = 0;	
-		// 		for(int i = 0; i < 4096; i+=2) {
-		// 			uint32_t startTime = time_us_32();	
-		// 			volatile uint16_t word = ptr16[i >> 1];
-		// 			buffer[i >> 1] = word;
-		// 			uint32_t accessTime = time_us_32() - startTime;
-		// 			totalTime += accessTime;
-
-		// 			if (largestAccessTime < accessTime) {
-		// 				largestAccessTime = accessTime;
-		// 			} 
-
-		// 			if (smallestAccessTime > accessTime) {
-		// 				smallestAccessTime = accessTime;
-		// 			}
-
-		// 			if (i < 64) {
-		// 				if (i % 8 == 0) {
-		// 					printf("\n%08x: ", i);
-							
-		// 				}
-		// 				printf("%04x ", word);
-		// 			}
-		// 		}
-		// 		// totalTime = time_us_32() - startTime;
-		// 		float elapsed_time_s = (1e-6f * totalTime);
-		// 		printf("\nxip access for 4kB via 16bit pointer took %d us. %.3f MB/s\n", totalTime, ((4096 / 1e6f) / elapsed_time_s));
-		// 		printf("Variance-> Longest Access: %d, Shortest: %d\n", largestAccessTime, smallestAccessTime);
-
-		// 		// systick_hw->csr = 0x5;
-    	// 		// systick_hw->rvr = 0x00FFFFFF;
-
-		// 		// printf("\n\nTake 2\n");
-		// 		// totalTime = 0;
-		// 		// for(int i = 0; i < 4096; i+=2) {
-		// 		// 	// now = time_us_32();	
-		// 		// 	uint32_t startTime_ns = systick_hw->cvr;
-		// 		// 	uint16_t word = ptr16[i >> 1];
-		// 		// 	uint32_t endTime_ns = systick_hw->cvr;
-		// 		// 	float accessTime = startTime_ns - endTime_ns;//time_us_32() - now;
-		// 		// 	totalTime += accessTime;
-
-		// 		// 	if (largestAccessTime < accessTime) {
-		// 		// 		largestAccessTime = accessTime;
-		// 		// 	} 
-
-		// 		// 	if (smallestAccessTime > accessTime) {
-		// 		// 		smallestAccessTime = accessTime;
-		// 		// 	}
-
-		// 		// 	if (i < 64) {
-		// 		// 		if (i % 8 == 0) {
-		// 		// 			printf("\n%08x: ", i);
-							
-		// 		// 		}
-		// 		// 		printf("%04x ", word);
-		// 		// 	}
-		// 		// }
-		// 		// elapsed_time_s = (1e-6f * totalTime) * 5;
-		// 		// printf("\nxip(via boot2) access for 4kB via 16bit pointer took %f cycles. %.3f MB/s\n", totalTime, ((4096 / 1e6f) / elapsed_time_s));
-		// 		// printf("Variance-> Longest Access: %d, Shortest: %d\n", largestAccessTime, smallestAccessTime);
-
-		// 		//load_rom_cache(0);
-		// 	}
+		// 	pc64_send_load_new_rom_command();
 		// }
 
-		// process_log_buffer();
-
-		// if (waitingForRomLoad) {
+		if (waitingForRomLoad) {
 			if(time_us_32() - t > 1000000) {
 				t = time_us_32();
 				it++;
@@ -273,55 +194,62 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 			
 				// wait 30 seconds then release
 				if (it > 30 && !hasInit) {
-					printf("Attempting to read from psram\n");
+					// uart_tx_program_putc(0x1);
+					// uart_tx_program_putc(0x1);
+					// printf("Attempting to read from psram\n");
 					hasInit = true;
 					set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
 					
-					printf("Setting demux\n");
+					// printf("Setting demux\n");
 					current_mcu_enable_demux(true);
 
-					printf("Using chip 3\n");
+					// printf("Using chip 3\n");
 					// psram_set_cs2(3); // use the psram chip
 					psram_set_cs(3);
 
 					program_connect_internal_flash();
 					program_flash_exit_xip();
 
-					printf("Reading from psram slow\n");
-					char buf[1024 / 2 / 2 / 2 / 2];
-					program_flash_read_data(0, buf, 32);
-					for(int i = 0; i < 16; i++) {
-						printf("%02x\n", buf[i]);
-					}
+					// printf("Reading from psram slow\n");
+					// char buf[1024 / 2 / 2 / 2 / 2];
+					// program_flash_read_data(0, buf, 32);
+					// for(int i = 0; i < 16; i++) {
+					// 	//printf("%02x\n", buf[i]);
+					// 	uart_tx_program_putc(buf[i]);
+					// }
 
 					program_flash_flush_cache();
 					program_flash_enter_cmd_xip();
-					printf("Reading from psram fast\n");
+					// printf("Reading from psram fast\n");
 					// Reads should be enabled now
-					g_loadRomFromMemoryArray = true; // read from psram
-					waitingForRomLoad = false;
-					sd_is_busy = false;
+					
 
-					volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+					volatile uint8_t *ptr = (volatile uint8_t *)0x10000000;
 					uint32_t cycleCountStart = 0;
 					uint32_t totalTime = 0;
 					int psram_csToggleTime = 0;
 					int total_memoryAccessTime = 0;
 					int totalReadTime = 0;
-					for (int i = 0; i < 128; i++) {
+					for (int i = 0; i < 32; i++) {
 						uint32_t modifiedAddress = i;
 						
 						uint32_t startTime_us = time_us_32();
-						uint32_t word = ptr[modifiedAddress];
+						uint8_t word = ptr[modifiedAddress];
 
 						totalReadTime += time_us_32() - startTime_us;
-						if (i < 16) { // only print the first 16 words
-							printf("PSRAM-MCU1[%d]: %08x\n",i, word);
+						if (i < 32) { // only print the first 16 words
+							// printf("PSRAM-MCU1[%d]: %08x\n",i, word);
+							uart_tx_program_putc(word);
 						}
 					}
+
+					g_loadRomFromMemoryArray = true; // read from psram
+					waitingForRomLoad = false;
+					sd_is_busy = false;
+					g_resetN64PILoop = true;
 				}
 			}
-		// }
+		}
 
 		if (readingData) {
 			// Process anything that might be on the uart buffer
@@ -356,6 +284,12 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 					break;
 				case CORE1_LOAD_NEW_ROM_CMD:
 					waitingForRomLoad = true;
+					
+					// Turn off the qspi hardware so mcu2 can use it
+					current_mcu_enable_demux(false);
+    				ssi_hw->ssienr = 0;
+    				qspi_disable();
+
 					pc64_send_load_new_rom_command();
 
 				default:
@@ -474,27 +408,31 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 
 	gpio_configure(mcu1_gpio_config, ARRAY_SIZE(mcu1_gpio_config));
 	// set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
+	// psram_set_cs(1);
 
 	// Enable STDIO
 	// stdio_async_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
-	stdio_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
+	// stdio_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
 
 	printf("\n\nMCU1: Was%s able to set clock to %d MHz\n", clockWasSet ? "" : " not", freq_khz/1000);
 
 	// IF READING FROM FROM FLASH... (works for compressed roms)
-	// qspi_oeover_normal(true);
-	// ssi_hw->ssienr = 1;
+	qspi_oeover_normal(true);
+	ssi_hw->ssienr = 1;
+
 	// Set up ROM mapping table
-	// if (memcmp(picocart_header, "picocartcompress", 16) == 0) {
-	// 	// Copy rom compressed map from flash into RAM
-	// 	// uart_tx_program_puts("Found a compressed ROM\n");
-	// 	printf("Found a compressed ROM\n");
-	// 	memcpy(rom_mapping, flash_rom_mapping, MAPPING_TABLE_LEN * sizeof(uint16_t));
-	// } else {
-	// 	for (int i = 0; i < MAPPING_TABLE_LEN; i++) {
-	// 		rom_mapping[i] = i;
-	// 	}
-	// }
+	if (memcmp(picocart_header, "picocartcompress", 16) == 0) {
+		// Copy rom compressed map from flash into RAM
+		// uart_tx_program_puts("Found a compressed ROM\n");
+		printf("Found a compressed ROM\n");
+		memcpy(rom_mapping, flash_rom_mapping, MAPPING_TABLE_LEN * sizeof(uint16_t));
+	} else {
+		for (int i = 0; i < MAPPING_TABLE_LEN; i++) {
+			rom_mapping[i] = i;
+		}
+	}
+
+	
 
 #if 0
 	printf("Start board test\n");
@@ -518,6 +456,10 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 
 	n64_pi_run();
 
+	uart_tx_program_putc(0x99);
+	g_resetN64PILoop = false;
+
+	n64_pi_run();
 	while (true) {
 
 	}

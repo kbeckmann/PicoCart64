@@ -147,12 +147,14 @@ void main_task_entry(__unused void *params)
 	// } else {
 	// 	printf("Skipping rom load this time. Rom should already be in flash.\n");
 	// }
-
+	// set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
+	// current_mcu_enable_demux(true);
 	// psram_set_cs(1);
-	// current_mcu_enable_demux(false);
 	
-	// ssi_hw->ssienr = 0;
-	// qspi_oeover_disable();
+	// current_mcu_enable_demux(false);
+    ssi_hw->ssienr = 0;
+	qspi_oeover_disable();
+    // qspi_disable();
 
 	vTaskDelay(100);
 	printf("Booting MCU1...\n");
@@ -162,15 +164,15 @@ void main_task_entry(__unused void *params)
 	mount_sd();
 	printf("Finished!\n");
 
-	// // Setup PIO UART
-	// printf("Initing MCU1<->MCU2 serial bridge...");
-	// pio_uart_init(PIN_SPI1_CS, PIN_SPI1_RX);
-	// printf("Finshed!\n");
+	// Setup PIO UART
+	printf("Initing MCU1<->MCU2 serial bridge...");
+	pio_uart_init(PIN_SPI1_CS, PIN_SPI1_RX);
+	printf("Finshed!\n");
 
-	vTaskDelay(1000);
+	// vTaskDelay(1000);
 	
 	//pc64_load_new_rom_command("Doom 64 (USA) (Rev 1).z64");
-	load_new_rom("Doom 64 (USA) (Rev 1).z64");
+	// load_new_rom("Doom 64 (USA) (Rev 1).z64");
 
 	volatile uint32_t t = 0;
 	while (true) {

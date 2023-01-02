@@ -234,11 +234,11 @@ void bootRom(display_context_t disp, int silent) {
         // evd_lockRegs();
         // sleep(10);
 
-        while (!(disp = display_lock()));
-        //blank screen to avoid glitches
+        // while (!(disp = display_lock()));
+        // //blank screen to avoid glitches
 
-        graphics_fill_screen(disp, 0x000000FF);
-        display_show(disp);
+        // graphics_fill_screen(disp, 0x000000FF);
+        // display_show(disp);
 
         // f_mount(0, "", 0);                     /* Unmount the default drive */
         // free(fs);                              /* Here the work area can be discarded */
@@ -825,14 +825,14 @@ void start_shell(void) {
             }
         }
 
-        printf("Press START to load The Shell.\n");
-        while (true) {
-            controller_scan();
-            struct controller_data keys = get_keys_pressed();
-            if (keys.c[0].start) {
-                break;
-            }
-        }
+        // printf("Press START to load The Shell.\n");
+        // while (true) {
+        //     controller_scan();
+        //     struct controller_data keys = get_keys_pressed();
+        //     if (keys.c[0].start) {
+        //         break;
+        //     }
+        // }
         console_clear();
 
         waitForStart();
@@ -843,6 +843,10 @@ void start_shell(void) {
 
         printf("Loading selected rom 'DOOM 64'\n");
         loadRomAtSelection(0);
+        printf("Start waiting for sd_busy register...\n");
+        
+        wait_ms(1000);
+
         printf("Waiting for rom load...\n");
         while(pc64_sd_wait());
         printf("Done waiting...\n");
@@ -851,14 +855,13 @@ void start_shell(void) {
         g_sendingSelectedRom = false;
 
         // start boot
-        display_init(RESOLUTION_512x240, DEPTH_16_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
+        // display_init(RESOLUTION_512x240, DEPTH_16_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
         static display_context_t display = 0;
 		/* Grab a render buffer */
-		while (!(display = display_lock())) ;
+		// while (!(display = display_lock())) ;
         printf("Booting rom!\n");
         bootRom(display, 1);
     
-
         /* Starts the shell by rendering the list of files from the SD card*/
         // show_list();
     }

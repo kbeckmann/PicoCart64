@@ -340,14 +340,14 @@ int main(void)
     // }
 
 	/* Start the shell if the user presses start */
-    printf("\n\nPress START to continue to the shell...\n");
-	while (true) {
-        controller_scan();
-        struct controller_data keys = get_keys_pressed();
-        if (keys.c[0].start) {
-            break;
-        }
-    }
+    // printf("\n\nPress START to continue to the shell...\n");
+	// while (true) {
+    //     controller_scan();
+    //     struct controller_data keys = get_keys_pressed();
+    //     if (keys.c[0].start) {
+    //         break;
+    //     }
+    // }
 
 	// #else
 	// printf("Running on emulator... Skipping picocart tests.\n");
