@@ -155,12 +155,12 @@ void process_log_buffer() {
 
 uint32_t last_rom_cache_update_address = 0;
 void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
-	pio_uart_init(PIN_MCU2_DIO, PIN_MCU2_CS);
+	// pio_uart_init(PIN_MCU2_DIO, PIN_MCU2_CS);
 
 	printf("MCU1 core1 booted!\n");
-	uart_tx_program_putc(0xA);
-	uart_tx_program_putc(0xB);
-	uart_tx_program_putc(0xC);
+	// uart_tx_program_putc(0xA);
+	// uart_tx_program_putc(0xB);
+	// uart_tx_program_putc(0xC);
 	
 	bool readingData = false;
 	volatile bool hasInit = false;
@@ -433,11 +433,11 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 	bool clockWasSet = set_sys_clock_khz(freq_khz, false);
 
 	gpio_configure(mcu1_gpio_config, ARRAY_SIZE(mcu1_gpio_config));
-	set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
+	// set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
 
 	// Enable STDIO
 	// stdio_async_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
-	// stdio_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
+	stdio_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
 
 	printf("\n\nMCU1: Was%s able to set clock to %d MHz\n", clockWasSet ? "" : " not", freq_khz/1000);
 

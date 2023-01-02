@@ -148,7 +148,7 @@ void main_task_entry(__unused void *params)
 	// 	printf("Skipping rom load this time. Rom should already be in flash.\n");
 	// }
 
-	// psram_set_cs(1);
+	psram_set_cs(1);
 	// current_mcu_enable_demux(false);
 	
 	// ssi_hw->ssienr = 0;
@@ -158,14 +158,14 @@ void main_task_entry(__unused void *params)
 	printf("Booting MCU1...\n");
 	gpio_put(PIN_MCU1_RUN, 1);
 
-	printf("Mounting SD Card...");
-	mount_sd();
-	printf("Finished!\n");
+	// printf("Mounting SD Card...");
+	// mount_sd();
+	// printf("Finished!\n");
 
-	// Setup PIO UART
-	printf("Initing MCU1<->MCU2 serial bridge...");
-	pio_uart_init(PIN_SPI1_CS, PIN_SPI1_RX);
-	printf("Finshed!\n");
+	// // Setup PIO UART
+	// printf("Initing MCU1<->MCU2 serial bridge...");
+	// pio_uart_init(PIN_SPI1_CS, PIN_SPI1_RX);
+	// printf("Finshed!\n");
 	
 	//pc64_load_new_rom_command("Doom 64 (USA) (Rev 1).z64");
 	// load_rom("Doom 64 (USA) (Rev 1).z64");

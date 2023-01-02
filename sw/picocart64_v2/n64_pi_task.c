@@ -290,6 +290,9 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 
 			// Pre-fetch
 			next_word = rom_read(last_addr);
+			// uint32_t chunk_index = rom_mapping[(last_addr & 0xFFFFFF) >> COMPRESSION_SHIFT_AMOUNT];
+			// const uint16_t *chunk_16 = (const uint16_t *)rom_chunks[chunk_index];
+			// next_word = chunk_16[(last_addr & COMPRESSION_MASK) >> 1];
 
 			// ROM patching done
 			addr = n64_pi_get_value(pio);
@@ -330,12 +333,17 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 			do {
 				// Pre-fetch from the address
 				next_word = rom_read(last_addr);
+				// uint32_t chunk_index = rom_mapping[(last_addr & 0xFFFFFF) >> COMPRESSION_SHIFT_AMOUNT];
+				// const uint16_t *chunk_16 = (const uint16_t *)rom_chunks[chunk_index];
+				// next_word = chunk_16[(last_addr & COMPRESSION_MASK) >> 1];
 
 				addr = n64_pi_get_value(pio);
+				// printf("%04x\n", addr);
 
 				if (addr == 0) {
 					// READ
  handle_d1a2_read:
+					// uart_tx_program_putc(0xD);
 					pio_sm_put(pio, 0, swap8(next_word));
 					last_addr += 2;
 				} else if (addr & 0x00000001) {
