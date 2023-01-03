@@ -268,7 +268,7 @@ void load_new_rom(char* filename) {
     uart_tx_program_putc(COMMAND_START2);
 
     // command
-    uart_tx_program_putc(COMMAND_LOAD_ROM);
+    uart_tx_program_putc(0xAA);
 
     // Signal finish
     uart_tx_program_putc(COMMAND_FINISH);
@@ -291,8 +291,11 @@ void mcu1_process_rx_buffer() {
         #endif
 
         if (romLoading) {
+            // Echo the chars
+            uart_tx_program_putc(value);
+
             if (value == COMMAND_START) {
-            mayHaveStart = true;
+                mayHaveStart = true;
             } else if (value == COMMAND_START2 && mayHaveStart) {
                 receivingData = true;
             } else if (value == COMMAND_FINISH && receivingData) {
@@ -305,13 +308,18 @@ void mcu1_process_rx_buffer() {
             }
 
             if (mayHaveFinish && !receivingData) {
-                   char command = mcu2_cmd_buffer[0];
-                   // TODO check the command? 
-                   // May not be needed
+                char command = mcu2_cmd_buffer[0];
+                // TODO check the command? 
+                // May not be needed
 
-                   romLoading = false; // signal that the rom is finished loading
-                   sendDataReady = true;
-                   bufferIndex = 0;
+                romLoading = false; // signal that the rom is finished loading
+                sendDataReady = true;
+                
+                // Reset state 
+                bufferIndex = 0;
+                mayHaveFinish = false;
+                mayHaveStart = false;
+                receivingData = false;
             }
 
         } else {
@@ -332,11 +340,11 @@ void mcu1_process_rx_buffer() {
                 sendDataReady = true;
                 break;
             }
-        }
-    }
 
-    if (bufferByteIndex >= 512) {
-        sendDataReady = true;
+            if (bufferByteIndex >= 512) {
+                sendDataReady = true;
+            }
+        }
     }
 }
 
@@ -345,9 +353,6 @@ void mcu2_process_rx_buffer() {
         char ch = rx_uart_buffer_get();
         
         printf("%02x ", ch);
-        // if (ch == 0xAA) {
-        //     printf("\n");
-        // }
 
         if (ch == COMMAND_START) {
             mayHaveStart = true;
@@ -376,13 +381,14 @@ void mcu2_process_rx_buffer() {
                 sectorToSend = sector_back;
                 numSectorsToSend = 1;
                 sendDataReady = true;
-                //printf("Parsed! sector_front:%d sector_back: %d\n", sector_front, sector_back);
+                
             } else if (command == COMMAND_LOAD_ROM) {
                 sprintf(sd_selected_rom_title, "%s", buffer+1);
                 // strncpy(sd_selected_rom_title, buffer+1, 256);
                 printf("Rom to load: %s\n", sd_selected_rom_title);
-
+                printf("BUFFER: %s\n", buffer);
                 startRomLoad = true;
+
             } else {
                 // not supported yet
                 printf("\nUnknown command: %x\n", command);
@@ -400,11 +406,6 @@ void mcu2_process_rx_buffer() {
                 echoIndex = 0;
             }
         }
-
-        // if (bufferIndex-1 == 14) {
-        //     bufferIndex = 0;
-        //     printf("\nError: Missing last byte\n");
-        // }
     }
 }
 

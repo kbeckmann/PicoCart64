@@ -590,18 +590,18 @@ static void show_list(void) {
             // check the busy register
             uint16_t sdBusy =  pc64_sd_wait_single();
             if (sdBusy == 0) {
-                graphics_draw_box(display, 30, 120, 5, 5, graphics_convert_color(WHITE_COLOR));
+                graphics_draw_box(display, SCREEN_WIDTH - 8, 3, 5, 5, graphics_convert_color(WHITE_COLOR));
                 g_isLoading = false;
                 g_sendingSelectedRom = false;
-                wait_ms(5000);
+                wait_ms(300);
                 // start boot
                 bootRom(display, 1);
             } else {
-                graphics_draw_box(display, 30, 120, 5, 5, graphics_convert_color(SELECTION_COLOR));
+                graphics_draw_box(display, SCREEN_WIDTH - 8, 3, 5, 5, graphics_convert_color(SELECTION_COLOR));
             }
-            char b[] = "                ";
-            sprintf(b, "busy: %d", sdBusy);
-            graphics_draw_text(display, 30, 130, b);
+            // char b[] = "                ";
+            // sprintf(b, "busy: %d", sdBusy);
+            // graphics_draw_text(display, 30, 130, b);
         }
 
         /* Force the backbuffer flip */

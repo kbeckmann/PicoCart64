@@ -594,6 +594,7 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 						
 						//write_word |= n64_pi_get_value(pio) >> 16;
 						//stdio_uart_out_chars((const char *)pc64_uart_tx_buf, write_word & (sizeof(pc64_uart_tx_buf) - 1));
+						uart_tx_program_putc((uint8_t)half_word);
 						pc64_set_sd_rom_selection((char *)pc64_uart_tx_buf, half_word);
 						multicore_fifo_push_blocking(CORE1_LOAD_NEW_ROM_CMD);
 

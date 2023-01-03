@@ -157,7 +157,7 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 		// 	pc64_send_load_new_rom_command();
 		// }
 
-		if (isWaitingForRomLoad && 0) {
+		if (isWaitingForRomLoad) {
 			if(time_us_32() - t > 1000000) {
 				t = time_us_32();
 				it++;
@@ -233,15 +233,14 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 				program_flash_flush_cache();
 				program_flash_enter_cmd_xip();
 
-				uart_tx_program_putc(0x99);
+				uart_tx_program_putc(0xA);
 
 				// rom is loaded now
 				isWaitingForRomLoad = false;
-				romLoading = false;
 				sd_is_busy = false;
 				readingData = false;
 
-				uart_tx_program_putc(0x98);
+				uart_tx_program_putc(0xB);
 			}
 		}
 
