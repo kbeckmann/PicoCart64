@@ -157,7 +157,7 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 		// 	pc64_send_load_new_rom_command();
 		// }
 
-		if (isWaitingForRomLoad) {
+		if (isWaitingForRomLoad && 0) {
 			if(time_us_32() - t > 1000000) {
 				t = time_us_32();
 				it++;
@@ -206,6 +206,8 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 					sd_is_busy = false;
 					isWaitingForRomLoad = false;
 
+					g_restart_pi_handler = true;
+
 					uart_tx_program_putc(0x97);
 
 					// Once the sd_is_busy flag is released, the menu rom will wait a little
@@ -220,7 +222,7 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 			// Process anything that might be on the uart buffer
 			mcu1_process_rx_buffer();
 
-			if (sendDataReady) {
+			if (sendDataReady && !isWaitingForRomLoad) {
 				// Now that the data is written to the array, go ahead and release the lock
 				sd_is_busy = false;
 				readingData = false;
@@ -236,9 +238,12 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 				uart_tx_program_putc(0xA);
 
 				// rom is loaded now
+				g_loadRomFromMemoryArray = true; // read from psram
 				isWaitingForRomLoad = false;
 				sd_is_busy = false;
 				readingData = false;
+
+				g_restart_pi_handler = true;
 
 				uart_tx_program_putc(0xB);
 			}
