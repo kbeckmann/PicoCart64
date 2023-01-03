@@ -157,7 +157,7 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 		// 	pc64_send_load_new_rom_command();
 		// }
 
-		if (isWaitingForRomLoad) {
+		if (isWaitingForRomLoad && 0) {
 			if(time_us_32() - t > 1000000) {
 				t = time_us_32();
 				it++;
@@ -166,30 +166,15 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 			
 				// wait 30 seconds then release
 				if (it > 30 && !hasInit) {
-					// uart_tx_program_putc(0x1);
-					// uart_tx_program_putc(0x1);
-					// printf("Attempting to read from psram\n");
 					hasInit = true;
 					set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
 					
-					// printf("Setting demux\n");
 					current_mcu_enable_demux(true);
 
-					// printf("Using chip 3\n");
-					// psram_set_cs2(3); // use the psram chip
 					psram_set_cs(3);
 
 					program_connect_internal_flash();
 					program_flash_exit_xip();
-
-					// printf("Reading from psram slow\n");
-					// char buf[1024 / 2 / 2 / 2 / 2];
-					// program_flash_read_data(0, buf, 32);
-					// for(int i = 0; i < 16; i++) {
-					// 	//printf("%02x\n", buf[i]);
-					// 	uart_tx_program_putc(buf[i]);
-					// }
-
 					program_flash_flush_cache();
 					program_flash_enter_cmd_xip();
 					// printf("Reading from psram fast\n");
@@ -240,9 +225,23 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 				sd_is_busy = false;
 				readingData = false;
 			} else if (sendDataReady && isWaitingForRomLoad) {
-				// rom is loaded now
+				set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
+				current_mcu_enable_demux(true);
+				psram_set_cs(3);
+				program_connect_internal_flash();
+				program_flash_exit_xip();
+				program_flash_flush_cache();
+				program_flash_enter_cmd_xip();
+
 				uart_tx_program_putc(0x99);
+
+				// rom is loaded now
+				isWaitingForRomLoad = false;
+				romLoading = false;
+				sd_is_busy = false;
 				readingData = false;
+
+				uart_tx_program_putc(0x98);
 			}
 		}
 
@@ -279,9 +278,12 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
     				ssi_hw->ssienr = 0;
     				qspi_disable();
 
-					pc64_send_load_new_rom_command();
+					// Something about the above code to turn off qspi
+					// causing the pi loop to behave oddly.
+					// This will restart the loop.
+					g_restart_pi_handler = true;
 
-					g_restart_pi_handler = true; // try restarting here
+					pc64_send_load_new_rom_command();
 
 				default:
 					break;

@@ -311,6 +311,7 @@ void mcu1_process_rx_buffer() {
 
                    romLoading = false; // signal that the rom is finished loading
                    sendDataReady = true;
+                   bufferIndex = 0;
             }
 
         } else {

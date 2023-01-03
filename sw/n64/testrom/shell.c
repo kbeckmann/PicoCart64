@@ -155,43 +155,54 @@ color_t WHITE_COLOR = { .r = 0xCC, .g = 0xCC, .b = 0xCC, .a = 0x00 }; // 0xCCCCC
 void loadRomAtSelection(int selection) {
     g_sendingSelectedRom = true;
 
-    char fileToLoad[256] = "Doom 64 (USA) (Rev 1).z64";
-    //strcpy(fileToLoad, g_fileEntries[selection]);
+    char* fileToLoad = malloc(sizeof(char*) * 256);
+    strcpy(fileToLoad, g_fileEntries[selection]);
 
     // Write the file name to the cart buffer
     uint32_t len_aligned32 = (strlen(fileToLoad) + 3) & (-4);
-	data_cache_hit_writeback_invalidate((uint8_t *) fileToLoad, len_aligned32);
-	pi_write_raw(fileToLoad, PC64_BASE_ADDRESS_START, 0, len_aligned32);
+    pi_write_raw(fileToLoad, PC64_BASE_ADDRESS_START, 0, len_aligned32);
+	// io_write(PC64_BASE_ADDRESS_START, fileToLoad);
 
     uint16_t sdSelectRomFilenameLength[] = { strlen(fileToLoad) };
-    data_cache_hit_writeback_invalidate(&sdSelectRomFilenameLength, sizeof(sdSelectRomFilenameLength));
+    // data_cache_hit_writeback_invalidate(&sdSelectRomFilenameLength, sizeof(sdSelectRomFilenameLength));
     // Send command to start the load, the cart will check the pc64 buffer for the filename 
-    pi_write_raw(&sdSelectRomFilenameLength, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_SELECT_ROM, sizeof(sdSelectRomFilenameLength));
+    data_cache_hit_writeback_invalidate(read_buf, sizeof(read_buf));
+    pi_write_raw(sdSelectRomFilenameLength, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_SELECT_ROM, sizeof(uint16_t));
+    // io_write(PC64_CIBASE_ADDRESS_START + PC64_REGISTER_SD_SELECT_ROM, &sdSelectRomFilenameLength);
 
     g_isLoading = true;
+
+    wait_ms(100);
 }
 
-static uint32_t pc64_sd_wait_single() {
-    uint32_t isBusy = io_read(PC64_CIBASE_ADDRESS_START + PC64_REGISTER_SD_BUSY);
+static uint16_t pc64_sd_wait_single() {
+    
+    uint16_t read_buf[] = { 1 };
+    data_cache_hit_writeback_invalidate(read_buf, sizeof(read_buf));
+    pi_read_raw(read_buf, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_BUSY, sizeof(uint16_t));
+    //uint32_t isBusy = io_read(PC64_CIBASE_ADDRESS_START + PC64_REGISTER_SD_BUSY);
 
-    return isBusy;
+    return read_buf[0];
 }
 
 static uint8_t pc64_sd_wait() {
     uint32_t timeout = 0;
-    //uint32_t *read_buf32 = (uint32_t *) read_buf;
-    uint32_t isBusy = 0;
+    uint16_t read_buf[] = { 1 };
+	uint16_t busy[] = { 1 };
+    // uint32_t isBusy = 0;
     
     // Wait until the cartridge interface is ready
     do {
         // returns 1 while sd card is busy
-        isBusy = io_read(PC64_CIBASE_ADDRESS_START + PC64_REGISTER_SD_BUSY);
+        data_cache_hit_writeback_invalidate(read_buf, sizeof(read_buf));
+        pi_read_raw(read_buf, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_BUSY, sizeof(uint16_t));
+        // isBusy = io_read(PC64_CIBASE_ADDRESS_START + PC64_REGISTER_SD_BUSY);
         
         // Took too long, abort
-        if((timeout++) > 10000)
+        if((timeout++) > 1000000)
             return -1;
     }
-    while(isBusy);
+    while(memcmp(busy, read_buf, sizeof(uint16_t)) == 0);
     (void) timeout; // Needed to stop unused variable warning
     
     // Success
@@ -300,7 +311,7 @@ static int calculate_num_rows_per_page(void) {
 /*
  * Render a list of strings and show a caret on the currently selected row
  */
-static void render_list(display_context_t display, char **list, int currently_selected, int first_visible, int max_on_screen)
+static void render_list(display_context_t display, int currently_selected, int first_visible, int max_on_screen)
 {
 
 	/* If we aren't starting at the first row, draw an indicator to show more files above */
@@ -314,7 +325,7 @@ static void render_list(display_context_t display, char **list, int currently_se
 		int y = i * ROW_HEIGHT + LIST_TOP_PADDING;	// First row must start below the menu bar, so add that plus a pad
 
 		// if we run out of items to draw on the screen, don't draw anything else
-		if (row > NUM_ENTRIES) {
+		if (row >= NUM_ENTRIES) {
 			break;
 		}
 
@@ -326,7 +337,7 @@ static void render_list(display_context_t display, char **list, int currently_se
 		}
 
 		// Render the list item
-		graphics_draw_text(display, x, y, list[row]);
+		graphics_draw_text(display, x, y, g_fileEntries[row]);
 
 		/* If this is the last row and there are more files below, draw an indicator */
 		if (row + 1 < NUM_ENTRIES && i + 1 >= max_on_screen) {
@@ -376,11 +387,9 @@ static void render_info_panel(display_context_t display, int currently_selected)
     graphics_draw_box(display, x - MARGIN_PADDING, BOTTOM_BAR_Y, INFO_PANEL_WIDTH, BOTTOM_BAR_HEIGHT, graphics_convert_color(MENU_BAR_COLOR));
 }
 
-static void draw_header_bar(display_context_t display, char* headerText) {
+static void draw_header_bar(display_context_t display, const char* headerText) {
     int x = 0, y = 0, width = SCREEN_WIDTH, height = MENU_BAR_HEIGHT;
     graphics_draw_box(display, x, y, width, height, graphics_convert_color(MENU_BAR_COLOR));
-    
-    
     graphics_draw_text(display, MARGIN_PADDING, y+6, headerText);
 }
 
@@ -523,15 +532,15 @@ int ls(const char *dir) {
 static void show_list(void) {    
 
     // Fetch the root contents
-    g_fileEntries = malloc(sizeof(char*) * FILE_ENTRIES_BUFFER_SIZE * 4); // alloc the buffer
+    g_fileEntries = malloc(sizeof(char*) * FILE_ENTRIES_BUFFER_SIZE); // alloc the buffer
 
     // TODO alloc any other buffers here as well
-	NUM_ENTRIES = ls("/") - 1;
-
-    char* menuHeaderText = malloc(sizeof(char) * 100);
-    sprintf(menuHeaderText, "DREAMDrive OS (git rev %08x)\t\t\t\t%d Files", GIT_REV, NUM_ENTRIES);
+	NUM_ENTRIES = ls("/");
 
     waitForStart();
+
+    char* menuHeaderText = malloc(sizeof(char) * 128);
+    sprintf(menuHeaderText, "DREAMDrive OS (git rev %08x)\t\t\t\t%d Files", GIT_REV, NUM_ENTRIES);
 
     // display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
     display_init(RESOLUTION_512x240, DEPTH_16_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
@@ -546,8 +555,6 @@ static void show_list(void) {
 	int first_visible = 0;
 	int max_on_screen = calculate_num_rows_per_page();
 
-    waitForStart();
-
     timer_init();
     bool createLoadingTimer = false;
 
@@ -561,10 +568,10 @@ static void show_list(void) {
 		graphics_fill_screen(display, 0);
 
 		/* Draw top header bar */
-		draw_header_bar(display, menuHeaderText);
+		draw_header_bar(display, (const char*) menuHeaderText);
 
 		/* Render the list of file */
-		render_list(display, g_fileEntries, currently_selected, first_visible, max_on_screen);
+		render_list(display, currently_selected, first_visible, max_on_screen);
 
         /* Render info about the currently selected rom including box art */
         render_info_panel(display, currently_selected);
@@ -582,15 +589,19 @@ static void show_list(void) {
         if (g_sendingSelectedRom) {
             // check the busy register
             uint16_t sdBusy =  pc64_sd_wait_single();
-            uint16_t sdBusy2 = pc64_sd_wait_single(); // in my testing, this had to be run again for it to be successful.
-            uint16_t sdBusy3 = pc64_sd_wait_single();
-            if (sdBusy == 0 && sdBusy2 == 0 && sdBusy3 == 0) {
+            if (sdBusy == 0) {
+                graphics_draw_box(display, 30, 120, 5, 5, graphics_convert_color(WHITE_COLOR));
                 g_isLoading = false;
                 g_sendingSelectedRom = false;
                 wait_ms(5000);
                 // start boot
                 bootRom(display, 1);
+            } else {
+                graphics_draw_box(display, 30, 120, 5, 5, graphics_convert_color(SELECTION_COLOR));
             }
+            char b[] = "                ";
+            sprintf(b, "busy: %d", sdBusy);
+            graphics_draw_text(display, 30, 130, b);
         }
 
         /* Force the backbuffer flip */
