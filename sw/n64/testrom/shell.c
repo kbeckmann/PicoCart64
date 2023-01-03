@@ -171,44 +171,29 @@ void loadRomAtSelection(int selection) {
     g_isLoading = true;
 }
 
-static uint16_t pc64_sd_wait_single() {
-    wait_ms(300);
+static uint32_t pc64_sd_wait_single() {
+    uint32_t isBusy = io_read(PC64_CIBASE_ADDRESS_START + PC64_REGISTER_SD_BUSY);
 
-    uint16_t read_buf[] = { 0x1 };
-    uint16_t busy[] = { 0x1 };
-    
-    // returns 1 while sd card is busy
-    data_cache_hit_writeback_invalidate(read_buf, sizeof(read_buf));
-    pi_read_raw(read_buf, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_BUSY, sizeof(uint16_t));
-
-    if (memcmp(busy, read_buf, sizeof(uint16_t)) == 0) {
-        return 0;
-    } else {
-        return 1;
-    }
+    return isBusy;
 }
 
 static uint8_t pc64_sd_wait() {
-    // uint32_t timeout = 0;
-    uint16_t read_buf[] = { 0x1 };
-	uint16_t busy[] = { 0x1 };
+    uint32_t timeout = 0;
+    //uint32_t *read_buf32 = (uint32_t *) read_buf;
+    uint32_t isBusy = 0;
     
     // Wait until the cartridge interface is ready
     do {
         // returns 1 while sd card is busy
-        //pi_read_raw(read_buf, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_BUSY, sizeof(uint32_t))
-		data_cache_hit_writeback_invalidate(read_buf, sizeof(read_buf));
-        pi_read_raw(read_buf, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_BUSY, sizeof(uint16_t));
+        isBusy = io_read(PC64_CIBASE_ADDRESS_START + PC64_REGISTER_SD_BUSY);
         
         // Took too long, abort
-        // if((timeout++) > 10000000) {
-		// 	fprintf(stdout, "SD_WAIT timed out. read_buf: %d\n", read_buf[0]);
-		// 	return -1;
-		// }
+        if((timeout++) > 10000)
+            return -1;
     }
-    while(memcmp(busy, read_buf, sizeof(uint16_t)) == 0);
-    //(void) timeout; // Needed to stop unused variable warning
-
+    while(isBusy);
+    (void) timeout; // Needed to stop unused variable warning
+    
     // Success
     return 0;
 }
@@ -391,13 +376,12 @@ static void render_info_panel(display_context_t display, int currently_selected)
     graphics_draw_box(display, x - MARGIN_PADDING, BOTTOM_BAR_Y, INFO_PANEL_WIDTH, BOTTOM_BAR_HEIGHT, graphics_convert_color(MENU_BAR_COLOR));
 }
 
-static void draw_header_bar(display_context_t display, int fileCount) {
+static void draw_header_bar(display_context_t display, char* headerText) {
     int x = 0, y = 0, width = SCREEN_WIDTH, height = MENU_BAR_HEIGHT;
     graphics_draw_box(display, x, y, width, height, graphics_convert_color(MENU_BAR_COLOR));
     
-    char menuHeaderBuffer[100];
-    sprintf(menuHeaderBuffer, "DREAMDrive OS (git rev %08x)\t\t\t\t%d Files", GIT_REV, fileCount);
-    graphics_draw_text(display, MARGIN_PADDING, y+6, menuHeaderBuffer);
+    
+    graphics_draw_text(display, MARGIN_PADDING, y+6, headerText);
 }
 
 static void draw_bottom_bar(display_context_t display) {
@@ -539,9 +523,13 @@ int ls(const char *dir) {
 static void show_list(void) {    
 
     // Fetch the root contents
-    g_fileEntries = malloc(sizeof(char*) * FILE_ENTRIES_BUFFER_SIZE); // alloc the buffer
+    g_fileEntries = malloc(sizeof(char*) * FILE_ENTRIES_BUFFER_SIZE * 4); // alloc the buffer
+
     // TODO alloc any other buffers here as well
-	NUM_ENTRIES = ls("/");
+	NUM_ENTRIES = ls("/") - 1;
+
+    char* menuHeaderText = malloc(sizeof(char) * 100);
+    sprintf(menuHeaderText, "DREAMDrive OS (git rev %08x)\t\t\t\t%d Files", GIT_REV, NUM_ENTRIES);
 
     waitForStart();
 
@@ -573,7 +561,7 @@ static void show_list(void) {
 		graphics_fill_screen(display, 0);
 
 		/* Draw top header bar */
-		draw_header_bar(display, NUM_ENTRIES);
+		draw_header_bar(display, menuHeaderText);
 
 		/* Render the list of file */
 		render_list(display, g_fileEntries, currently_selected, first_visible, max_on_screen);
