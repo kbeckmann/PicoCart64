@@ -77,35 +77,7 @@ static const gpio_config_t mcu1_gpio_config[] = {
 	{PIN_MCU2_DIO, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO1},
 };
 
-static inline uint8_t psram_addr_to_chip2(uint32_t address)
-{
-	return ((address >> 23) & 0x7) + 1;
-}
-
-//   0: Deassert all CS
-// 1-8: Assert the specific PSRAM CS (1 indexed, matches U1, U2 ... U8)
-static inline void psram_set_cs2(uint8_t chip)
-{
-	uint32_t mask = (1 << PIN_DEMUX_IE) | (1 << PIN_DEMUX_A0) | (1 << PIN_DEMUX_A1) | (1 << PIN_DEMUX_A2);
-	uint32_t new_mask;
-
-	if (chip >= 1 && chip <= 8) {
-		chip--;					// convert to 0-indexed
-		new_mask = (1 << PIN_DEMUX_IE) | (chip << PIN_DEMUX_A0);
-	} else {
-		// Set PIN_DEMUX_IE = 0 to pull all PSRAM CS-lines high
-		new_mask = 0;
-	}
-
-	uint32_t old_gpio_out = sio_hw->gpio_out;
-	sio_hw->gpio_out = (old_gpio_out & (~mask)) | new_mask;
-}
-
-volatile uint32_t *rom_ptr = (volatile uint32_t *)0x10000000;
-static inline uint32_t read_from_psram2(uint32_t address) {
-	uint32_t word = rom_ptr[address];
-	return swap16(word);
-}
+volatile bool g_restart_pi_handler = false;
 
 uint32_t log_buffer[LOG_BUFFER_SIZE]; // store addresses
 volatile int log_head = 0;
@@ -158,13 +130,13 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 	pio_uart_init(PIN_MCU2_DIO, PIN_MCU2_CS);
 
 	printf("MCU1 core1 booted!\n");
-	uart_tx_program_putc(0xA);
-	uart_tx_program_putc(0xB);
-	uart_tx_program_putc(0xC);
+	// uart_tx_program_putc(0xA);
+	// uart_tx_program_putc(0xB);
+	// uart_tx_program_putc(0xC);
 	
 	bool readingData = false;
 	volatile bool hasInit = false;
-	volatile bool waitingForRomLoad = false;
+	volatile bool isWaitingForRomLoad = false;
 	volatile uint32_t t = 0;
 	volatile uint32_t it = 0;
 	volatile uint32_t t2 = 0;
@@ -185,7 +157,7 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 		// 	pc64_send_load_new_rom_command();
 		// }
 
-		if (waitingForRomLoad) {
+		if (isWaitingForRomLoad) {
 			if(time_us_32() - t > 1000000) {
 				t = time_us_32();
 				it++;
@@ -224,29 +196,37 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 					// Reads should be enabled now
 					
 
-					volatile uint8_t *ptr = (volatile uint8_t *)0x10000000;
-					uint32_t cycleCountStart = 0;
-					uint32_t totalTime = 0;
-					int psram_csToggleTime = 0;
-					int total_memoryAccessTime = 0;
-					int totalReadTime = 0;
-					for (int i = 0; i < 32; i++) {
-						uint32_t modifiedAddress = i;
+					// volatile uint8_t *ptr = (volatile uint8_t *)0x10000000;
+					// uint32_t cycleCountStart = 0;
+					// uint32_t totalTime = 0;
+					// int psram_csToggleTime = 0;
+					// int total_memoryAccessTime = 0;
+					// int totalReadTime = 0;
+					// for (int i = 0; i < 32; i++) {
+					// 	uint32_t modifiedAddress = i;
 						
-						uint32_t startTime_us = time_us_32();
-						uint8_t word = ptr[modifiedAddress];
+					// 	uint32_t startTime_us = time_us_32();
+					// 	uint8_t word = ptr[modifiedAddress];
 
-						totalReadTime += time_us_32() - startTime_us;
-						if (i < 32) { // only print the first 16 words
-							// printf("PSRAM-MCU1[%d]: %08x\n",i, word);
-							uart_tx_program_putc(word);
-						}
-					}
+					// 	totalReadTime += time_us_32() - startTime_us;
+					// 	if (i < 32) { // only print the first 16 words
+					// 		// printf("PSRAM-MCU1[%d]: %08x\n",i, word);
+					// 		uart_tx_program_putc(word);
+					// 	}
+					// }
 
+				
 					g_loadRomFromMemoryArray = true; // read from psram
-					waitingForRomLoad = false;
+					romLoading = false;
 					sd_is_busy = false;
-					g_resetN64PILoop = true;
+					isWaitingForRomLoad = false;
+
+					uart_tx_program_putc(0x97);
+
+					// Once the sd_is_busy flag is released, the menu rom will wait a little
+					// extra time before trying to restart the code so that should be enough time
+					// for us to restart the pio program like this
+					// restart_n64_pi_pio();
 				}
 			}
 		}
@@ -258,6 +238,10 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 			if (sendDataReady) {
 				// Now that the data is written to the array, go ahead and release the lock
 				sd_is_busy = false;
+				readingData = false;
+			} else if (sendDataReady && isWaitingForRomLoad) {
+				// rom is loaded now
+				uart_tx_program_putc(0x99);
 				readingData = false;
 			}
 		}
@@ -283,14 +267,21 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 					// }
 					break;
 				case CORE1_LOAD_NEW_ROM_CMD:
-					waitingForRomLoad = true;
+					sd_is_busy = true;
+					romLoading = true;
+					isWaitingForRomLoad = true;
 					
+					readingData = true;
+					rx_uart_buffer_reset();
+
 					// Turn off the qspi hardware so mcu2 can use it
 					current_mcu_enable_demux(false);
     				ssi_hw->ssienr = 0;
     				qspi_disable();
 
 					pc64_send_load_new_rom_command();
+
+					g_restart_pi_handler = true; // try restarting here
 
 				default:
 					break;
@@ -456,12 +447,10 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 
 	n64_pi_run();
 
-	uart_tx_program_putc(0x99);
-	g_resetN64PILoop = false;
-
-	n64_pi_run();
 	while (true) {
-
+		if(g_restart_pi_handler) {
+			n64_pi_run();
+		}
 	}
 #endif
 

@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <libdragon.h>
+#include <usb.h>
 
 #include "git_info.h"
 #include "shell.h"
@@ -84,6 +85,9 @@ typedef struct {
 
 rom_file_info_t** g_romFileInfoBuffer;
 
+bool IS_EMULATOR = 0;
+bool LOAD_BOX_ART = 0;
+
 char** g_fileEntries; // Buffer for file entries
 sprite_t** g_thumbnail_cache;
 int g_currentPage = 0; // variable for file list pagination
@@ -92,27 +96,27 @@ int g_currentPage = 0; // variable for file list pagination
 // Thumbnails need to be cached for snappier menu feel
 // #if BUILD_FOR_EMULATOR == 1
 // /**/
-// char* g_thumbnail_table[] = {
-//     // "goldeneye.sprite", 
-//     "NGEJ.sprite",
-//     "doom.sprite", 
-//     "mario_tennis.sprite", 
-//     "mario64.sprite"
-// };
+char* g_thumbnail_table[] = {
+    // "goldeneye.sprite", 
+    "NGEJ.sprite",
+    "doom.sprite", 
+    "mario_tennis.sprite", 
+    "mario64.sprite"
+};
 
-// int g_fileSizes[] = {
-//     12582912,
-//     8388608,
-//     16777216,
-//     8388608  
-// };
+int g_fileSizes[] = {
+    12582912,
+    8388608,
+    16777216,
+    8388608  
+};
 
-// char* g_fileInfo[] = {
-//     "Goldeneye 007",
-//     "DOOM 64",
-//     "Mario Tennis",
-//     "Super Mario 64"  
-// };
+char* g_fileInfo[] = {
+    "Goldeneye 007",
+    "DOOM 64",
+    "Mario Tennis",
+    "Super Mario 64"  
+};
 // /**/
 // #else
 // // TODO implement a more generic implementation of the file info stuff
@@ -167,15 +171,46 @@ void loadRomAtSelection(int selection) {
     g_isLoading = true;
 }
 
-static uint16_t pc64_sd_wait() {
-    uint16_t read_buf[] = { 1 };
+static uint16_t pc64_sd_wait_single() {
+    wait_ms(300);
+
+    uint16_t read_buf[] = { 0x1 };
+    uint16_t busy[] = { 0x1 };
     
     // returns 1 while sd card is busy
     data_cache_hit_writeback_invalidate(read_buf, sizeof(read_buf));
     pi_read_raw(read_buf, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_BUSY, sizeof(uint16_t));
 
-    // Return status
-    return read_buf[0];
+    if (memcmp(busy, read_buf, sizeof(uint16_t)) == 0) {
+        return 0;
+    } else {
+        return 1;
+    }
+}
+
+static uint8_t pc64_sd_wait() {
+    // uint32_t timeout = 0;
+    uint16_t read_buf[] = { 0x1 };
+	uint16_t busy[] = { 0x1 };
+    
+    // Wait until the cartridge interface is ready
+    do {
+        // returns 1 while sd card is busy
+        //pi_read_raw(read_buf, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_BUSY, sizeof(uint32_t))
+		data_cache_hit_writeback_invalidate(read_buf, sizeof(read_buf));
+        pi_read_raw(read_buf, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_BUSY, sizeof(uint16_t));
+        
+        // Took too long, abort
+        // if((timeout++) > 10000000) {
+		// 	fprintf(stdout, "SD_WAIT timed out. read_buf: %d\n", read_buf[0]);
+		// 	return -1;
+		// }
+    }
+    while(memcmp(busy, read_buf, sizeof(uint16_t)) == 0);
+    //(void) timeout; // Needed to stop unused variable warning
+
+    // Success
+    return 0;
 }
 
 int boot_cic = 2;
@@ -252,6 +287,7 @@ void waitForStart() {
             controller_scan();
             struct controller_data keys = get_keys_pressed();
             if (keys.c[0].start) {
+                wait_ms(300);
                 break;
             }
     }
@@ -325,14 +361,15 @@ static void render_info_panel(display_context_t display, int currently_selected)
     */
     int x = FILE_PANEL_WIDTH + MARGIN_PADDING, y = MENU_BAR_HEIGHT + MARGIN_PADDING;
 
-#if LOAD_BOX_ART_ENABLED == 1
-    int offset = ((INFO_PANEL_WIDTH / 2) + (g_thumbnail_cache[currently_selected]->width / 2));
-    graphics_draw_sprite(display, SCREEN_WIDTH - offset, y, g_thumbnail_cache[currently_selected]);
+    if (LOAD_BOX_ART) {
+        int offset = ((INFO_PANEL_WIDTH / 2) + (g_thumbnail_cache[currently_selected]->width / 2));
+        //graphics_draw_sprite(display, SCREEN_WIDTH - offset, y, g_thumbnail_cache[currently_selected]);
 
-    y += g_thumbnail_cache[currently_selected]->height + MARGIN_PADDING;
-#else
-    y += 100;
-#endif
+        //y += g_thumbnail_cache[currently_selected]->height + MARGIN_PADDING;
+        y += 100;
+    } else {
+        y += 100;
+    }
 
     // Only update the text string if we have changed selection
     if (currently_selected != g_lastSelection) {
@@ -371,7 +408,7 @@ static void draw_bottom_bar(display_context_t display) {
     graphics_draw_box(display, 0, BOTTOM_BAR_Y, SCREEN_WIDTH - INFO_PANEL_WIDTH, BOTTOM_BAR_HEIGHT, graphics_convert_color(BOTTOM_BAR_COLOR));
     #endif
     
-    graphics_draw_sprite_trans(display, MARGIN_PADDING, BOTTOM_BAR_Y, a_button_icon);
+    //graphics_draw_sprite_trans(display, MARGIN_PADDING, BOTTOM_BAR_Y, a_button_icon);
     graphics_draw_text(display, MARGIN_PADDING + 32, BOTTOM_BAR_Y + BOTTOM_BAR_HEIGHT/2 - 4, "Load ROM");
 }
 
@@ -433,21 +470,18 @@ void update_spinner( int ovfl ) {
     }
 }
 
-// #if BUILD_FOR_EMULATOR == 1
-
-// int ls(const char *dir) {
-
-//     int num_entries = 0;
-//     g_fileEntries[num_entries++] = "GoldenEye 007 (U) [!].z64";
-//     g_fileEntries[num_entries++] = "Doom 64 (USA) (Rev 1).z64";
-//     g_fileEntries[num_entries++] = "Mario Tennis (USA).z64";
-//     g_fileEntries[num_entries++] = "Super Mario 64 (U) [!].z64";
-
-//     return num_entries;
-// }
-
-// #else
 int ls(const char *dir) {
+
+    // If we couldn't init dfs (on an emulator?) just add some dummy data
+    if (IS_EMULATOR) {
+        int num_entries = 0;
+        g_fileEntries[num_entries++] = "GoldenEye 007 (U) [!].z64";
+        g_fileEntries[num_entries++] = "Doom 64 (USA) (Rev 1).z64";
+        g_fileEntries[num_entries++] = "Mario Tennis (USA).z64";
+        g_fileEntries[num_entries++] = "Super Mario 64 (U) [!].z64";
+        return num_entries;
+    }
+
     FRESULT fr; /* Return value */
     char const *p_dir = dir;
 
@@ -509,6 +543,8 @@ static void show_list(void) {
     // TODO alloc any other buffers here as well
 	NUM_ENTRIES = ls("/");
 
+    waitForStart();
+
     // display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
     display_init(RESOLUTION_512x240, DEPTH_16_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
     // display_init(RESOLUTION_512x240, DEPTH_32_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
@@ -525,7 +561,7 @@ static void show_list(void) {
     waitForStart();
 
     timer_init();
-    new_timer(TIMER_TICKS(1000000 / 10), TF_CONTINUOUS, update_spinner);
+    bool createLoadingTimer = false;
 
 	while (1) {
 		static display_context_t display = 0;
@@ -543,7 +579,7 @@ static void show_list(void) {
 		render_list(display, g_fileEntries, currently_selected, first_visible, max_on_screen);
 
         /* Render info about the currently selected rom including box art */
-        //render_info_panel(display, currently_selected);
+        render_info_panel(display, currently_selected);
 
         /* A little debug text at the bottom of the screen */
         //snprintf(debugTextBuffer, 100, "currently_selected=%d, first_visible=%d, max_per_page=%d", currently_selected, first_visible, max_on_screen);
@@ -557,10 +593,13 @@ static void show_list(void) {
 
         if (g_sendingSelectedRom) {
             // check the busy register
-            uint16_t sdBusy = pc64_sd_wait();
-            if (sdBusy == 0) {
+            uint16_t sdBusy =  pc64_sd_wait_single();
+            uint16_t sdBusy2 = pc64_sd_wait_single(); // in my testing, this had to be run again for it to be successful.
+            uint16_t sdBusy3 = pc64_sd_wait_single();
+            if (sdBusy == 0 && sdBusy2 == 0 && sdBusy3 == 0) {
                 g_isLoading = false;
                 g_sendingSelectedRom = false;
+                wait_ms(5000);
                 // start boot
                 bootRom(display, 1);
             }
@@ -568,6 +607,11 @@ static void show_list(void) {
 
         /* Force the backbuffer flip */
         display_show(display);
+
+        // If we are loading, then don't allow anymore input
+        if (g_isLoading) {
+            continue;
+        }
 
 		/* Grab controller input and move the selection up or down */
 		controller_scan();
@@ -580,6 +624,11 @@ static void show_list(void) {
 		} else if (keys.c[0].A) {
             // Load the selected from
             loadRomAtSelection(currently_selected);
+            createLoadingTimer = true;
+            if (createLoadingTimer) {
+                createLoadingTimer = false;
+                new_timer(TIMER_TICKS(1000000 / 10), TF_CONTINUOUS, update_spinner);
+            }
         } else if (keys.c[0].right) {
             // page forward
             //mag = max_on_screen; // TODO something more sophisticated than this, because we need to handle partial
@@ -666,7 +715,7 @@ int filesize( FILE *pFile )
 
 sprite_t *read_sprite( const char * const spritename )
 {
-    printf("reading sprite %s", spritename);
+    printf("reading sprite %s ", spritename);
     //FILE *fp = fopen(spritename, "r");
     int fp = dfs_open(spritename);
 
@@ -675,10 +724,15 @@ sprite_t *read_sprite( const char * const spritename )
         sprite_t *sp = malloc( dfs_size( fp ) );
         // fread( sp, 1, filesize( fp ), fp );
         // fclose( fp );
-        dfs_read(sp, 1, dfs_size(fp), fp);
+        int ret = dfs_read(sp, 1, dfs_size(fp), fp);
         dfs_close(fp);
 
-        printf("height: %d, width: %d\n", sp->height, sp->width);
+        if (ret == DFS_ESUCCESS && sp) {
+            printf("height: %d, width: %d\n", sp->height, sp->width);
+        } else {
+            printf("...Error loading sprite: %d\n", ret);
+            waitForStart();
+        }
 
         return sp;
     }
@@ -724,13 +778,7 @@ int read_rom_header_serial_number(char* buf, char* filename) {
 }
 
 static void init_sprites(void) {
-    // int count = 0;
-    // populate_dir(&count);
     printf("init sprites\n");
-    // int fp = dfs_open("/a-button-icon.png");
-    // a_button_icon = malloc( dfs_size( fp ) );
-    // dfs_read( a_button_icon, 1, dfs_size( fp ), fp );
-    // dfs_close( fp );
 
     a_button_icon = read_sprite("a-button-icon.sprite");
 
@@ -744,62 +792,59 @@ static void init_sprites(void) {
     //     animated_spinner[i] = read_sprite(n);
     // }
 
-    // #if BUILD_FOR_EMULATOR == 1
-    // int thumbnailCount = sizeof(g_thumbnail_table) / sizeof(*g_thumbnail_table);
-    // for(int i = 0; i < thumbnailCount; i++) {
-    //     // fp = dfs_open(g_thumbnail_table[i]);
-    //     // printf("%s opened? %d\n", g_thumbnail_table[i], fp);
+    if (IS_EMULATOR) {
+        LOAD_BOX_ART = true;
+        int thumbnailCount = sizeof(g_thumbnail_table) / sizeof(*g_thumbnail_table);
+        for(int i = 0; i < thumbnailCount; i++) {
+            // fp = dfs_open(g_thumbnail_table[i]);
+            // printf("%s opened? %d\n", g_thumbnail_table[i], fp);
 
-    //     // sprite_t* sprite = malloc( dfs_size( fp ) );
-    //     // dfs_read(sprite, 1, dfs_size(fp), fp);
-    //     // g_thumbnail_cache[i] = sprite;
+            // sprite_t* sprite = malloc( dfs_size( fp ) );
+            // dfs_read(sprite, 1, dfs_size(fp), fp);
+            // g_thumbnail_cache[i] = sprite;
 
-    //     // dfs_close( fp );
+            // dfs_close( fp );
 
-    //     printf("Loading thumbnail: %s\n", g_thumbnail_table[i]);
-    //     g_thumbnail_cache[i] = read_sprite(g_thumbnail_table[i]);
-    //     // printf("height: %d, width: %d\n", g_thumbnail_cache[i]->height, g_thumbnail_cache[i]->width);
-    // }
-    // #endif
+            printf("Loading thumbnail: %s\n", g_thumbnail_table[i]);
+            g_thumbnail_cache[i] = read_sprite(g_thumbnail_table[i]);
+            // printf("height: %d, width: %d\n", g_thumbnail_cache[i]->height, g_thumbnail_cache[i]->width);
+        }
+    }
 
     printf("done!\n");
-    waitForStart();
 }
 
 void start_shell(void) {
-    /* Init the screen, controller, and filesystem */
-    // display_init(RESOLUTION_512x240, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE);
-    // display_init(RESOLUTION_512x480, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE); // jitters in cen64
     controller_init();
-    
-    // #if BUILD_FOR_EMULATOR == 1
-    // bool debuggingOutputEnabled = debug_init_isviewer();
 
-    // if (!debuggingOutputEnabled) {
-    //     printf("Unable to enable isviewer support.\n");
-    // }
+    if (usb_initialize()) {
+        char usbcart = usb_getcart();
+        printf("USB Cart %d\n", usbcart);
+        switch (usbcart)
+        {
+        case CART_64DRIVE:
+        case CART_EVERDRIVE:
+        case CART_PC64:
+            IS_EMULATOR = false;
+            break;
+        default:
+            IS_EMULATOR = true;
+        }
+    } else {
+        IS_EMULATOR = true;
+    }
 
-    // int ret = dfs_init(DFS_DEFAULT_LOCATION);
-    // if (ret != DFS_ESUCCESS) {
-    //     printf("Unable to init filesystem. ret: %d\n", ret);
-	// 	printf("git rev %08x\n", GIT_REV);
-
-    //     waitForStart();
-    // }
-
-    // /* Load sprites for shell from the filesystem */
-    // init_sprites();
-
-    // /* Starts the shell by rendering the list of files from the SD card*/
-    // show_list();
-
-    // #else
+    if (IS_EMULATOR) {
+        printf("Running in an emulator?\n");
+    } else {
+        printf("Running on real hardware?\n");
+    }
 
     int ret = dfs_init(DFS_DEFAULT_LOCATION);
     if (ret != DFS_ESUCCESS) {
         printf("Unable to init filesystem. ret: %d\n", ret);
 		printf("git rev %08x\n", GIT_REV);
-    } else {
+    } else if (!IS_EMULATOR) {
         printf("Initing sd access");
         wait_ms( 100 );
 
@@ -813,9 +858,11 @@ void start_shell(void) {
                     struct controller_data keys = get_keys_pressed();
                     if (keys.c[0].start) {
                         retrying = true;
+                        wait_ms(300);
                         break;
                     } else if (keys.c[0].B) {
                         retrying = false;
+                        wait_ms(300);
                         break;
                     }
                 }
@@ -825,45 +872,43 @@ void start_shell(void) {
             }
         }
 
-        // printf("Press START to load The Shell.\n");
-        // while (true) {
-        //     controller_scan();
-        //     struct controller_data keys = get_keys_pressed();
-        //     if (keys.c[0].start) {
-        //         break;
-        //     }
-        // }
         console_clear();
 
-        waitForStart();
+        // waitForStart();
 
         /* Load sprites for shell from the filesystem */
-        init_sprites();
 
-
-        printf("Loading selected rom 'DOOM 64'\n");
-        loadRomAtSelection(0);
-        printf("Start waiting for sd_busy register...\n");
+        // printf("Loading selected rom 'DOOM 64'\n");
+        // loadRomAtSelection(0);
+        // printf("Start waiting for sd_busy register...\n");
         
-        wait_ms(1000);
+        // // wait before trying to poll busy register just to be sure everything is set
+        // // this is likely overkill 
+        // wait_ms(1000); 
 
-        printf("Waiting for rom load...\n");
-        while(pc64_sd_wait());
-        printf("Done waiting...\n");
+        // printf("Waiting for rom load...\n");
+        // pc64_sd_wait();
+        // pc64_sd_wait();
+
+        // printf("busy flag released, waiting for cart to settle...\n");
+        // wait_ms(5000);
         
-        g_isLoading = false;
-        g_sendingSelectedRom = false;
+        // g_isLoading = false;
+        // g_sendingSelectedRom = false;
 
-        // start boot
-        // display_init(RESOLUTION_512x240, DEPTH_16_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
-        static display_context_t display = 0;
-		/* Grab a render buffer */
-		// while (!(display = display_lock())) ;
-        printf("Booting rom!\n");
-        bootRom(display, 1);
+        // // start boot
+        // // display_init(RESOLUTION_512x240, DEPTH_16_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
+        // static display_context_t display = 0;
+		// /* Grab a render buffer */
+		// // while (!(display = display_lock())) ;
+        // printf("Booting rom!\n");
+        // bootRom(display, 1);
     
         /* Starts the shell by rendering the list of files from the SD card*/
-        // show_list();
     }
+
+    init_sprites();
+    show_list();
+
     // #endif
 }

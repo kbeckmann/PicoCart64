@@ -61,6 +61,7 @@ char sd_selected_rom_title[256];
 volatile bool sd_is_busy = true;
 
 // Variables used for signalling sd data send 
+volatile bool waitingForRomLoad = false;
 volatile bool sendDataReady = false;
 volatile uint32_t sectorToSend = 0;
 volatile uint32_t numSectorsToSend = 0;
@@ -146,6 +147,7 @@ void pc64_send_load_new_rom_command() {
         // Block cart while waiting for data
     sd_is_busy = true;
     sendDataReady = false;
+    romLoading = true;
     bufferIndex = 0;
     bufferByteIndex = 0;
 
@@ -156,22 +158,8 @@ void pc64_send_load_new_rom_command() {
     // command
     uart_tx_program_putc(COMMAND_LOAD_ROM);
 
-    // // sector
-    // uart_tx_program_putc(0);
-    // uart_tx_program_putc(0);
-    // uart_tx_program_putc(0);
-    // uart_tx_program_putc(0);
-
-    // uart_tx_program_putc((char)((sector & 0xFF000000) >> 24));
-    // uart_tx_program_putc((char)((sector & 0x00FF0000) >> 16));
-    // uart_tx_program_putc((char)((sector & 0x0000FF00) >> 8));
-    // uart_tx_program_putc((char)(sector  & 0x000000FF));
-
-    // // num sectors
-    // uart_tx_program_putc((char)((sectorCount & 0xFF000000) >> 24));
-    // uart_tx_program_putc((char)((sectorCount & 0x00FF0000) >> 16));
-    // uart_tx_program_putc((char)((sectorCount & 0x0000FF00) >> 8));
-    // uart_tx_program_putc((char)(sectorCount & 0x000000FF));
+    // Send the title to load
+    uart_tx_program_puts(sd_selected_rom_title);
 
     // Signal finish
     uart_tx_program_putc(COMMAND_FINISH);
@@ -273,8 +261,27 @@ void load_new_rom(char* filename) {
     ssi_hw->ssienr = 0;
 
     qspi_disable();
+
+    // Let MCU1 know that we are finished
+    // Signal start
+    uart_tx_program_putc(COMMAND_START);
+    uart_tx_program_putc(COMMAND_START2);
+
+    // command
+    uart_tx_program_putc(COMMAND_LOAD_ROM);
+
+    // Signal finish
+    uart_tx_program_putc(COMMAND_FINISH);
+    uart_tx_program_putc(COMMAND_FINISH2);
 }
 
+// MCU listens for other MCU commands and will respond accordingly
+int startIndex = 0;
+bool mayHaveStart = false;
+bool mayHaveFinish = false;
+bool receivingData = false;
+unsigned char mcu2_cmd_buffer[64]; // TODO rename
+int echoIndex = 0;
 void mcu1_process_rx_buffer() {
     while (rx_uart_buffer_has_data()) {
         uint8_t value = rx_uart_buffer_get();
@@ -283,22 +290,47 @@ void mcu1_process_rx_buffer() {
         uart_tx_program_putc(value);
         #endif
 
-        // Combine two char values into a 16 bit value
-        // Only increment bufferIndex when adding a value
-        // else, store the ch into the holding field
-        if (bufferByteIndex % 2 == 1) {
-            uint16_t value16 = lastBufferValue << 8 | value;
-            pc64_uart_tx_buf[bufferIndex] = value16;
-            bufferIndex += 1;
+        if (romLoading) {
+            if (value == COMMAND_START) {
+            mayHaveStart = true;
+            } else if (value == COMMAND_START2 && mayHaveStart) {
+                receivingData = true;
+            } else if (value == COMMAND_FINISH && receivingData) {
+                mayHaveFinish = true;
+            } else if (value == COMMAND_FINISH2 && receivingData) {
+                receivingData = false;
+            } else if (receivingData && !mayHaveFinish) {
+                mcu2_cmd_buffer[bufferIndex] = value;
+                bufferIndex++;
+            }
+
+            if (mayHaveFinish && !receivingData) {
+                   char command = mcu2_cmd_buffer[0];
+                   // TODO check the command? 
+                   // May not be needed
+
+                   romLoading = false; // signal that the rom is finished loading
+                   sendDataReady = true;
+            }
+
         } else {
-            lastBufferValue = value;
-        }
+            // Combine two char values into a 16 bit value
+            // Only increment bufferIndex when adding a value
+            // else, store the ch into the holding field
+            if (bufferByteIndex % 2 == 1) {
+                uint16_t value16 = lastBufferValue << 8 | value;
+                pc64_uart_tx_buf[bufferIndex] = value16;
+                bufferIndex += 1;
+            } else {
+                lastBufferValue = value;
+            }
 
-        bufferByteIndex++;
+            bufferByteIndex++;
 
-        if (bufferByteIndex >= SD_CARD_SECTOR_SIZE) {
-            sendDataReady = true;
-            break;
+            if (bufferByteIndex >= SD_CARD_SECTOR_SIZE) {
+                sendDataReady = true;
+                break;
+            }
         }
     }
 
@@ -307,13 +339,6 @@ void mcu1_process_rx_buffer() {
     }
 }
 
-// MCU2 listens for MCU1 commands and will respond accordingly
-int startIndex = 0;
-bool mayHaveStart = false;
-bool mayHaveFinish = false;
-bool receivingData = false;
-unsigned char mcu2_cmd_buffer[64];
-int echoIndex = 0;
 void mcu2_process_rx_buffer() {
     while (rx_uart_buffer_has_data()) {
         char ch = rx_uart_buffer_get();
@@ -332,25 +357,30 @@ void mcu2_process_rx_buffer() {
         } else if (ch == COMMAND_FINISH2 && receivingData) {
             receivingData = false;
         } else if (receivingData && !mayHaveFinish) {
-            mcu2_cmd_buffer[bufferIndex] = ch;
+            ((uint8_t*)(pc64_uart_tx_buf))[bufferIndex] = ch;
             bufferIndex++;
         }
 
         if (mayHaveFinish && !receivingData) {
             // end of command
             // process what was sent
-            char command = mcu2_cmd_buffer[0];
-            uint32_t sector_front =(mcu2_cmd_buffer[1] << 24) | (mcu2_cmd_buffer[2] << 16) | (mcu2_cmd_buffer[3] << 8) | mcu2_cmd_buffer[4];
-            uint32_t sector_back = (mcu2_cmd_buffer[5] << 24) | (mcu2_cmd_buffer[6] << 16) | (mcu2_cmd_buffer[7] << 8) | mcu2_cmd_buffer[8];
-            //uint64_t sector = ((uint64_t)sector_front) << 32 | sector_back;
-            volatile uint32_t sectorCount = (mcu2_cmd_buffer[9] << 24) | (mcu2_cmd_buffer[10] << 16) | (mcu2_cmd_buffer[11] << 8) | mcu2_cmd_buffer[12];
+            uint8_t* buffer = (uint8_t*)pc64_uart_tx_buf; // cast to char array
+            char command = buffer[0];
 
             if (command == COMMAND_SD_READ) {
+                uint32_t sector_front =(buffer[1] << 24) | (buffer[2] << 16) | (buffer[3] << 8) | buffer[4];
+                uint32_t sector_back = (buffer[5] << 24) | (buffer[6] << 16) | (buffer[7] << 8) | buffer[8];
+                //uint64_t sector = ((uint64_t)sector_front) << 32 | sector_back;
+                volatile uint32_t sectorCount = (buffer[9] << 24) | (buffer[10] << 16) | (buffer[11] << 8) | buffer[12];
                 sectorToSend = sector_back;
                 numSectorsToSend = 1;
                 sendDataReady = true;
                 //printf("Parsed! sector_front:%d sector_back: %d\n", sector_front, sector_back);
             } else if (command == COMMAND_LOAD_ROM) {
+                sprintf(sd_selected_rom_title, "%s", buffer+1);
+                // strncpy(sd_selected_rom_title, buffer+1, 256);
+                printf("Rom to load: %s\n", sd_selected_rom_title);
+
                 startRomLoad = true;
             } else {
                 // not supported yet
@@ -364,16 +394,16 @@ void mcu2_process_rx_buffer() {
             echoIndex = 0;
         } else {
             echoIndex++;
-            if (echoIndex >= 20) {
+            if (echoIndex >= 32) {
                 printf("\n");
                 echoIndex = 0;
             }
         }
 
-        if (bufferIndex-1 == 14) {
-            bufferIndex = 0;
-            printf("\nError: Missing last byte\n");
-        }
+        // if (bufferIndex-1 == 14) {
+        //     bufferIndex = 0;
+        //     printf("\nError: Missing last byte\n");
+        // }
     }
 }
 

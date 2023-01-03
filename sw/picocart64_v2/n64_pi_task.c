@@ -59,7 +59,7 @@ static volatile uint32_t back_cache_endingAddress = 0;
 #endif
 
 volatile bool g_loadRomFromMemoryArray = false;
-volatile bool g_resetN64PILoop = false;
+static uint n64_pi_pio_offset;
 volatile uint16_t *ptr16 = (volatile uint16_t *)0x10000000;
 // static const uint16_t *rom_file_16 = (uint16_t *) rom_chunks;
 
@@ -207,6 +207,18 @@ void load_rom_cache(uint32_t startingAt) {
 	#endif
 }
 
+void restart_n64_pi_pio() {
+	PIO pio = pio0;
+	// Stop pio so it's safe to reenter n64_pi_run method
+	pio_sm_set_enabled(pio, 0, false);
+	pio_remove_program(pio, &n64_pi_program, n64_pi_pio_offset);
+
+	// Start it again
+	// n64_pi_pio_offset = pio_add_program(pio, &n64_pi_program);
+	// n64_pi_program_init(pio, 0, n64_pi_pio_offset);
+	// pio_sm_set_enabled(pio, 0, true);
+}
+
 static inline uint32_t resolve_sram_address(uint32_t address)
 {	
 	uint32_t bank = (address >> 18) & 0x3;
@@ -233,10 +245,14 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 	systick_hw->csr = 0x5;
     systick_hw->rvr = 0x00FFFFFF;
 
+	// Probably already restarted or first time start, we want to run the loop
+	// until this is true, so always reset it
+	g_restart_pi_handler = false;
+
 	// Init PIO
 	PIO pio = pio0;
-	uint offset = pio_add_program(pio, &n64_pi_program);
-	n64_pi_program_init(pio, 0, offset);
+	n64_pi_pio_offset = pio_add_program(pio, &n64_pi_program);
+	n64_pi_program_init(pio, 0, n64_pi_pio_offset);
 	pio_sm_set_enabled(pio, 0, true);
 
 	// Wait for reset to be released
@@ -254,7 +270,7 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 
 	// add_log_to_buffer(addr);
 	uint32_t lastUpdate = 0;
-	while (1 && !g_resetN64PILoop) {
+	while (1 && !g_restart_pi_handler) {
 		// addr must not be a WRITE or READ request here,
 		// it should contain a 16-bit aligned address.
 		// Assert drains performance, uncomment when debugging.
@@ -269,7 +285,6 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 		// Note that the if-cases are ordered in priority from
 		// most timing critical to least.
 		if (last_addr == 0x10000000) {
-		// if (last_addr == 0x10000000) {
 			// Configure bus to run slowly.
 			// This is better patched in the rom, so we won't need a branch here.
 			// But let's keep it here so it's easy to import roms.
@@ -337,6 +352,10 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 					// New address
 					break;
 				}
+
+				if (g_restart_pi_handler) {
+					break;
+				}
 			} while (1);
 		} else if (last_addr >= 0x10000000 && last_addr <= 0x1FBFFFFF) {
 			// Domain 1, Address 2 Cartridge ROM
@@ -367,7 +386,11 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 					// New address
 					break;
 				}
-			} while (1 && !g_resetN64PILoop);
+
+				if (g_restart_pi_handler) {
+					break;
+				}
+			} while (1);
 		}
 #if 0
 		else if (last_addr >= 0x05000000 && last_addr <= 0x05FFFFFF) {
@@ -441,6 +464,10 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 					// New address
 					break;
 				}
+
+				if (g_restart_pi_handler) {
+					break;
+				}
 			} while (1);
 		} else if (last_addr >= PC64_RAND_ADDRESS_START && last_addr <= PC64_RAND_ADDRESS_END) {
 			// PicoCart64 RAND address space
@@ -458,6 +485,10 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 					last_addr += 2;
 				} else {
 					// New address
+					break;
+				}
+
+				if (g_restart_pi_handler) {
 					break;
 				}
 			} while (1);
@@ -577,6 +608,10 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 					// New address
 					break;
 				}
+
+				if (g_restart_pi_handler) {
+					break;
+				}
 			} while (1);
 		} else {
 			// Don't handle this request - jump back to the beginning.
@@ -586,17 +621,27 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 #if 0
 			uart_print_hex_u32(last_addr);
 #endif
+
+			if (g_restart_pi_handler) {
+				break;
+			}
+
 			// Read to empty fifo
 			addr = n64_pi_get_value(pio);
 
 			// Jump to start of the PIO program.
-			pio_sm_exec(pio, 0, pio_encode_jmp(offset + 0));
+			pio_sm_exec(pio, 0, pio_encode_jmp(n64_pi_pio_offset + 0));
 
 			// Read and handle the following requests normally
 			addr = n64_pi_get_value(pio);
 		}
+
+		if (g_restart_pi_handler) {
+			break;
+		}
 	}
 
+	// Tear down the pio sm so the function can be called again.
 	pio_sm_set_enabled(pio, 0, false);
-	pio_remove_program(pio, &n64_pi_program, offset);
+	pio_remove_program(pio, &n64_pi_program, n64_pi_pio_offset);
 }

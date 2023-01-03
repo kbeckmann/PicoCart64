@@ -1,6 +1,10 @@
 {
     "cmake.configureOnOpen": true,
     "files.associations": {
-        "rom_vars.h": "c"
+        "rom_vars.h": "c",
+        "n64_pi_task.h": "c",
+        "n64_defs.h": "c",
+        "n64_pi.h": "c",
+        "n64_pi.pio.h": "c"
     }
 }
