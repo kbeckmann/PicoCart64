@@ -130,9 +130,9 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 	pio_uart_init(PIN_MCU2_DIO, PIN_MCU2_CS);
 
 	printf("MCU1 core1 booted!\n");
-	// uart_tx_program_putc(0xA);
-	// uart_tx_program_putc(0xB);
-	// uart_tx_program_putc(0xC);
+	uart_tx_program_putc(0xA);
+	uart_tx_program_putc(0xB);
+	uart_tx_program_putc(0xC);
 	
 	bool readingData = false;
 	volatile bool hasInit = false;
@@ -143,80 +143,6 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 	volatile bool test_load = true;
 	while (1) {
 		tight_loop_contents();
-
-		// if (test_load && time_us_32() - t2 > (1000000 * 10)) {
-		// 	t2 = time_us_32();
-		// 	test_load = false;
-
-		// 	waitingForRomLoad = true;
-		// 	// Turn off the qspi hardware so mcu2 can use it
-		// 	current_mcu_enable_demux(false);
-		// 	ssi_hw->ssienr = 0;
-		// 	qspi_disable();
-
-		// 	pc64_send_load_new_rom_command();
-		// }
-
-		if (isWaitingForRomLoad && 0) {
-			if(time_us_32() - t > 1000000) {
-				t = time_us_32();
-				it++;
-
-				// printf(".");
-			
-				// wait 30 seconds then release
-				if (it > 30 && !hasInit) {
-					hasInit = true;
-					set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
-					
-					current_mcu_enable_demux(true);
-
-					psram_set_cs(3);
-
-					program_connect_internal_flash();
-					program_flash_exit_xip();
-					program_flash_flush_cache();
-					program_flash_enter_cmd_xip();
-					// printf("Reading from psram fast\n");
-					// Reads should be enabled now
-					
-
-					// volatile uint8_t *ptr = (volatile uint8_t *)0x10000000;
-					// uint32_t cycleCountStart = 0;
-					// uint32_t totalTime = 0;
-					// int psram_csToggleTime = 0;
-					// int total_memoryAccessTime = 0;
-					// int totalReadTime = 0;
-					// for (int i = 0; i < 32; i++) {
-					// 	uint32_t modifiedAddress = i;
-						
-					// 	uint32_t startTime_us = time_us_32();
-					// 	uint8_t word = ptr[modifiedAddress];
-
-					// 	totalReadTime += time_us_32() - startTime_us;
-					// 	if (i < 32) { // only print the first 16 words
-					// 		// printf("PSRAM-MCU1[%d]: %08x\n",i, word);
-					// 		uart_tx_program_putc(word);
-					// 	}
-					// }
-
-				
-					g_loadRomFromMemoryArray = true; // read from psram
-					romLoading = false;
-					sd_is_busy = false;
-					isWaitingForRomLoad = false;
-
-					g_restart_pi_handler = true;
-
-					uart_tx_program_putc(0x97);
-
-					// Once the sd_is_busy flag is released, the menu rom will wait a little
-					// extra time before trying to restart the code so that should be enough time
-					// for us to restart the pio program like this
-					// restart_n64_pi_pio();
-				}
-			}
-		}
 
 		if (readingData) {
 			// Process anything that might be on the uart buffer
@@ -235,8 +161,6 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 				program_flash_flush_cache();
 				program_flash_enter_cmd_xip();
 
-				uart_tx_program_putc(0xA);
-
 				// rom is loaded now
 				g_loadRomFromMemoryArray = true; // read from psram
 				isWaitingForRomLoad = false;
@@ -246,7 +170,8 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 				// Not sure if we would need to re-restart it.
 				// g_restart_pi_handler = true;
 
-				uart_tx_program_putc(0xB);
+				// Sanity chirp to mcu2 just to know that this completed
+				uart_tx_program_putc(0xAB);
 			}
 		}
 
@@ -392,8 +317,8 @@ void boardTest() {
 void __no_inline_not_in_flash_func(mcu1_main)(void)
 {
 	int count = 0;
-	const int freq_khz = 133000;
-	// const int freq_khz = 166000;
+	// const int freq_khz = 133000;
+	const int freq_khz = 166000;
 	// const int freq_khz = 200000;
 	// const int freq_khz = 210000;
 	// const int freq_khz = 220000;
@@ -430,8 +355,6 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 		}
 	}
 
-	
-
 #if 0
 	printf("Start board test\n");
 	boardTest();
@@ -444,13 +367,6 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 	multicore_launch_core1(mcu1_core1_entry);
 
 	printf("launching n64_pi_run...\n");
-
-	// current_mcu_enable_demux(true);
-	// psram_set_cs(2);
-	// program_connect_internal_flash();
-	// program_flash_exit_xip();
-	// program_flash_flush_cache();
-	// picocart_boot2_enable();
 
 	n64_pi_run();
 

@@ -208,8 +208,7 @@ void main_task_entry(__unused void *params)
 
 		if (startRomLoad && !romLoading) {
 			romLoading = true;
-			printf("Loading rom!\n");
-			load_new_rom("Doom 64 (USA) (Rev 1).z64");
+			load_selected_rom();
 			romLoading = false;
 			startRomLoad = false;
 		}

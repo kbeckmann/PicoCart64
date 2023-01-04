@@ -51,7 +51,9 @@ void send_sd_card_data();
 // SD Card functions
 void mount_sd(void);
 
-// sd/rom/psram stuff
+/* sd/rom/psram stuff */
+// loads the rom file specified in sd_selected_rom_title, that is set with the load rom command from mcu1
+void load_selected_rom(); 
 void load_rom(const char *filename);
 
 void pc64_send_load_new_rom_command();

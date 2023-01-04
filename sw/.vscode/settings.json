@@ -5,6 +5,8 @@
         "n64_pi_task.h": "c",
         "n64_defs.h": "c",
         "n64_pi.h": "c",
-        "n64_pi.pio.h": "c"
+        "n64_pi.pio.h": "c",
+        "internal_sd_card.h": "c",
+        "psram.h": "c"
     }
 }

@@ -5,6 +5,22 @@
 #include "psram.h"
 #include "gpio_helper.h"
 
+/*
+U1 = FLASH, BOOT
+U2 = Unoccupied
+U3 = PSRAM 8M
+U4 = PSRAM 8M
+U5 = PSRAM 8M
+U6 = PSRAM 8M
+U7 = FLASH 16M
+U8 = FLASH 16M
+*/ 
+
+const int MAX_MEMORY_ARRAY_CHIP_INDEX = 8;
+const uint32_t PSRAM_CHIP_CAPACITY_BYTES = 8 * 1024 * 1024;
+const uint32_t FLASH_CHIP_CAPACITY_BYTES = 16 * 1024 * 1024;
+const int START_ROM_LOAD_CHIP_INDEX = 3;
+
 volatile int current_mcu_demux_pin_0 =  -1;
 volatile int current_mcu_demux_pin_1 =  -1;
 volatile int current_mcu_demux_pin_2 =  -1;
@@ -30,9 +46,10 @@ void set_demux_mcu_variables(int demux_pin0, int demux_pin1, int demux_pin2, int
     current_demux_enabled_config[3] = (gpio_config_t){demux_pinIE, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_SIO};
 }
 
-uint8_t psram_addr_to_chip(uint32_t address)
+inline uint8_t psram_addr_to_chip(uint32_t address)
 {
-	return ((address >> 23) & 0x7) + 1;
+	// return ((address >> 23) & 0x7) + 1;
+	return ((address >> 23) & 0x7) + 3; // +3 since psram is soldered starting at 3 on my test board
 }
 
 //   0: Deassert all CS

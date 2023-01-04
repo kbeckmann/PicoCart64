@@ -444,7 +444,7 @@ int __noinline program_flash_size_log2() {
 // doing cached XIP reads from the flash. Called by the bootrom before
 // entering flash second stage, and called by the debugger after flash
 // programming.
-void __noinline program_flash_flush_cache() {
+void inline program_flash_flush_cache() {
     xip_ctrl_hw->flush = 1;
     // Read blocks until flush completion
     (void) xip_ctrl_hw->flush;

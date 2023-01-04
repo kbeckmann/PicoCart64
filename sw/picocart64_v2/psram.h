@@ -1,7 +1,7 @@
 /**
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2022 Konrad Beckmann
+ * Copyright (c) 2022 Kaili Hill
  */
 
 #pragma once
@@ -14,10 +14,14 @@
 
 #include "hardware/regs/pads_qspi.h"
 
-// extern int current_mcu_demux_pin_0;
-// extern int current_mcu_demux_pin_1;
-// extern int current_mcu_demux_pin_2;
-// extern int current_mcu_demux_pin_ie;
+// Max number of chips on the board
+extern const int MAX_MEMORY_ARRAY_CHIP_INDEX;
+// Capcity of the PSRAM chips soldered to the board
+extern const uint32_t PSRAM_CHIP_CAPACITY_BYTES;
+// Capcity of the nor flash chips soldered to the board
+extern const uint32_t FLASH_CHIP_CAPACITY_BYTES;
+// Starting chip index(U?) of the chip where a rom is first loaded
+extern const int START_ROM_LOAD_CHIP_INDEX;
 
 uint8_t psram_addr_to_chip(uint32_t address);
 void psram_set_cs(uint8_t chip);

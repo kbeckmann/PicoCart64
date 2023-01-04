@@ -163,6 +163,11 @@ void pc64_send_load_new_rom_command() {
     uart_tx_program_putc(COMMAND_FINISH2);
 }
 
+void load_selected_rom() {
+    printf("Loading '%s'...\n", sd_selected_rom_title);
+    load_new_rom(sd_selected_rom_title);
+}
+
 void load_new_rom(char* filename) {
     sd_is_busy = true;
     char buf[1024 / 2 / 2 / 2 / 2];
@@ -197,14 +202,21 @@ void load_new_rom(char* filename) {
 	int len = 0;
 	int total = 0;
 	uint64_t t0 = to_us_since_boot(get_absolute_time());
+    int currentPSRAMChip = 3;
 	do {
         fr = f_read(&fil, buf, sizeof(buf), &len);
-		//qspi_write(total, buf, len);
-
         program_write_buf(total, buf, len);
-
 		total += len;
-	} while (len > 0 && total < 0x007C8240); //007C8240 just lets us cut off some empty space
+
+        int newChip = psram_addr_to_chip(total);
+        if (newChip != currentPSRAMChip && newChip <= MAX_MEMORY_ARRAY_CHIP_INDEX) {
+            printf("Changing psram chip. Was: %d, now: %d\n", currentPSRAMChip, newChip);
+            printf("Total bytes: %d. Bytes remaining = %ld\n", total, (filinfo.fsize - total));
+            currentPSRAMChip = newChip;
+            psram_set_cs(currentPSRAMChip); // Switch the PSRAM chip
+        }
+
+	} while (len > 0); //007C8240 just lets us cut off some empty space
 	uint64_t t1 = to_us_since_boot(get_absolute_time());
 	uint32_t delta = (t1 - t0) / 1000;
 	uint32_t kBps = (uint32_t) ((float)(total / 1024.0f) / (float)(delta / 1000.0f));
@@ -217,10 +229,9 @@ void load_new_rom(char* filename) {
 	}
 	printf("---- read file done -----\n\n\n");
 
-
-    //psram_set_cs(3); // Use the PSRAM chip
-     // Now see if regular reads work
-    // qspi_enable();
+    // Set back to starting PSRAM chip to read a few bytes
+    psram_set_cs(3); // Use the PSRAM chip
+    
     program_flash_read_data(0, buf, 32);
 
     for(int i = 0; i < 16; i++) {
@@ -241,9 +252,7 @@ void load_new_rom(char* filename) {
         uint32_t modifiedAddress = i;
         
         uint32_t startTime_us = time_us_32();
-        // psram_set_cs(3);
         uint32_t word = ptr[modifiedAddress];
-        // psram_set_cs(0);
 
         totalReadTime += time_us_32() - startTime_us;
         if (i < 16) { // only print the first 16 words
@@ -381,9 +390,6 @@ void mcu2_process_rx_buffer() {
                 
             } else if (command == COMMAND_LOAD_ROM) {
                 sprintf(sd_selected_rom_title, "%s", buffer+1);
-                // strncpy(sd_selected_rom_title, buffer+1, 256);
-                printf("Rom to load: %s\n", sd_selected_rom_title);
-                printf("BUFFER: %s\n", buffer);
                 startRomLoad = true;
 
             } else {

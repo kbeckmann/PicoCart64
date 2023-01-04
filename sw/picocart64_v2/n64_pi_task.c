@@ -27,7 +27,7 @@
 
 #include "sdcard/internal_sd_card.h"
 #include "psram.h"
-#include "qspi_helper.h"
+#include "program_flash_array.h"
 
 #include "rom.h"
 // const char __attribute__((section(".n64_rom.header"))) picocart_header[16] = "picocartcompress";
@@ -58,10 +58,12 @@ static volatile uint32_t back_cache_startingAddress = 0;
 static volatile uint32_t back_cache_endingAddress = 0;
 #endif
 
+volatile int g_currentMemoryArrayChip = 3;
+ // Used when addressing chips outside the starting one
+volatile uint32_t address_modifier = 0;
 volatile bool g_loadRomFromMemoryArray = false;
 static uint n64_pi_pio_offset;
 volatile uint16_t *ptr16 = (volatile uint16_t *)0x10000000;
-// static const uint16_t *rom_file_16 = (uint16_t *) rom_chunks;
 
 uint16_t rom_mapping[MAPPING_TABLE_LEN];
 
@@ -72,22 +74,22 @@ static const uint16_t *rom_file_16 = (uint16_t *) rom_chunks;
 #endif
 
 
-static inline void psram_set_cs2(uint8_t chip)
-{
-	uint32_t mask = (1 << PIN_DEMUX_IE) | (1 << PIN_DEMUX_A0) | (1 << PIN_DEMUX_A1) | (1 << PIN_DEMUX_A2);
-	uint32_t new_mask;
+// static inline void psram_set_cs2(uint8_t chip)
+// {
+// 	uint32_t mask = (1 << PIN_DEMUX_IE) | (1 << PIN_DEMUX_A0) | (1 << PIN_DEMUX_A1) | (1 << PIN_DEMUX_A2);
+// 	uint32_t new_mask;
 
-	if (chip >= 1 && chip <= 8) {
-		chip--;					// convert to 0-indexed
-		new_mask = (1 << PIN_DEMUX_IE) | (chip << PIN_DEMUX_A0);
-	} else {
-		// Set PIN_DEMUX_IE = 0 to pull all PSRAM CS-lines high
-		new_mask = 0;
-	}
+// 	if (chip >= 1 && chip <= 8) {
+// 		chip--;					// convert to 0-indexed
+// 		new_mask = (1 << PIN_DEMUX_IE) | (chip << PIN_DEMUX_A0);
+// 	} else {
+// 		// Set PIN_DEMUX_IE = 0 to pull all PSRAM CS-lines high
+// 		new_mask = 0;
+// 	}
 
-	uint32_t old_gpio_out = sio_hw->gpio_out;
-	sio_hw->gpio_out = (old_gpio_out & (~mask)) | new_mask;
-}
+// 	uint32_t old_gpio_out = sio_hw->gpio_out;
+// 	sio_hw->gpio_out = (old_gpio_out & (~mask)) | new_mask;
+// }
 
 volatile uint32_t update_rom_cache_for_address = 0;
 void update_rom_cache(uint32_t address) {
@@ -129,7 +131,22 @@ static inline uint16_t rom_read(uint32_t rom_address) {
 		const uint16_t *chunk_16 = (const uint16_t *)rom_chunks[chunk_index];
 		return chunk_16[(rom_address & COMPRESSION_MASK) >> 1];
 	} else {
-		return ptr16[(rom_address & 0xFFFFFF) >> 1];
+		if (psram_addr_to_chip((rom_address & 0xFFFFFF) >> 1) != g_currentMemoryArrayChip) {
+			g_currentMemoryArrayChip = psram_addr_to_chip((rom_address & 0xFFFFFF) >> 1);
+
+			uart_tx_program_putc(0xC);
+			uart_tx_program_putc((uint8_t)g_currentMemoryArrayChip);
+			
+			// set address modifier
+			address_modifier = (g_currentMemoryArrayChip - START_ROM_LOAD_CHIP_INDEX) * PSRAM_CHIP_CAPACITY_BYTES;
+
+			// Set the new chip
+			psram_set_cs(g_currentMemoryArrayChip);
+			
+			// Flush cache
+			program_flash_flush_cache();
+		}
+		return ptr16[((rom_address & 0xFFFFFF) >> 1) - address_modifier];
 	}
 #else
 	return rom_file_16[(last_addr & 0xFFFFFF) >> 1];
@@ -579,29 +596,8 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 						break;
 
 					case PC64_REGISTER_SD_SELECT_ROM:
-						// Rom is requesting we load rom
-						// it will send the title of the rom
-						// and we should load it
-						// TODO: This should probably be turned into a CMD+Register thing
-						// where n64 writes to a picocart register and 
-						// then sends the command, so we can do things like open directories
-						// and traverse the filesystem
-
-						// Data is written into the pc64 buffer like below
-						// pc64_uart_tx_buf[(last_addr & (sizeof(pc64_uart_tx_buf) - 1)) >> 1] = swap8(addr >> 16);
-						// and once the select rom command is sent, accompanined by a length (or we always write 256 chars...)
-						// we can pull that data out of the buffer and find the requested file.
-						// Set SD BUSY to true so the rom can poll on it while we load
-
-						// Once the rom has been written to the storage array (ram/flash) release the SD BUSY flag and the rom can
-						// do whatever magic it is, to load that rom. TODO: waiting for that magic in the discord.
-						
-						
-						//write_word |= n64_pi_get_value(pio) >> 16;
-						//stdio_uart_out_chars((const char *)pc64_uart_tx_buf, write_word & (sizeof(pc64_uart_tx_buf) - 1));
 						pc64_set_sd_rom_selection((char *)pc64_uart_tx_buf, half_word);
 						multicore_fifo_push_blocking(CORE1_LOAD_NEW_ROM_CMD);
-
 						break;
 
 					default:

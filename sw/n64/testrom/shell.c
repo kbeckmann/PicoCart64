@@ -733,7 +733,7 @@ sprite_t *read_sprite( const char * const spritename )
             printf("height: %d, width: %d\n", sp->height, sp->width);
         } else {
             printf("...Error loading sprite: %d\n", ret);
-            waitForStart();
+            //waitForStart();
         }
 
         return sp;
