@@ -445,7 +445,6 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 				// Pre-fetch from the address
 				uint32_t buf_index = (last_addr & (sizeof(pc64_uart_tx_buf) - 1)) >> 1;
 				//next_word = PC64_MAGIC;//swap8(pc64_uart_tx_buf[buf_index]);
-				next_word = pc64_uart_tx_buf[buf_index];
 
 				// Read command/address
 				addr = n64_pi_get_value(pio);
@@ -453,10 +452,12 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 				if (addr & 0x00000001) {
 					// We got a WRITE
 					// 0bxxxxxxxx_xxxxxxxx_11111111_11111111
-					pc64_uart_tx_buf[(last_addr & (sizeof(pc64_uart_tx_buf) - 1)) >> 1] = swap8(addr >> 16);
+					// pc64_uart_tx_buf[(last_addr & (sizeof(pc64_uart_tx_buf) - 1)) >> 1] = swap8(addr >> 16);
+					pc64_uart_tx_buf[buf_index] = swap8(addr >> 16);
 					last_addr += 2;
 				} else if (addr == 0) {
 					// READ
+					next_word = pc64_uart_tx_buf[buf_index];
 					pio_sm_put(pio, 0, next_word);
 					last_addr += 2;
 
@@ -598,7 +599,6 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 						
 						//write_word |= n64_pi_get_value(pio) >> 16;
 						//stdio_uart_out_chars((const char *)pc64_uart_tx_buf, write_word & (sizeof(pc64_uart_tx_buf) - 1));
-						uart_tx_program_putc((uint8_t)half_word);
 						pc64_set_sd_rom_selection((char *)pc64_uart_tx_buf, half_word);
 						multicore_fifo_push_blocking(CORE1_LOAD_NEW_ROM_CMD);
 

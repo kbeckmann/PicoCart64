@@ -89,6 +89,7 @@ bool IS_EMULATOR = 0;
 bool LOAD_BOX_ART = 0;
 
 char** g_fileEntries; // Buffer for file entries
+int* g_fileSizes;
 sprite_t** g_thumbnail_cache;
 int g_currentPage = 0; // variable for file list pagination
 
@@ -104,12 +105,12 @@ char* g_thumbnail_table[] = {
     "mario64.sprite"
 };
 
-int g_fileSizes[] = {
-    12582912,
-    8388608,
-    16777216,
-    8388608  
-};
+// int g_fileSizes[] = {
+//     12582912,
+//     8388608,
+//     16777216,
+//     8388608  
+// };
 
 char* g_fileInfo[] = {
     "Goldeneye 007",
@@ -159,8 +160,9 @@ void loadRomAtSelection(int selection) {
     strcpy(fileToLoad, g_fileEntries[selection]);
 
     // Write the file name to the cart buffer
-    uint32_t len_aligned32 = (strlen(fileToLoad) + 3) & (-4);
-    pi_write_raw(fileToLoad, PC64_BASE_ADDRESS_START, 0, len_aligned32);
+    uint32_t len_aligned32 = (strlen(g_fileEntries[selection]) + 3) & (-4);
+    data_cache_hit_writeback_invalidate(g_fileEntries[selection], len_aligned32);
+    pi_write_raw(g_fileEntries[selection], PC64_BASE_ADDRESS_START, 0, len_aligned32);
 	// io_write(PC64_BASE_ADDRESS_START, fileToLoad);
 
     uint16_t sdSelectRomFilenameLength[] = { strlen(fileToLoad) };
@@ -375,7 +377,7 @@ static void render_info_panel(display_context_t display, int currently_selected)
         // Something might be wrong with this... Probably should use a global buffer and avoid creating new objects every time
         // sprintf(g_infoPanelTextBuf, "%s\nSize: %dM", g_fileInfo[currently_selected], g_fileSizes[currently_selected] / 1024 / 1024);
         // TODO if part of the string is longer than the number of characters that can fit in in the info panel width, split or clip it
-        sprintf(g_infoPanelTextBuf, "Goldeneye 007\nSize: 12M\nUSA\nReleased 1997\n%d", currently_selected);
+        sprintf(g_infoPanelTextBuf, "%s\nSize: %dM\nCountry\nReleased ?\n%d", g_fileEntries[currently_selected], g_fileSizes[currently_selected], currently_selected);
 
         g_lastSelection = currently_selected;
     }
@@ -511,7 +513,9 @@ int ls(const char *dir) {
         printf("%s [%s] [size=%llu]\n", fno.fname, pcAttrib, fno.fsize);
         if (fno.fname[0] != '.') {
             g_fileEntries[num_entries] = malloc(sizeof(char*) * FILE_NAME_MAX_LENGTH);
-		    sprintf(g_fileEntries[num_entries++], "%s [size=%llu]\n", fno.fname, fno.fsize);
+            g_fileSizes[num_entries] = fno.fsize / 1024 / 1024;
+		    sprintf(g_fileEntries[num_entries++], "%s\n", fno.fname, fno.fsize); // [size=%llu]
+            
         } else {
             printf("Skipping file\n");
         }
@@ -533,11 +537,10 @@ static void show_list(void) {
 
     // Fetch the root contents
     g_fileEntries = malloc(sizeof(char*) * FILE_ENTRIES_BUFFER_SIZE); // alloc the buffer
+    g_fileSizes = malloc(sizeof(int) * FILE_ENTRIES_BUFFER_SIZE);
 
     // TODO alloc any other buffers here as well
 	NUM_ENTRIES = ls("/");
-
-    waitForStart();
 
     char* menuHeaderText = malloc(sizeof(char) * 128);
     sprintf(menuHeaderText, "DREAMDrive OS (git rev %08x)\t\t\t\t%d Files", GIT_REV, NUM_ENTRIES);

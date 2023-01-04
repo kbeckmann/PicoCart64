@@ -96,9 +96,6 @@ void pc64_set_sd_read_sector_count(uint32_t count) {
 }
 
 void pc64_set_sd_rom_selection(char* titleBuffer, uint16_t len) {
-    // for (int i = 0; i < 256; i++) {
-    //     sd_selected_rom_title[i] = title[i];
-    // }
     strcpy(sd_selected_rom_title, titleBuffer);
 }
 
