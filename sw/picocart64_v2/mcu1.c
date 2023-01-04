@@ -243,7 +243,8 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 				sd_is_busy = false;
 				readingData = false;
 
-				g_restart_pi_handler = true;
+				// Not sure if we would need to re-restart it.
+				// g_restart_pi_handler = true;
 
 				uart_tx_program_putc(0xB);
 			}

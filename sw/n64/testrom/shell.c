@@ -166,13 +166,13 @@ void loadRomAtSelection(int selection) {
     uint16_t sdSelectRomFilenameLength[] = { strlen(fileToLoad) };
     // data_cache_hit_writeback_invalidate(&sdSelectRomFilenameLength, sizeof(sdSelectRomFilenameLength));
     // Send command to start the load, the cart will check the pc64 buffer for the filename 
-    data_cache_hit_writeback_invalidate(read_buf, sizeof(read_buf));
+    data_cache_hit_writeback_invalidate(sdSelectRomFilenameLength, sizeof(uint16_t));
     pi_write_raw(sdSelectRomFilenameLength, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_SELECT_ROM, sizeof(uint16_t));
     // io_write(PC64_CIBASE_ADDRESS_START + PC64_REGISTER_SD_SELECT_ROM, &sdSelectRomFilenameLength);
 
     g_isLoading = true;
 
-    wait_ms(100);
+    wait_ms(1000);
 }
 
 static uint16_t pc64_sd_wait_single() {
@@ -588,7 +588,7 @@ static void show_list(void) {
 
         if (g_sendingSelectedRom) {
             // check the busy register
-            uint16_t sdBusy =  pc64_sd_wait_single();
+            uint16_t sdBusy = pc64_sd_wait_single();
             if (sdBusy == 0) {
                 graphics_draw_box(display, SCREEN_WIDTH - 8, 3, 5, 5, graphics_convert_color(WHITE_COLOR));
                 g_isLoading = false;
@@ -599,9 +599,9 @@ static void show_list(void) {
             } else {
                 graphics_draw_box(display, SCREEN_WIDTH - 8, 3, 5, 5, graphics_convert_color(SELECTION_COLOR));
             }
-            // char b[] = "                ";
-            // sprintf(b, "busy: %d", sdBusy);
-            // graphics_draw_text(display, 30, 130, b);
+            char b[] = "                ";
+            sprintf(b, "busy: %d", sdBusy);
+            graphics_draw_text(display, 30, 130, b);
         }
 
         /* Force the backbuffer flip */
@@ -626,7 +626,7 @@ static void show_list(void) {
             createLoadingTimer = true;
             if (createLoadingTimer) {
                 createLoadingTimer = false;
-                new_timer(TIMER_TICKS(1000000 / 10), TF_CONTINUOUS, update_spinner);
+                //new_timer(TIMER_TICKS(1000000 / 10), TF_CONTINUOUS, update_spinner);
             }
         } else if (keys.c[0].right) {
             // page forward

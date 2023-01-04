@@ -517,8 +517,12 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 
 						break;
 					case PC64_REGISTER_SD_BUSY:
-						next_word = sd_is_busy ? 0x00000001 : 0x00000000;
-						pio_sm_put(pio, 0, next_word);
+						// next_word = sd_is_busy ? 0x00000001 : 0x00000000;
+						if (sd_is_busy) {
+							pio_sm_put(pio, 0, 0x00000001);
+						} else {
+							pio_sm_put(pio, 0, 0x00000000);
+						}
 						
 						break;
 					default:
