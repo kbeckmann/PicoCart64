@@ -124,15 +124,15 @@ static inline void swap_rom_cache() {
 	#endif
 }
 
-static inline uint16_t rom_read(uint32_t rom_address) {
+inline uint16_t rom_read(uint32_t rom_address) {
 #if COMPRESSED_ROM
 	if (!g_loadRomFromMemoryArray) {
 		uint32_t chunk_index = rom_mapping[(rom_address & 0xFFFFFF) >> COMPRESSION_SHIFT_AMOUNT];
 		const uint16_t *chunk_16 = (const uint16_t *)rom_chunks[chunk_index];
 		return chunk_16[(rom_address & COMPRESSION_MASK) >> 1];
 	} else {
-		if (psram_addr_to_chip((rom_address & 0xFFFFFF) >> 1) != g_currentMemoryArrayChip) {
-			g_currentMemoryArrayChip = psram_addr_to_chip((rom_address & 0xFFFFFF) >> 1);
+		if (psram_addr_to_chip((rom_address)) != g_currentMemoryArrayChip) {
+			g_currentMemoryArrayChip = psram_addr_to_chip((rom_address));
 
 			uart_tx_program_putc(0xC);
 			uart_tx_program_putc((uint8_t)g_currentMemoryArrayChip);
@@ -146,7 +146,7 @@ static inline uint16_t rom_read(uint32_t rom_address) {
 			// Flush cache
 			program_flash_flush_cache();
 		}
-		return ptr16[((rom_address & 0xFFFFFF) >> 1) - address_modifier];
+		return ptr16[(((rom_address - address_modifier) & 0xFFFFFF) >> 1)];
 	}
 #else
 	return rom_file_16[(last_addr & 0xFFFFFF) >> 1];
@@ -302,6 +302,10 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 		// Note that the if-cases are ordered in priority from
 		// most timing critical to least.
 		if (last_addr == 0x10000000) {
+			
+			// Chirp, reading 0
+			uart_tx_program_putc(0x10);
+
 			// Configure bus to run slowly.
 			// This is better patched in the rom, so we won't need a branch here.
 			// But let's keep it here so it's easy to import roms.
@@ -318,13 +322,20 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 			last_addr += 2;
 
 			// Patch bus speed here if needed (e.g. if not overclocking)
-			next_word = 0xFF40;
 			// next_word = 0x2040;
+			// if (g_loadRomFromMemoryArray) {
+			// 	// Official SDK standard speed
+			// 	next_word = 0x1240;
+			// } else {
+			// 	next_word = 0xFF40;
+			// }
 
-			// Official SDK standard speed
-			// next_word = 0x1240;
+			// Slowest speed
+			next_word = 0xFF40;
+
+			// next_word = 0x2040;
+		
 			addr = n64_pi_get_value(pio);
-			// uart_print_hex_u32(addr);
 
 			// Assume addr == 0, i.e. push 16 bits of data
 			pio_sm_put(pio, 0, next_word);
@@ -332,9 +343,6 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 
 			// Pre-fetch
 			next_word = rom_read(last_addr);
-			// uint32_t chunk_index = rom_mapping[(last_addr & 0xFFFFFF) >> COMPRESSION_SHIFT_AMOUNT];
-			// const uint16_t *chunk_16 = (const uint16_t *)rom_chunks[chunk_index];
-			// next_word = chunk_16[(last_addr & COMPRESSION_MASK) >> 1];
 
 			// ROM patching done
 			addr = n64_pi_get_value(pio);

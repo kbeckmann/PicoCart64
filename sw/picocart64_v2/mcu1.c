@@ -140,9 +140,41 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 	volatile uint32_t t = 0;
 	volatile uint32_t it = 0;
 	volatile uint32_t t2 = 0;
-	volatile bool test_load = true;
+
+	volatile bool test_load = false;
 	while (1) {
 		tight_loop_contents();
+
+		// Tick every second
+		if(time_us_32() - t > 1000000) {
+			t = time_us_32();
+			t2++;
+		}
+
+	// Do a rom load test after x seconds
+		if(test_load && t2 > 3) {
+			test_load = false;
+
+			pc64_set_sd_rom_selection("GoldenEye 007 (U) [!].z64", 25);
+			sd_is_busy = true;
+			romLoading = true;
+			isWaitingForRomLoad = true;
+			
+			readingData = true;
+			rx_uart_buffer_reset();
+
+			// Turn off the qspi hardware so mcu2 can use it
+			current_mcu_enable_demux(false);
+			ssi_hw->ssienr = 0;
+			qspi_disable();
+
+			// Something about the above code to turn off qspi
+			// causing the pi loop to behave oddly.
+			// This will restart the loop.
+			g_restart_pi_handler = true;
+
+			pc64_send_load_new_rom_command();
+		}
 
 		if (readingData) {
 			// Process anything that might be on the uart buffer
@@ -158,8 +190,19 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 				psram_set_cs(3);
 				program_connect_internal_flash();
 				program_flash_exit_xip();
+
+				// Send command to enter quad mode
+				program_flash_do_cmd(0x35, NULL, NULL, 0);
+
+				// send the command to enter quad mode for next chip as well
+				psram_set_cs(4);
+				program_flash_do_cmd(0x35, NULL, NULL, 0);
+
+				// Flush cache
 				program_flash_flush_cache();
-				program_flash_enter_cmd_xip();
+
+				program_flash_enter_cmd_xip(true); // psram quad mode
+				psram_set_cs(3); // Use the PSRAM chip
 
 				// rom is loaded now
 				g_loadRomFromMemoryArray = true; // read from psram
@@ -172,6 +215,13 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 
 				// Sanity chirp to mcu2 just to know that this completed
 				uart_tx_program_putc(0xAB);
+
+				// test read at
+				// 0x10000000 + 8 MB
+				// uint32_t addressToRead = 0x10000000 + 8 * 1024 * 1024;
+				// uint16_t word = rom_read(addressToRead);
+				// uart_tx_program_putc((uint8_t)(word >> 8));
+				// uart_tx_program_putc((uint8_t)(word));
 			}
 		}
 
@@ -318,8 +368,8 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 {
 	int count = 0;
 	// const int freq_khz = 133000;
-	const int freq_khz = 166000;
-	// const int freq_khz = 200000;
+	// const int freq_khz = 166000;
+	const int freq_khz = 200000;
 	// const int freq_khz = 210000;
 	// const int freq_khz = 220000;
 	// const int freq_khz = 230000;
@@ -341,7 +391,16 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 
 	// IF READING FROM FROM FLASH... (works for compressed roms)
 	qspi_oeover_normal(true);
+	ssi_hw->ssienr = 0;
+	ssi_hw->baudr = 4; // change baud
 	ssi_hw->ssienr = 1;
+
+	// current_mcu_enable_demux(true);
+	// program_connect_internal_flash();
+    // program_flash_exit_xip();
+	// program_flash_flush_cache();
+	// program_flash_enter_cmd_xip(false); // enter xip false=not psram chip, since it's flash
+	// psram_set_cs(1); // Use the PSRAM chip
 
 	// Set up ROM mapping table
 	if (memcmp(picocart_header, "picocartcompress", 16) == 0) {

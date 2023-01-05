@@ -24,13 +24,15 @@ void program_flash_range_erase(uint32_t addr, size_t count, uint32_t block_size,
 void program_flash_read_data(uint32_t addr, uint8_t *rx, size_t count);
 int  program_flash_size_log2();
 void program_flash_flush_cache();
-void program_flash_enter_cmd_xip();
+void program_flash_enter_cmd_xip(bool isPSRAM);
 void program_flash_abort();
 int  program_flash_was_aborted();
 
 void program_flash_disable();
 io_rw_32 grab_ctrlr0();
 io_rw_32 grab_spi_ctrlr_0();
+
+void exitQuadMode();
 
 void program_write_buf(uint32_t addr, const uint8_t* data, uint32_t len);
 

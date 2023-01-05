@@ -17,7 +17,7 @@
 #define LATCH_DELAY_US 4 * LATCH_DELAY_MULTIPLYER // Used for reads
 #define LATCH_DELAY_NS (110 / 7) * LATCH_DELAY_MULTIPLYER // Used for sending addresses. 133mhz is 7.5NS, let's just use int math though
 
-#define CART_ADDRESS_START 0x10000000
+#define CART_ADDRESS_START 0x10000002
 #define CART_ADDRESS_UPPER_RANGE 0x1FBFFFFF
 
 uint32_t finalReadAddress = CART_ADDRESS_START + 0x16; //0x200000;

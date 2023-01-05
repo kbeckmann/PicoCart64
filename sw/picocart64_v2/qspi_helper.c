@@ -362,11 +362,9 @@ void qspi_init_qspi(bool sendQuadEnableCommand)
 
 		while ((ssi_hw->sr & SSI_SR_BUSY_BITS) != 0) { tight_loop_contents(); }  
 
-		printf("Sent quad mode enable command\n");  
-		printf("Sample delay %d\n",ssi->rx_sample_dly);
+		// printf("Sent quad mode enable command\n");  
+		// printf("Sample delay %d\n",ssi->rx_sample_dly);
 	}
-
-	
 
     ssi->ssienr = 0;
     ssi->baudr = 2;

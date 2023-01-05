@@ -216,7 +216,7 @@ void load_new_rom(char* filename) {
             psram_set_cs(currentPSRAMChip); // Switch the PSRAM chip
         }
 
-	} while (len > 0); //007C8240 just lets us cut off some empty space
+	} while (len > 0 && len < 0x007C8240); //007C8240 just lets us cut off some empty space
 	uint64_t t1 = to_us_since_boot(get_absolute_time());
 	uint32_t delta = (t1 - t0) / 1000;
 	uint32_t kBps = (uint32_t) ((float)(total / 1024.0f) / (float)(delta / 1000.0f));
@@ -238,9 +238,14 @@ void load_new_rom(char* filename) {
         printf("%02x\n", buf[i]);
     }
 
-    // Now enable xip and try to read
+    // Send command to enter quad mode
+    program_flash_do_cmd(0x35, NULL, NULL, 0);
     program_flash_flush_cache();
-    program_flash_enter_cmd_xip();
+
+    // Now enable xip and try to read
+    program_flash_enter_cmd_xip(true);
+    psram_set_cs(3); // Use the PSRAM chip
+
     printf("\n\nWITH qspi_enter_cmd_xip\n");
     volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
     uint32_t cycleCountStart = 0;
@@ -262,11 +267,16 @@ void load_new_rom(char* filename) {
 
     printf("\n128 32bit reads @ 0x10000000 reads took %d us\n", totalReadTime);
 
+    // Send exit quad mode command
+    // TODO exit quad mode on every chip
+    exitQuadMode();
+
     // Now turn off the hardware
     current_mcu_enable_demux(false);
     ssi_hw->ssienr = 0;
 
     qspi_disable();
+    printf("Rom Loaded, MCU2 qspi: OFF, sending mcu1 rom loaded command\n");
 
     // Let MCU1 know that we are finished
     // Signal start

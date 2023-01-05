@@ -57,7 +57,7 @@ void __no_inline_not_in_flash_func(picocart_flash_enable_xip_via_boot2)(void) {
     // rom_flash_enter_cmd_xip_fn flash_enter_cmd_xip = (rom_flash_enter_cmd_xip_fn)rom_func_lookup_inline(ROM_FUNC_FLASH_ENTER_CMD_XIP);
     // assert(flash_enter_cmd_xip);
     // flash_enter_cmd_xip();
-    program_flash_enter_cmd_xip();
+    program_flash_enter_cmd_xip(false);
 }
 
 #endif

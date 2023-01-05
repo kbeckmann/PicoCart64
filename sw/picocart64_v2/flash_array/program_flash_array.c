@@ -11,6 +11,7 @@
 #include "hardware/resets.h"
 #include "program_flash_array.h"
 #include "hardware/resets.h"
+#include "../psram.h"
 
 // These are supported by almost any SPI flash
 #define FLASHCMD_PAGE_PROGRAM     0x02
@@ -171,6 +172,47 @@ void program_flash_do_cmd(uint8_t cmd, const uint8_t *tx, uint8_t *rx, size_t co
     program_flash_put_get(tx, rx, count, 1);
 }
 
+void exitQuadMode() {
+    ssi->dr0 = 0xF5;
+    int rx_skip = 1;
+    uint8_t *tx = NULL;
+    uint8_t *rx = NULL;
+    int count = 0;
+    //program_flash_put_get(NULL, NULL, 0, 1);
+    // Make sure there is never more data in flight than the depth of the RX
+    // FIFO. Otherwise, when we are interrupted for long periods, hardware
+    // will overflow the RX FIFO.
+    const uint max_in_flight = 16 - 2; // account for data internal to SSI
+    size_t tx_count = count;
+    size_t rx_count = count;
+    while (tx_count || rx_skip || rx_count) {
+        // NB order of reads, for pessimism rather than optimism
+        uint32_t tx_level = ssi_hw->txflr;
+        uint32_t rx_level = ssi_hw->rxflr;
+        bool did_something = false; // Expect this to be folded into control flow, not register
+        if (tx_count && tx_level + rx_level < max_in_flight) {
+            ssi->dr0 = (uint32_t) (tx ? *tx++ : 0);
+            --tx_count;
+            did_something = true;
+        }
+        if (rx_level) {
+            uint8_t rxbyte = ssi->dr0;
+            did_something = true;
+            if (rx_skip) {
+                --rx_skip;
+            } else {
+                if (rx)
+                    *rx++ = rxbyte;
+                --rx_count;
+            }
+        }
+        // APB load costs 4 cycles, so only do it on idle loops (our budget is 48 cyc/byte)
+        // if (!did_something && __builtin_expect(program_flash_was_aborted(), 0))
+        if (!did_something) {
+           break;
+        }
+    }
+}
 
 // Timing of this one is critical, so do not expose the symbol to debugger etc
 static inline void program_flash_put_cmd_addr(uint8_t cmd, uint32_t addr) {
@@ -453,23 +495,68 @@ void inline program_flash_flush_cache() {
     program_flash_cs_force(OUTOVER_NORMAL);
 }
 
-// Put the SSI into a mode where XIP accesses translate to standard
-// serial 03h read commands. The flash remains in its default serial command
-// state, so will still respond to other commands.
-void __noinline program_flash_enter_cmd_xip() {
-    // DEFAULT THAT WAS HERE
+void enterPSRAMQuadMode() {
+    // printf("Configuring for spi to send psram into quad mode\n");
+    // ssi->ssienr = 0;
+    // ssi->baudr = 8;
+    // ssi->ctrlr0 =
+    //         (SSI_CTRLR0_SPI_FRF_VALUE_STD << SSI_CTRLR0_SPI_FRF_LSB) |  // Standard 1-bit SPI serial frames
+    //         (7 << SSI_CTRLR0_DFS_32_LSB) |                             // 32 clocks per data frame
+    //         (SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB); // Send instr + addr, receive data
+    // ssi->spi_ctrlr0 =
+    //         (0 << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |
+    //         (2u << SSI_SPI_CTRLR0_INST_L_LSB) |    // 8-bit instruction prefix
+    //         (8u << SSI_SPI_CTRLR0_ADDR_L_LSB) |    // 24-bit addressing for 03h commands
+    //         (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C2A  // Command in serial format address in quad
+    //                 << SSI_SPI_CTRLR0_TRANS_TYPE_LSB);
+    // ssi->ssienr = 1;
+
+    // psram_set_cs(3); // shouldn't need to manually for the cs pin
+    // ssi->dr0 = 0x35;
+    // psram_set_cs(0);
+
+    // while ((ssi_hw->sr & SSI_SR_BUSY_BITS) != 0) { tight_loop_contents(); }  
+
     ssi->ssienr = 0;
+    ssi->baudr = 2;
     ssi->ctrlr0 =
-            (SSI_CTRLR0_SPI_FRF_VALUE_STD << SSI_CTRLR0_SPI_FRF_LSB) |  // Standard 1-bit SPI serial frames
+            (SSI_CTRLR0_SPI_FRF_VALUE_QUAD << SSI_CTRLR0_SPI_FRF_LSB) |  // Quad SPI serial frames
             (31 << SSI_CTRLR0_DFS_32_LSB) |                             // 32 clocks per data frame
             (SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB); // Send instr + addr, receive data
     ssi->spi_ctrlr0 =
-            (FLASHCMD_READ_DATA << SSI_SPI_CTRLR0_XIP_CMD_LSB) | // Standard 03h read
-            (2u << SSI_SPI_CTRLR0_INST_L_LSB) |    // 8-bit instruction prefix
-            (6u << SSI_SPI_CTRLR0_ADDR_L_LSB) |    // 24-bit addressing for 03h commands
-            (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C1A  // Command and address both in serial format
+            (0xEB << SSI_SPI_CTRLR0_XIP_CMD_LSB) | 
+            (4u << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |
+            (SSI_SPI_CTRLR0_INST_L_VALUE_8B << SSI_SPI_CTRLR0_INST_L_LSB) |    // 
+            (8u << SSI_SPI_CTRLR0_ADDR_L_LSB) |    // 24-bit addressing for 03h commands
+            (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_2C2A  // Command and address both in serial format
                     << SSI_SPI_CTRLR0_TRANS_TYPE_LSB);
+
+	ssi->rx_sample_dly = 2;
     ssi->ssienr = 1;
+}
+
+// Put the SSI into a mode where XIP accesses translate to standard
+// serial 03h read commands. The flash remains in its default serial command
+// state, so will still respond to other commands.
+void __noinline program_flash_enter_cmd_xip(bool isPSRAM) {
+
+    if (isPSRAM) {
+        enterPSRAMQuadMode();
+    } else {
+
+    // // DEFAULT THAT WAS HERE
+    // ssi->ssienr = 0;
+    // ssi->ctrlr0 =
+    //         (SSI_CTRLR0_SPI_FRF_VALUE_STD << SSI_CTRLR0_SPI_FRF_LSB) |  // Standard 1-bit SPI serial frames
+    //         (31 << SSI_CTRLR0_DFS_32_LSB) |                             // 32 clocks per data frame
+    //         (SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB); // Send instr + addr, receive data
+    // ssi->spi_ctrlr0 =
+    //         (FLASHCMD_READ_DATA << SSI_SPI_CTRLR0_XIP_CMD_LSB) | // Standard 03h read
+    //         (2u << SSI_SPI_CTRLR0_INST_L_LSB) |    // 8-bit instruction prefix
+    //         (6u << SSI_SPI_CTRLR0_ADDR_L_LSB) |    // 24-bit addressing for 03h commands
+    //         (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C1A  // Command and address both in serial format
+    //                 << SSI_SPI_CTRLR0_TRANS_TYPE_LSB);
+    // ssi->ssienr = 1;
 
 // THIS WORKS!
     // ssi->ssienr = 0;
@@ -490,41 +577,40 @@ void __noinline program_flash_enter_cmd_xip() {
 
 // FLASH QUAD MODE XIP - works
     // printf("Configure xip...\n");
+    ssi->ssienr = 0;
+    ssi->baudr = 4;
+    ssi->ctrlr0 =
+            (SSI_CTRLR0_SPI_FRF_VALUE_QUAD << SSI_CTRLR0_SPI_FRF_LSB) |  // Standard 1-bit SPI serial frames
+            (31 << SSI_CTRLR0_DFS_32_LSB) |                             // 32 clocks per data frame
+            (SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB); // Send instr + addr, receive data
+    ssi->spi_ctrlr0 =
+            (4u << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |
+            (2u << SSI_SPI_CTRLR0_INST_L_LSB) |    // 8-bit instruction prefix
+            (8u << SSI_SPI_CTRLR0_ADDR_L_LSB) |    // 24-bit addressing for 03h commands
+            (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C2A  // Command in serial format address in quad
+                    << SSI_SPI_CTRLR0_TRANS_TYPE_LSB);
+    ssi->ssienr = 1;
 
-    // ssi->ssienr = 0;
-    // ssi->baudr = 2;
-    // ssi->ctrlr0 =
-    //         (SSI_CTRLR0_SPI_FRF_VALUE_QUAD << SSI_CTRLR0_SPI_FRF_LSB) |  // Standard 1-bit SPI serial frames
-    //         (31 << SSI_CTRLR0_DFS_32_LSB) |                             // 32 clocks per data frame
-    //         (SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB); // Send instr + addr, receive data
-    // ssi->spi_ctrlr0 =
-    //         (4u << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |
-    //         (2u << SSI_SPI_CTRLR0_INST_L_LSB) |    // 8-bit instruction prefix
-    //         (8u << SSI_SPI_CTRLR0_ADDR_L_LSB) |    // 24-bit addressing for 03h commands
-    //         (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C2A  // Command in serial format address in quad
-    //                 << SSI_SPI_CTRLR0_TRANS_TYPE_LSB);
-    // ssi->ssienr = 1;
+    ssi->dr0 = 0xEB;
+    ssi->dr0 = 0x000000a0;
 
-    // ssi->dr0 = 0xEB;
-    // ssi->dr0 = 0x000000a0;
+    while ((ssi_hw->sr & SSI_SR_BUSY_BITS) != 0) { tight_loop_contents(); }  
 
-    // while ((ssi_hw->sr & SSI_SR_BUSY_BITS) != 0) { tight_loop_contents(); }  
-    // printf("Sent read commands now setting up continous read mode\n");  
-
-    // ssi->ssienr = 0;
-    // ssi->baudr = 2;
-    // ssi->ctrlr0 =
-    //         (SSI_CTRLR0_SPI_FRF_VALUE_QUAD << SSI_CTRLR0_SPI_FRF_LSB) |  // Standard 1-bit SPI serial frames
-    //         (31 << SSI_CTRLR0_DFS_32_LSB) |                             // 32 clocks per data frame
-    //         (SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB); // Send instr + addr, receive data
-    // ssi->spi_ctrlr0 =
-    //         (0xa0 << SSI_SPI_CTRLR0_XIP_CMD_LSB) | // Standard 03h read
-    //         (4u << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |
-    //         (SSI_SPI_CTRLR0_INST_L_VALUE_NONE << SSI_SPI_CTRLR0_INST_L_LSB) |    // 
-    //         (8u << SSI_SPI_CTRLR0_ADDR_L_LSB) |    // 24-bit addressing for 03h commands
-    //         (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_2C2A  // Command and address both in serial format
-    //                 << SSI_SPI_CTRLR0_TRANS_TYPE_LSB);
-    // ssi->ssienr = 1;
+    ssi->ssienr = 0;
+    ssi->baudr = 2;
+    ssi->ctrlr0 =
+            (SSI_CTRLR0_SPI_FRF_VALUE_QUAD << SSI_CTRLR0_SPI_FRF_LSB) |  // Standard 1-bit SPI serial frames
+            (31 << SSI_CTRLR0_DFS_32_LSB) |                             // 32 clocks per data frame
+            (SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB); // Send instr + addr, receive data
+    ssi->spi_ctrlr0 =
+            (0xa0 << SSI_SPI_CTRLR0_XIP_CMD_LSB) | // Standard 03h read
+            (4u << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |
+            (SSI_SPI_CTRLR0_INST_L_VALUE_NONE << SSI_SPI_CTRLR0_INST_L_LSB) |    // 
+            (8u << SSI_SPI_CTRLR0_ADDR_L_LSB) |    // 24-bit addressing for 03h commands
+            (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_2C2A  // Command and address both in serial format
+                    << SSI_SPI_CTRLR0_TRANS_TYPE_LSB);
+    ssi->ssienr = 1;
+    }
 
     // printf("DONE!\n");
 }

@@ -178,27 +178,6 @@ void main_task_entry(__unused void *params)
 	while (true) {
 		tight_loop_contents();
 
-		if(time_us_32() - t > 1000000) {
-			// printf(". ");
-			// test_read_from_psram();
-			t = time_us_32();
-
-			// if (count == 0) {
-			// 	count++;
-			// 	printf("Booting MCU1...\n");
-			// 	gpio_put(PIN_MCU1_RUN, 1);
-			// }
-			// count++;
-			// if (count % 60 == 0 && count != 0) {
-			// 	printf("Resetting core 1\n");
-			// 	gpio_put(PIN_MCU1_RUN, 0);
-			// 	for(int k = 0; k < 10000; k++) {
-			// 		tight_loop_contents();
-			// 	}
-			// 	gpio_put(PIN_MCU1_RUN, 1);
-			// }
-		}
-
 		// process the buffer look for cmd data
 		mcu2_process_rx_buffer();
 
