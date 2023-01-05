@@ -63,7 +63,8 @@ volatile int g_currentMemoryArrayChip = 3;
 volatile uint32_t address_modifier = 0;
 volatile bool g_loadRomFromMemoryArray = false;
 static uint n64_pi_pio_offset;
-volatile uint16_t *ptr16 = (volatile uint16_t *)0x10000000;
+// volatile uint16_t *ptr16 = (volatile uint16_t *)0x10000000;
+volatile uint16_t *ptr16 = (volatile uint16_t *)0x13000000; // no cache
 
 uint16_t rom_mapping[MAPPING_TABLE_LEN];
 
@@ -131,22 +132,27 @@ inline uint16_t rom_read(uint32_t rom_address) {
 		const uint16_t *chunk_16 = (const uint16_t *)rom_chunks[chunk_index];
 		return chunk_16[(rom_address & COMPRESSION_MASK) >> 1];
 	} else {
-		if (psram_addr_to_chip((rom_address)) != g_currentMemoryArrayChip) {
-			g_currentMemoryArrayChip = psram_addr_to_chip((rom_address));
+if (psram_addr_to_chip((rom_address)) != g_currentMemoryArrayChip) {
+	g_currentMemoryArrayChip = psram_addr_to_chip((rom_address));
 
-			uart_tx_program_putc(0xC);
-			uart_tx_program_putc((uint8_t)g_currentMemoryArrayChip);
-			
-			// set address modifier
-			address_modifier = (g_currentMemoryArrayChip - START_ROM_LOAD_CHIP_INDEX) * PSRAM_CHIP_CAPACITY_BYTES;
+	// uart_tx_program_putc(0xC);
+	// uart_tx_program_putc((uint8_t)g_currentMemoryArrayChip);
+	
+	// set address modifier
+	address_modifier = (g_currentMemoryArrayChip - START_ROM_LOAD_CHIP_INDEX) * PSRAM_CHIP_CAPACITY_BYTES;
 
-			// Set the new chip
-			psram_set_cs(g_currentMemoryArrayChip);
-			
-			// Flush cache
-			program_flash_flush_cache();
-		}
-		return ptr16[(((rom_address - address_modifier) & 0xFFFFFF) >> 1)];
+	// Set the new chip
+	psram_set_cs(g_currentMemoryArrayChip);
+	
+	// xip_ctrl_hw->flush = 1;
+    // // Read blocks until flush completion
+    // (void) xip_ctrl_hw->flush;
+    // // Enable the cache
+    // hw_set_bits(&xip_ctrl_hw->ctrl, XIP_CTRL_EN_BITS);
+	// Flush cache
+	// program_flash_flush_cache();
+}
+return ptr16[(((rom_address - address_modifier) & 0xFFFFFF) >> 1)];
 	}
 #else
 	return rom_file_16[(last_addr & 0xFFFFFF) >> 1];

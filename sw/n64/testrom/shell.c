@@ -433,6 +433,7 @@ char* loadingText[] = { "Loading", "Loading.", "Loading..", "Loading..." };
 int loadingTextIndex = 0;
 const int loadingBoxWidth = 128;
 const int loadingBoxHeight = 32;
+int counter = 0;
 void animate_progress_spinner(display_context_t display) {
     // Border
     graphics_draw_box(display, 
@@ -454,6 +455,15 @@ void animate_progress_spinner(display_context_t display) {
 
     // Text
     graphics_draw_text(display, (SCREEN_WIDTH / 2) - (MARGIN_PADDING * 4), SCREEN_HEIGHT / 2, loadingText[loadingTextIndex]);    
+
+    if (counter > 60) {
+        counter = 0;
+        loadingTextIndex++;
+        if (loadingTextIndex >= 4) {
+            loadingTextIndex = 0;
+        }
+    }
+    counter++;
 }
 
 void update_spinner( int ovfl ) {
@@ -603,8 +613,8 @@ static void show_list(void) {
                 graphics_draw_box(display, SCREEN_WIDTH - 8, 3, 5, 5, graphics_convert_color(SELECTION_COLOR));
             }
             char b[] = "                ";
-            sprintf(b, "busy: %d", sdBusy);
-            graphics_draw_text(display, 30, 130, b);
+            // sprintf(b, "busy: %d", sdBusy);
+            // graphics_draw_text(display, 30, 130, b);
         }
 
         /* Force the backbuffer flip */

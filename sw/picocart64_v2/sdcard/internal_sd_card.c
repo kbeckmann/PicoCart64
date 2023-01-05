@@ -247,7 +247,8 @@ void load_new_rom(char* filename) {
     psram_set_cs(3); // Use the PSRAM chip
 
     printf("\n\nWITH qspi_enter_cmd_xip\n");
-    volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+    // volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
+    volatile uint32_t *ptr = (volatile uint32_t *)0x13000000;
     uint32_t cycleCountStart = 0;
     uint32_t totalTime = 0;
     int psram_csToggleTime = 0;

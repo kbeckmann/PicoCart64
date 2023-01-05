@@ -218,10 +218,21 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 
 				// test read at
 				// 0x10000000 + 8 MB
-				// uint32_t addressToRead = 0x10000000 + 8 * 1024 * 1024;
-				// uint16_t word = rom_read(addressToRead);
-				// uart_tx_program_putc((uint8_t)(word >> 8));
-				// uart_tx_program_putc((uint8_t)(word));
+				uint32_t addressToRead = 0x10000000 + 8 * 1024 * 1024;
+				uint16_t word = rom_read(addressToRead);
+				uart_tx_program_putc((uint8_t)(word >> 8));
+				uart_tx_program_putc((uint8_t)(word));
+
+				addressToRead = 0x10000000;
+				word = rom_read(addressToRead);
+				uart_tx_program_putc((uint8_t)(word >> 8));
+				uart_tx_program_putc((uint8_t)(word));
+
+				addressToRead = 0x10000000 + 8 * 1024 * 1024;
+				word = rom_read(addressToRead);
+				uart_tx_program_putc((uint8_t)(word >> 8));
+				uart_tx_program_putc((uint8_t)(word));
+
 			}
 		}
 
