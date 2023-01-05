@@ -4,7 +4,8 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
-                "/home/kaili/Code/pico-sdk/**"
+                "/home/kaili/Code/pico-sdk/**",
+                "/Users/kaili/Code/libraries/pico-sdk/src/rp2_common/hardware_pio/include"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",

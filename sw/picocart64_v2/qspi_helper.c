@@ -352,9 +352,9 @@ void qspi_init_qspi(bool sendQuadEnableCommand)
 						<< SSI_SPI_CTRLR0_TRANS_TYPE_LSB);
 		ssi->ssienr = 1;
 
-		psram_set_cs(1);
+		// psram_set_cs(1);
 		ssi->dr0 = 0x35;
-		psram_set_cs(0);
+		// psram_set_cs(0);
 
 		// psram_set_cs(1);
 		// ssi->dr0 = 0x000000;

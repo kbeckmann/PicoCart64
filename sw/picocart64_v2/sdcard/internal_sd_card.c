@@ -170,7 +170,7 @@ void load_selected_rom() {
 
 void load_new_rom(char* filename) {
     sd_is_busy = true;
-    char buf[1024 / 2 / 2 / 2 / 2];
+    char buf[256];
     sd_card_t *pSD = sd_get_by_num(0);
 	FRESULT fr = f_mount(&pSD->fatfs, pSD->pcName, 1);
 	if (FR_OK != fr) {
@@ -216,7 +216,7 @@ void load_new_rom(char* filename) {
             psram_set_cs(currentPSRAMChip); // Switch the PSRAM chip
         }
 
-	} while (len > 0 && len < 0x007C8240); //007C8240 just lets us cut off some empty space
+	} while (len > 0); //007C8240 just lets us cut off some empty space
 	uint64_t t1 = to_us_since_boot(get_absolute_time());
 	uint32_t delta = (t1 - t0) / 1000;
 	uint32_t kBps = (uint32_t) ((float)(total / 1024.0f) / (float)(delta / 1000.0f));
@@ -229,14 +229,14 @@ void load_new_rom(char* filename) {
 	}
 	printf("---- read file done -----\n\n\n");
 
+
     // Set back to starting PSRAM chip to read a few bytes
     psram_set_cs(3); // Use the PSRAM chip
     
-    program_flash_read_data(0, buf, 32);
-
-    for(int i = 0; i < 16; i++) {
-        printf("%02x\n", buf[i]);
-    }
+    // program_flash_read_data(0, buf, 32);
+    // for(int i = 0; i < 16; i++) {
+    //     printf("%02x\n", buf[i]);
+    // }
 
     // Send command to enter quad mode
     program_flash_do_cmd(0x35, NULL, NULL, 0);
@@ -256,11 +256,10 @@ void load_new_rom(char* filename) {
     int totalReadTime = 0;
     for (int i = 0; i < 128; i++) {
         uint32_t modifiedAddress = i;
-        
         uint32_t startTime_us = time_us_32();
         uint32_t word = ptr[modifiedAddress];
-
         totalReadTime += time_us_32() - startTime_us;
+
         if (i < 16) { // only print the first 16 words
             printf("PSRAM-MCU2[%d]: %08x\n",i, word);
         }
@@ -271,6 +270,8 @@ void load_new_rom(char* filename) {
     // Send exit quad mode command
     // TODO exit quad mode on every chip
     exitQuadMode();
+
+    return;
 
     // Now turn off the hardware
     current_mcu_enable_demux(false);

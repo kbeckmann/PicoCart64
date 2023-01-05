@@ -141,7 +141,7 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 	volatile uint32_t it = 0;
 	volatile uint32_t t2 = 0;
 
-	volatile bool test_load = false;
+	volatile bool test_load = true;
 	while (1) {
 		tight_loop_contents();
 
@@ -215,24 +215,6 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 
 				// Sanity chirp to mcu2 just to know that this completed
 				uart_tx_program_putc(0xAB);
-
-				// test read at
-				// 0x10000000 + 8 MB
-				uint32_t addressToRead = 0x10000000 + 8 * 1024 * 1024;
-				uint16_t word = rom_read(addressToRead);
-				uart_tx_program_putc((uint8_t)(word >> 8));
-				uart_tx_program_putc((uint8_t)(word));
-
-				addressToRead = 0x10000000;
-				word = rom_read(addressToRead);
-				uart_tx_program_putc((uint8_t)(word >> 8));
-				uart_tx_program_putc((uint8_t)(word));
-
-				addressToRead = 0x10000000 + 8 * 1024 * 1024;
-				word = rom_read(addressToRead);
-				uart_tx_program_putc((uint8_t)(word >> 8));
-				uart_tx_program_putc((uint8_t)(word));
-
 			}
 		}
 
