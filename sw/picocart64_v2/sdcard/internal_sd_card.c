@@ -170,7 +170,7 @@ void load_selected_rom() {
 
 void load_new_rom(char* filename) {
     sd_is_busy = true;
-    char buf[256];
+    char buf[512];
     sd_card_t *pSD = sd_get_by_num(0);
 	FRESULT fr = f_mount(&pSD->fatfs, pSD->pcName, 1);
 	if (FR_OK != fr) {
@@ -370,7 +370,7 @@ void mcu2_process_rx_buffer() {
     while (rx_uart_buffer_has_data()) {
         char ch = rx_uart_buffer_get();
         
-        printf("%02x ", ch);
+        // printf("%02x ", ch);
 
         if (ch == COMMAND_START) {
             mayHaveStart = true;
@@ -426,13 +426,19 @@ void mcu2_process_rx_buffer() {
 
 BYTE diskReadBuffer[DISK_READ_BUFFER_SIZE];
 // MCU2 will send data once it has the information it needs
+int totalSectorsRead = 0;
+int numberOfSendDataCalls = 0;
+uint32_t totalTimeOfSendData_ms = 0;
 void send_data(uint32_t sector, uint32_t sectorCount) {
+    numberOfSendDataCalls++;
     //printf("Sending data. Sector: %ld, Count: %d\n", sector, sectorCount);
     int loopCount = 0;
+    uint32_t startTime = time_us_32();
     do {
         loopCount++;
 
         DRESULT dr = disk_read(0, diskReadBuffer, (uint64_t)sector, 1);
+        totalSectorsRead++;
         
         if (dr != RES_OK) {
             printf("Error reading disk: %d\n", dr);
@@ -452,9 +458,9 @@ void send_data(uint32_t sector, uint32_t sectorCount) {
 
     // Repeat if we are reading more than 1 sector
     } while(sectorCount > 1);
-
-    printf("Read Sector %u\n", sector);
-
+    uint32_t totalTime = time_us_32() - startTime;
+    totalTimeOfSendData_ms += totalTime / 1000;
+    
     #if PRINT_BUFFER_AFTER_SEND == 1
         printf("buffer for sector: %ld\n", sector);
         for (uint diskBufferIndex = 0; diskBufferIndex < DISK_READ_BUFFER_SIZE; diskBufferIndex++) {

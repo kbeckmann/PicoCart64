@@ -90,19 +90,25 @@ bool LOAD_BOX_ART = 0;
 
 char** g_fileEntries; // Buffer for file entries
 int* g_fileSizes;
-sprite_t** g_thumbnail_cache;
+// sprite_t** g_thumbnail_cache;
 int g_currentPage = 0; // variable for file list pagination
 
-// Some arrays for testing layout while using the emulator
+bool thumbnail_loaded = false;
+static sprite_t* current_thumbnail;
+char* temp_serial;
+char* temp_spritename;
+
+//
 // Thumbnails need to be cached for snappier menu feel
 // #if BUILD_FOR_EMULATOR == 1
 // /**/
 char* g_thumbnail_table[] = {
     // "goldeneye.sprite", 
-    "NGEJ.sprite",
-    "doom.sprite", 
-    "mario_tennis.sprite", 
-    "mario64.sprite"
+    // "NGEJ.sprite",
+    // "doom.sprite", 
+    // "mario_tennis.sprite", 
+    // "mario64.sprite"
+    "NGEE.sprite"
 };
 
 // int g_fileSizes[] = {
@@ -125,9 +131,10 @@ char* g_fileInfo[] = {
 
 int NUM_ENTRIES = 0;
 bool g_sendingSelectedRom = false;
-int g_lastSelection = -1;
+int g_lastSelection = 0;
 char g_infoPanelTextBuf[256];
 bool g_isLoading = false;
+bool g_isRenderingMenu = false;
 
 /* Layout */
 #define INFO_PANEL_WIDTH (192 + (MARGIN_PADDING * 2)) // NEEDS PARENS!!! Seems the compiler doesn't evaluate the define before using it for other defines
@@ -357,29 +364,42 @@ static void render_info_panel(display_context_t display, int currently_selected)
     Discussion about things to display:
     It would be great to also see the config. Eeprom type/size. The byte order of the rom, ipl checksums, crc hash,
     */
-    int x = FILE_PANEL_WIDTH + MARGIN_PADDING, y = MENU_BAR_HEIGHT + MARGIN_PADDING;
 
-    if (LOAD_BOX_ART) {
-        int offset = ((INFO_PANEL_WIDTH / 2) + (g_thumbnail_cache[currently_selected]->width / 2));
-        //graphics_draw_sprite(display, SCREEN_WIDTH - offset, y, g_thumbnail_cache[currently_selected]);
-
-        //y += g_thumbnail_cache[currently_selected]->height + MARGIN_PADDING;
-        y += 100;
-    } else {
-        y += 100;
-    }
-
-    // Only update the text string if we have changed selection
+   // Only update the text string if we have changed selection
     if (currently_selected != g_lastSelection) {
         memset(g_infoPanelTextBuf, 0, 256);
+        memset(temp_serial, 0, 5);
 
-        // TODO fetch info from rom header
-        // Something might be wrong with this... Probably should use a global buffer and avoid creating new objects every time
-        // sprintf(g_infoPanelTextBuf, "%s\nSize: %dM", g_fileInfo[currently_selected], g_fileSizes[currently_selected] / 1024 / 1024);
+        // TODO load more information from the rom header, Game name, crc, serial, country
+        read_rom_header_serial_number(temp_serial, g_fileEntries[currently_selected]);
+
         // TODO if part of the string is longer than the number of characters that can fit in in the info panel width, split or clip it
-        sprintf(g_infoPanelTextBuf, "%s\nSize: %dM\nCountry\nReleased ?\n%d", g_fileEntries[currently_selected], g_fileSizes[currently_selected], currently_selected);
+        sprintf(g_infoPanelTextBuf, "%s\n%s\nSize: ?M\nCountry\nReleased ?\n%d", g_fileEntries[currently_selected], temp_serial, currently_selected);
+
+        // TODO fix the below code, loading thumbnails is causing a crash.
+        // Free the last thumbnail
+        // if (thumbnail_loaded) {
+        //     free(current_thumbnail);
+        //     thumbnail_loaded = false;
+        // }
+
+        // Try to load a thumbnail, if this isn't a rom, don't load box art
+        // if(load_boxart_for_rom(g_fileEntries[currently_selected]) != 0) {
+        //     LOAD_BOX_ART = false;
+        // } else {
+        //     LOAD_BOX_ART = true;
+        // }
 
         g_lastSelection = currently_selected;
+    }
+
+    int x = FILE_PANEL_WIDTH + MARGIN_PADDING, y = MENU_BAR_HEIGHT + MARGIN_PADDING;
+    if (LOAD_BOX_ART && current_thumbnail != NULL) {
+        int offset = ((INFO_PANEL_WIDTH / 2) + (current_thumbnail->width / 2));
+        graphics_draw_sprite(display, SCREEN_WIDTH - offset, y, current_thumbnail);
+        y += current_thumbnail->height + MARGIN_PADDING;
+    } else {
+        y += 100;
     }
     
     // Display the currently selected rom info
@@ -406,27 +426,6 @@ static void draw_bottom_bar(display_context_t display) {
     //graphics_draw_sprite_trans(display, MARGIN_PADDING, BOTTOM_BAR_Y, a_button_icon);
     graphics_draw_text(display, MARGIN_PADDING + 32, BOTTOM_BAR_Y + BOTTOM_BAR_HEIGHT/2 - 4, "Load ROM");
 }
-
-// Attempt at an animated loading spinner. Works but the sprites are messed up.
-// Make different sprites or just use the "Loading..." text animation
-// static volatile int spinner_index = 5;
-// void animate_progress_spinner(display_context_t display) {
-//     sprite_t* spinner = animated_spinner[spinner_index];
-//     graphics_draw_sprite_trans(display, 256, 120, spinner);
-// }
-
-// static volatile bool spinner_forward = true;
-// void update_spinner( int ovfl ) {
-//     spinner_index += spinner_forward ? 1: -1;
-
-//     if (spinner_index >= 13) {
-//         spinner_forward = !spinner_forward;
-//         spinner_index = 12;
-//     } else if (spinner_index < 5) {
-//         spinner_forward = !spinner_forward;
-//         spinner_index = 5;
-//     }
-// }
 
 // Janky lol
 char* loadingText[] = { "Loading", "Loading.", "Loading..", "Loading..." };
@@ -524,7 +523,7 @@ int ls(const char *dir) {
         if (fno.fname[0] != '.') {
             g_fileEntries[num_entries] = malloc(sizeof(char*) * FILE_NAME_MAX_LENGTH);
             g_fileSizes[num_entries] = fno.fsize / 1024 / 1024;
-		    sprintf(g_fileEntries[num_entries++], "%s\n", fno.fname, fno.fsize); // [size=%llu]
+		    sprintf(g_fileEntries[num_entries++], "%s\n", fno.fname);
             
         } else {
             printf("Skipping file\n");
@@ -549,21 +548,20 @@ static void show_list(void) {
     g_fileEntries = malloc(sizeof(char*) * FILE_ENTRIES_BUFFER_SIZE); // alloc the buffer
     g_fileSizes = malloc(sizeof(int) * FILE_ENTRIES_BUFFER_SIZE);
 
-    // TODO alloc any other buffers here as well
+    // Fetch the root directory contents
 	NUM_ENTRIES = ls("/");
 
     char* menuHeaderText = malloc(sizeof(char) * 128);
     sprintf(menuHeaderText, "DREAMDrive OS (git rev %08x)\t\t\t\t%d Files", GIT_REV, NUM_ENTRIES);
 
     // display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
+    // display_init(RESOLUTION_320x240, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE);
     display_init(RESOLUTION_512x240, DEPTH_16_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
     // display_init(RESOLUTION_512x240, DEPTH_32_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
-
-    // display_init(RESOLUTION_320x240, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE);
-    // display_init(RESOLUTION_512x240, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE);
     // display_init(RESOLUTION_512x480, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE); //Jumpy and janky, do not use
 
     // char debugTextBuffer[100];
+    g_isRenderingMenu = true;
 	int currently_selected = 0;
 	int first_visible = 0;
 	int max_on_screen = calculate_num_rows_per_page();
@@ -716,26 +714,22 @@ direntry_t *populate_dir(int *count)
     return list;
 }
 
-int filesize( FILE *pFile )
+long filesize( FILE *pFile )
 {
     fseek( pFile, 0, SEEK_END );
-    int lSize = ftell( pFile );
+    long lSize = ftell( pFile );
     rewind( pFile );
-
     return lSize;
 }
 
 sprite_t *read_sprite( const char * const spritename )
 {
     printf("reading sprite %s ", spritename);
-    //FILE *fp = fopen(spritename, "r");
     int fp = dfs_open(spritename);
 
     if( fp )
     {
         sprite_t *sp = malloc( dfs_size( fp ) );
-        // fread( sp, 1, filesize( fp ), fp );
-        // fclose( fp );
         int ret = dfs_read(sp, 1, dfs_size(fp), fp);
         dfs_close(fp);
 
@@ -743,7 +737,6 @@ sprite_t *read_sprite( const char * const spritename )
             printf("height: %d, width: %d\n", sp->height, sp->width);
         } else {
             printf("...Error loading sprite: %d\n", ret);
-            //waitForStart();
         }
 
         return sp;
@@ -755,12 +748,36 @@ sprite_t *read_sprite( const char * const spritename )
     }
 }
 
+sprite_t* load_sprite_from_sd(const char* const spritename) {
+    if (!g_isRenderingMenu) {
+    printf("loading sprite from sd : %s\n", spritename);
+    }
+    FILE *fp = fopen(spritename, "r");
+    if (fp) {
+        const long size = filesize(fp);
+        sprite_t *sp = malloc(size);
+        fread(sp, 1, size, fp);
+        fclose(fp);
+
+        if (!g_isRenderingMenu) {
+        printf("size: %ld, width: %d, height: %d\n", size, sp->width, sp->height);
+        }
+
+        return sp;
+    } else {
+        if (!g_isRenderingMenu) {
+        printf("Missing fp for %s from SD.\n", spritename);
+        }
+        return 0;
+    }
+}
+
 /*
  *
  * Read a rom's header and find its serial number
  * 
  * Example usage:
-    char* serialNumber[4];
+    char* serialNumber[5]; // make sure to include an extra for the null character
     int success = read_rom_header_serial_number(serialNumber, "rom://goldeneye.z64");
     if (success == 0) {
         success!
@@ -769,44 +786,83 @@ sprite_t *read_sprite( const char * const spritename )
     }
  *
  */
-int read_rom_header_serial_number(char* buf, char* filename) {
-    FILE* rom = fopen(filename, "r");
-    if (filesize(rom) < 0x40) {
+int read_rom_header_serial_number(char* buf, const char* const filename) {
+    FILE* fp = fopen(filename, "r");
+
+    if (!fp) {
+        fclose(fp);
+        if (!g_isRenderingMenu) {
+        printf("Unable to open file %s\n", filename);
+        }
         return -1;
     }
 
-    int r = fseek(rom, 0x3B, SEEK_SET);
+    // TODO check if a valid rom (maybe using the janky method of checking for 80 37 12 40 bytes)
+
+    // Doing a filesize on rom files keep returning -1 size... wth?
+    // const long size = filesize(fp);
+    // if (size < 1024) {
+    //     printf("failed to read rom %s\nSize: %ld\n", filename, size);
+    //     return -1;
+    // }
+
+    int r = fseek(fp, 0x3B, SEEK_SET);
     if (r != 0) {
+        fclose(fp);
+        if (!g_isRenderingMenu) {
         printf("Unable to seek rom file.\n");
+        }
+        return -1;
     }
 
-    int numRead = fread(buf, 1, 4, rom);
+    int numRead = fread(buf, 1, 4, fp);
     if (numRead == 0) {
+        fclose(fp);
+        if (!g_isRenderingMenu) {
         printf("Unable to read rom file header serial number.\n");
+        }
+        return -1;
     }
-    fclose(rom);
+
+    fclose(fp);
+
+    buf[4] = '\0';
     
+    return 0;
+}
+
+// Loads box art into cache and returns the index it was added to, -1 if it couldn't be added
+int load_boxart_for_rom(char* filename) {
+    memset(temp_serial, 0, 5);
+    int ret = read_rom_header_serial_number(temp_serial, filename);
+
+    if (ret != 0) {
+        thumbnail_loaded = false;
+        return - 1;
+    }
+
+    if(!g_isRenderingMenu) {
+    printf("Loading sprite...\n");
+    }
+    
+    memset(temp_spritename, 0, 256);
+    sprintf(temp_spritename, "sd:/N64/sprites/%s.sprite", temp_serial);
+
+    current_thumbnail = load_sprite_from_sd(temp_spritename);
+    thumbnail_loaded = true;
+
     return 0;
 }
 
 static void init_sprites(void) {
     printf("init sprites\n");
 
-    a_button_icon = read_sprite("a-button-icon.sprite");
-
-    g_thumbnail_cache = malloc(sizeof(sprite_t*) * 4); // alloc the buffer
-
-    // animated_spinner = malloc(sizeof(sprite_t*) * 13); // alloc space for the aniated spinner
-    // animated_spinner[0] = read_sprite("spinner.sprite");
-    // for (int i = 1; i < 13; i++) {
-    //     char* n[24];
-    //     sprintf(n, "spinner%d.sprite", i);
-    //     animated_spinner[i] = read_sprite(n);
-    // }
+    // a_button_icon = read_sprite("a-button-icon.sprite");
 
     if (IS_EMULATOR) {
+        // g_thumbnail_cache = malloc(sizeof(sprite_t*) * 4); // alloc the buffer
         LOAD_BOX_ART = true;
-        int thumbnailCount = sizeof(g_thumbnail_table) / sizeof(*g_thumbnail_table);
+        int thumbnailCount = 1; //sizeof(g_thumbnail_table) / sizeof(*g_thumbnail_table);
         for(int i = 0; i < thumbnailCount; i++) {
             // fp = dfs_open(g_thumbnail_table[i]);
             // printf("%s opened? %d\n", g_thumbnail_table[i], fp);
@@ -818,10 +874,44 @@ static void init_sprites(void) {
             // dfs_close( fp );
 
             printf("Loading thumbnail: %s\n", g_thumbnail_table[i]);
-            g_thumbnail_cache[i] = read_sprite(g_thumbnail_table[i]);
+            // g_thumbnail_cache[i] = read_sprite(g_thumbnail_table[i]);
             // printf("height: %d, width: %d\n", g_thumbnail_cache[i]->height, g_thumbnail_cache[i]->width);
         }
+    } else {
+        LOAD_BOX_ART = true;
+        // load_boxart_for_rom("sd:/Doom 64 (USA) (Rev 1).z64");
+        if(load_boxart_for_rom("sd:/GoldenEye 007 (U) [!].z64") != 0) {
+            printf("Failed to load boxart\n");
+            LOAD_BOX_ART = false;
+            thumbnail_loaded = false;
+        } else {
+            printf("Loaded box art\n");
+        }
+
+        waitForStart();
     }
+
+    // char buf[512];
+    // FIL fil;
+
+	// FRESULT fr = f_open(&fil, "GoldenEye 007 (U) [!].z64", FA_OPEN_EXISTING | FA_READ);
+
+    // int MB = 1 * 1024 * 1024;
+    // uint len = 0;
+	// int total = 0;
+    // unsigned long t0 = get_ticks_ms();//to_us_since_boot(get_absolute_time());
+    // do {
+    //     fr = f_read(&fil, buf, sizeof(buf), &len);
+    //     total += len;
+    // } while(len > 0 || total < MB);
+
+    // uint64_t t1 = get_ticks_ms();
+	// uint32_t delta = (t1 - t0) / 1000;
+	// uint32_t kBps = (uint32_t) ((float)(total / 1024.0f) / (float)(delta / 1000.0f));
+    
+	// printf("Read %d bytes in %ld ms (%ld kB/s)\n\n\n", total, delta, kBps);
+    // f_close(&fil);    
+    // waitForStart();
 
     printf("done!\n");
 }
@@ -846,11 +936,17 @@ void start_shell(void) {
         IS_EMULATOR = true;
     }
 
+    // IS_EMULATOR = true;
+
     if (IS_EMULATOR) {
         printf("Running in an emulator?\n");
     } else {
         printf("Running on real hardware?\n");
     }
+
+    // Alloc global holding variables
+    temp_serial = malloc(sizeof(char) * 5);
+    temp_spritename = malloc(sizeof(char) * 256);
 
     int ret = dfs_init(DFS_DEFAULT_LOCATION);
     if (ret != DFS_ESUCCESS) {

@@ -21,6 +21,11 @@ extern volatile bool sendDataReady;
 extern volatile bool startRomLoad;
 extern volatile bool romLoading;
 
+// debug vars
+extern int totalSectorsRead;
+extern int numberOfSendDataCalls;
+extern uint32_t totalTimeOfSendData_ms;
+
 // UART TX buffer
 extern volatile uint16_t pc64_uart_tx_buf[PC64_BASE_ADDRESS_LENGTH];
 

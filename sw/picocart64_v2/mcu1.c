@@ -141,7 +141,7 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 	volatile uint32_t it = 0;
 	volatile uint32_t t2 = 0;
 
-	volatile bool test_load = true;
+	volatile bool test_load = false;
 	while (1) {
 		tight_loop_contents();
 
@@ -360,9 +360,9 @@ void boardTest() {
 void __no_inline_not_in_flash_func(mcu1_main)(void)
 {
 	int count = 0;
-	// const int freq_khz = 133000;
+	const int freq_khz = 133000;
 	// const int freq_khz = 166000;
-	const int freq_khz = 200000;
+	// const int freq_khz = 200000;
 	// const int freq_khz = 210000;
 	// const int freq_khz = 220000;
 	// const int freq_khz = 230000;

@@ -175,6 +175,8 @@ void main_task_entry(__unused void *params)
 	// load_new_rom("Doom 64 (USA) (Rev 1).z64");
 
 	volatile uint32_t t = 0;
+	volatile uint32_t t2 = 0;
+	uint32_t totalBytesSinceLastPeriod = 0;
 	while (true) {
 		tight_loop_contents();
 
@@ -190,6 +192,18 @@ void main_task_entry(__unused void *params)
 			load_selected_rom();
 			romLoading = false;
 			startRomLoad = false;
+		}
+
+		// Tick every second
+		if(time_us_32() - t > 1000000) {
+			t = time_us_32();
+			t2++;	
+
+			if (t2 % 30 == 0) {
+				uint32_t totalDataInLastPeriod = 512 * totalSectorsRead;
+				uint32_t kBps = (uint32_t) ((float)(totalDataInLastPeriod / 1024.0f) / (float)(totalTimeOfSendData_ms / 1000.0f));
+    			printf("Sent %d bytes in %d ms (%d kB/s)\n", totalDataInLastPeriod, totalTimeOfSendData_ms, kBps);
+			}
 		}
 
 #if 0
