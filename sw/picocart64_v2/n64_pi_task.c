@@ -310,7 +310,7 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 		if (last_addr == 0x10000000) {
 			
 			// Chirp, reading 0
-			uart_tx_program_putc(0x10);
+			// uart_tx_program_putc(0x10);
 
 			// Configure bus to run slowly.
 			// This is better patched in the rom, so we won't need a branch here.
@@ -501,29 +501,7 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 					break;
 				}
 			} while (1);
-		} else if (last_addr >= PC64_RAND_ADDRESS_START && last_addr <= PC64_RAND_ADDRESS_END) {
-			// PicoCart64 RAND address space
-			do {
-				// Read command/address
-				addr = n64_pi_get_value(pio);
-
-				if (addr & 0x00000001) {
-					// We got a WRITE
-					last_addr += 2;
-				} else if (addr == 0) {
-					// READ
-					next_word = pc64_rand16();
-					pio_sm_put(pio, 0, next_word);
-					last_addr += 2;
-				} else {
-					// New address
-					break;
-				}
-
-				if (g_restart_pi_handler) {
-					break;
-				}
-			} while (1);
+		
 		} else if (last_addr >= PC64_CIBASE_ADDRESS_START && last_addr <= PC64_CIBASE_ADDRESS_END) {
 			// PicoCart64 CIBASE address space
 			do {
@@ -550,10 +528,23 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 						break;
 					case PC64_REGISTER_SD_BUSY:
 						// next_word = sd_is_busy ? 0x00000001 : 0x00000000;
+						
+						// Upper 16 bits are just 0
+						pio_sm_put(pio, 0, 0x0000);
+
+						last_addr += 2;
+
+						// Get the next command/address
+						addr = n64_pi_get_value(pio);
+						if (addr != 0) {
+							continue;
+						}
+
+						// now we can send the actual busy bit
 						if (sd_is_busy) {
-							pio_sm_put(pio, 0, 0x00000001);
+							pio_sm_put(pio, 0, 0x0001);
 						} else {
-							pio_sm_put(pio, 0, 0x00000000);
+							pio_sm_put(pio, 0, 0x0000);
 						}
 						
 						break;
@@ -568,7 +559,7 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 
 					// Read two 16-bit half-words and merge them to a 32-bit value
 					uint32_t write_word = addr & 0xFFFF0000;
-					uint16_t half_word = addr >> 16;
+					// uint16_t half_word = addr >> 16;
 					uint addr_advance = 4;
 
 					switch (last_addr - PC64_CIBASE_ADDRESS_START) {
@@ -587,30 +578,44 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 						multicore_fifo_push_blocking(CORE1_SEND_SD_READ_CMD);
 						break;
 
+					// case (PC64_COMMAND_SD_READ + 2):
+					// 	uart_tx_program_putc(0xBB);
+					// 	multicore_fifo_push_blocking(CORE1_SEND_SD_READ_CMD);
+					// 	break;
+
 					case PC64_REGISTER_SD_READ_SECTOR0:
-						addr_advance = 2;
-						pc64_set_sd_read_sector_part(0, half_word);
+						write_word |= n64_pi_get_value(pio) >> 16;
+						pc64_set_sd_read_sector_part(0, write_word);
+						// pc64_set_sd_read_sector_part(0, write_word);
 						break;
+
+					// case (PC64_REGISTER_SD_READ_SECTOR0+2):
+					// 	pc64_set_sd_read_sector_part(1, write_word);
+					// 	break;
+
 					case PC64_REGISTER_SD_READ_SECTOR1:
-						addr_advance = 2;
-						pc64_set_sd_read_sector_part(1, half_word);
+						write_word |= n64_pi_get_value(pio) >> 16;
+						pc64_set_sd_read_sector_part(1, write_word);
+						// pc64_set_sd_read_sector_part(2, write_word);
 						break;
-					case PC64_REGISTER_SD_READ_SECTOR2:
-						addr_advance = 2;
-						pc64_set_sd_read_sector_part(2, half_word);
-						break;
-					case PC64_REGISTER_SD_READ_SECTOR3:
-						addr_advance = 2;
-						pc64_set_sd_read_sector_part(3, half_word);
-						break;
+
+					// case (PC64_REGISTER_SD_READ_SECTOR1 + 2):
+					// 	pc64_set_sd_read_sector_part(3, write_word);
+					// 	break;
 
 					case PC64_REGISTER_SD_READ_NUM_SECTORS:
 						write_word |= n64_pi_get_value(pio) >> 16;
-						pc64_set_sd_read_sector_count(write_word);
+						pc64_set_sd_read_sector_count(1, write_word);
+						// pc64_set_sd_read_sector_count(0, write_word);
 						break;
 
+					// case (PC64_REGISTER_SD_READ_NUM_SECTORS + 2):
+					// 	pc64_set_sd_read_sector_count(1, write_word);
+					// 	break;
+
 					case PC64_REGISTER_SD_SELECT_ROM:
-						pc64_set_sd_rom_selection((char *)pc64_uart_tx_buf, half_word);
+						write_word |= n64_pi_get_value(pio) >> 16;
+						pc64_set_sd_rom_selection((char *)pc64_uart_tx_buf, write_word);
 						multicore_fifo_push_blocking(CORE1_LOAD_NEW_ROM_CMD);
 						break;
 
@@ -619,6 +624,41 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 					}
 
 					last_addr += addr_advance;
+				} else {
+					// New address
+					break;
+				}
+
+				if (g_restart_pi_handler) {
+					break;
+				}
+			} while (1);
+		} else if (last_addr >= 0x81000000 && last_addr <= 0x81001000) {
+			uart_tx_program_putc(0x09);
+			uart_tx_program_putc(0x08);
+			uart_tx_program_putc(0x07);
+			// Read to empty fifo
+			addr = n64_pi_get_value(pio);
+
+			// Jump to start of the PIO program.
+			pio_sm_exec(pio, 0, pio_encode_jmp(n64_pi_pio_offset + 0));
+
+			// Read and handle the following requests normally
+			addr = n64_pi_get_value(pio);
+		} else if (last_addr >= PC64_RAND_ADDRESS_START && last_addr <= PC64_RAND_ADDRESS_END) {
+			// PicoCart64 RAND address space
+			do {
+				// Read command/address
+				addr = n64_pi_get_value(pio);
+
+				if (addr & 0x00000001) {
+					// We got a WRITE
+					last_addr += 2;
+				} else if (addr == 0) {
+					// READ
+					next_word = pc64_rand16();
+					pio_sm_put(pio, 0, next_word);
+					last_addr += 2;
 				} else {
 					// New address
 					break;

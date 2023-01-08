@@ -245,8 +245,8 @@ void vLaunch(void)
 
 void mcu2_main(void)
 {
-	const int freq_khz = 133000;
-	// const int freq_khz = 166000;
+	// const int freq_khz = 133000;
+	const int freq_khz = 166000;
 	// const int freq_khz = 200000;
 	// const int freq_khz = 210000;
 	// const int freq_khz = 220000;

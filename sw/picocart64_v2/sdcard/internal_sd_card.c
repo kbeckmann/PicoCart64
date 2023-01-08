@@ -54,7 +54,8 @@ uint8_t lastBufferValue = 0;
 int bufferByteIndex = 0;
 volatile uint16_t pc64_uart_tx_buf[PC64_BASE_ADDRESS_LENGTH];
 
-volatile uint16_t sd_sector_registers[4];
+volatile uint32_t sd_sector_registers[4];
+volatile uint32_t sd_sector_count_registers[2];
 volatile uint32_t sd_read_sector_start;
 volatile uint32_t sd_read_sector_count;
 char sd_selected_rom_title[256];
@@ -75,7 +76,7 @@ volatile bool romLoading = false;
 //     sd_read_sector_start = sector;
 // }
 
-void pc64_set_sd_read_sector_part(int index, uint16_t value) {
+void pc64_set_sd_read_sector_part(int index, uint32_t value) {
     #if SD_CARD_RX_READ_DEBUG == 1
         printf("set read sector part %d = %d", index, value);
     #endif
@@ -88,14 +89,15 @@ void pc64_set_sd_read_sector_part(int index, uint16_t value) {
     // }
 }
 
-void pc64_set_sd_read_sector_count(uint32_t count) {
-    #if SD_CARD_RX_READ_DEBUG == 1
-        printf("set sector count = %d", count);
-    #endif
+void pc64_set_sd_read_sector_count(int index, uint32_t count) {
+    // sd_sector_count_registers[index] = count;
+    // if (index == 1) {
+    //     sd_read_sector_count = count;
+    // }
     sd_read_sector_count = count;
 }
 
-void pc64_set_sd_rom_selection(char* titleBuffer, uint16_t len) {
+void pc64_set_sd_rom_selection(char* titleBuffer, uint32_t len) {
     strcpy(sd_selected_rom_title, titleBuffer);
 }
 
@@ -107,7 +109,7 @@ void pc64_send_sd_read_command(void) {
     bufferIndex = 0;
     bufferByteIndex = 0;
 
-    uint32_t sector = (uint32_t)(sd_sector_registers[2] << 16 | sd_sector_registers[3]);
+    uint32_t sector = (uint32_t)(sd_sector_registers[0] << 16 | sd_sector_registers[1]);
     uint32_t sectorCount = 1;
 
     // Signal start
@@ -229,7 +231,6 @@ void load_new_rom(char* filename) {
 	}
 	printf("---- read file done -----\n\n\n");
 
-
     // Set back to starting PSRAM chip to read a few bytes
     psram_set_cs(3); // Use the PSRAM chip
     
@@ -305,12 +306,12 @@ void mcu1_process_rx_buffer() {
         uint8_t value = rx_uart_buffer_get();
         
         #if MCU1_ECHO_RECEIVED_DATA == 1
-        uart_tx_program_putc(value);
+        // uart_tx_program_putc(value);
         #endif
 
         if (romLoading) {
             // Echo the chars
-            uart_tx_program_putc(value);
+            // uart_tx_program_putc(value);
 
             if (value == COMMAND_START) {
                 mayHaveStart = true;
@@ -370,7 +371,7 @@ void mcu2_process_rx_buffer() {
     while (rx_uart_buffer_has_data()) {
         char ch = rx_uart_buffer_get();
         
-        // printf("%02x ", ch);
+        printf("%02x ", ch);
 
         if (ch == COMMAND_START) {
             mayHaveStart = true;
@@ -431,7 +432,7 @@ int numberOfSendDataCalls = 0;
 uint32_t totalTimeOfSendData_ms = 0;
 void send_data(uint32_t sector, uint32_t sectorCount) {
     numberOfSendDataCalls++;
-    //printf("Sending data. Sector: %ld, Count: %d\n", sector, sectorCount);
+    printf("Sector: %ld, Count: %d\n", sector, sectorCount);
     int loopCount = 0;
     uint32_t startTime = time_us_32();
     do {

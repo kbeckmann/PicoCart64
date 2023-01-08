@@ -32,13 +32,13 @@ extern volatile uint16_t pc64_uart_tx_buf[PC64_BASE_ADDRESS_LENGTH];
 // set the sector to start reading from
 void pc64_set_sd_read_sector(uint64_t sector);
 
-void pc64_set_sd_read_sector_part(int index, uint16_t value);
+void pc64_set_sd_read_sector_part(int index, uint32_t value);
 
 // set the number of sectors to read
-void pc64_set_sd_read_sector_count(uint32_t count);
+void pc64_set_sd_read_sector_count(int index, uint32_t count);
 
 // Set selected rom title, max 256 characters
-void pc64_set_sd_rom_selection(char* titleBuffer, uint16_t len);
+void pc64_set_sd_rom_selection(char* titleBuffer, uint32_t len);
 
 void pc64_send_sd_read_command(void);
 
@@ -63,3 +63,5 @@ void load_rom(const char *filename);
 
 void pc64_send_load_new_rom_command();
 void load_new_rom(char* filename);
+
+uint32_t xcrc32 (const unsigned char *buf, int len, uint32_t init);

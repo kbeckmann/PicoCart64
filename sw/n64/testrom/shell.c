@@ -186,34 +186,34 @@ void loadRomAtSelection(int selection) {
 
 static uint16_t pc64_sd_wait_single() {
     
-    uint16_t read_buf[] = { 1 };
-    data_cache_hit_writeback_invalidate(read_buf, sizeof(read_buf));
-    pi_read_raw(read_buf, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_BUSY, sizeof(uint16_t));
-    //uint32_t isBusy = io_read(PC64_CIBASE_ADDRESS_START + PC64_REGISTER_SD_BUSY);
+    // uint16_t read_buf[] = { 1 };
+    // data_cache_hit_writeback_invalidate(read_buf, sizeof(read_buf));
+    // pi_read_raw(read_buf, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_BUSY, sizeof(uint16_t));
+    uint32_t isBusy = io_read(PC64_CIBASE_ADDRESS_START + PC64_REGISTER_SD_BUSY);
 
-    return read_buf[0];
+    return isBusy;
 }
 
 static uint8_t pc64_sd_wait() {
     uint32_t timeout = 0;
-    uint16_t read_buf[] = { 1 };
-	uint16_t busy[] = { 1 };
-    // uint32_t isBusy = 0;
-    
+    uint32_t isBusy __attribute__((aligned(8)));
+	isBusy = 1;
+
     // Wait until the cartridge interface is ready
     do {
+		
         // returns 1 while sd card is busy
-        data_cache_hit_writeback_invalidate(read_buf, sizeof(read_buf));
-        pi_read_raw(read_buf, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_BUSY, sizeof(uint16_t));
-        // isBusy = io_read(PC64_CIBASE_ADDRESS_START + PC64_REGISTER_SD_BUSY);
+		isBusy = io_read(PC64_CIBASE_ADDRESS_START + PC64_REGISTER_SD_BUSY);
         
         // Took too long, abort
-        if((timeout++) > 1000000)
-            return -1;
+        if((timeout++) > 10000000) {
+			fprintf(stdout, "SD_WAIT timed out. isBusy: %ld\n", isBusy);
+			return -1;
+		}
     }
-    while(memcmp(busy, read_buf, sizeof(uint16_t)) == 0);
+    while(isBusy == 1);
     (void) timeout; // Needed to stop unused variable warning
-    
+
     // Success
     return 0;
 }
@@ -288,6 +288,18 @@ void bootRom(display_context_t disp, int silent) {
 
 void waitForStart() {
     printf("Start to continue...\n");
+    while (true) {
+            controller_scan();
+            struct controller_data keys = get_keys_pressed();
+            if (keys.c[0].start) {
+                wait_ms(300);
+                break;
+            }
+    }
+}
+
+void silentWaitForStart() {
+    printf("...\n");
     while (true) {
             controller_scan();
             struct controller_data keys = get_keys_pressed();
@@ -755,13 +767,50 @@ sprite_t* load_sprite_from_sd(const char* const spritename) {
     FILE *fp = fopen(spritename, "r");
     if (fp) {
         const long size = filesize(fp);
+        // int bytesRead = 0;
+        int totalRead = 0;
         sprite_t *sp = malloc(size);
+        // do {
+        //     bytesRead = fread(sp+totalRead, 1, 512, fp);
+        //     totalRead += bytesRead;
+        // } while(bytesRead > 0);
         fread(sp, 1, size, fp);
+        
+        // rewind(fp);
+        // for(int i = 0; i < size; i++) {
+        //     if (i % 32 == 0) {
+        //         silentWaitForStart();
+        //     }
+        //     if (i % 8 == 0) {
+        //         printf("\n%04x: ", i);
+        //     }
+        //     printf("%02x ", ((uint8_t*)(sp))[i]);
+        // }
+
         fclose(fp);
 
+        // silentWaitForStart();
+
+        // do a crc check
+        // fp = fopen(spritename, "r");
+        // uint8_t buf[512];
+        // uint32_t crc = 0xFFFFFFFFUL;
+        // int total = 0;
+        // int bytesRead = 0;
+        // do {
+        //     bytesRead = fread(buf, 1, sizeof(buf), fp);
+        //     crc = xcrc32(buf, bytesRead, crc);
+        //     total += bytesRead;
+        // } while(bytesRead > 0);
+        // printf("crc: %lu. totalbytes: %d\n", crc, total);
+        // fclose(fp);
+        // waitForStart();
+
         if (!g_isRenderingMenu) {
-        printf("size: %ld, width: %d, height: %d\n", size, sp->width, sp->height);
+        printf("bytesRead: %d, size: %ld, width: %d, height: %d\n", totalRead, size, sp->width, sp->height);
         }
+
+        // silentWaitForStart();
 
         return sp;
     } else {
@@ -879,14 +928,16 @@ static void init_sprites(void) {
         }
     } else {
         LOAD_BOX_ART = true;
+        current_thumbnail = load_sprite_from_sd("sd:/mudkip.sprite");
         // load_boxart_for_rom("sd:/Doom 64 (USA) (Rev 1).z64");
-        if(load_boxart_for_rom("sd:/GoldenEye 007 (U) [!].z64") != 0) {
-            printf("Failed to load boxart\n");
-            LOAD_BOX_ART = false;
-            thumbnail_loaded = false;
-        } else {
-            printf("Loaded box art\n");
-        }
+        //if(load_boxart_for_rom("sd:/GoldenEye 007 (U) [!].z64") != 0) {
+        // if(load_boxart_for_rom("sd:/GoldenEye 007 (U) [!].z64") != 0) {
+        //     printf("Failed to load boxart\n");
+        //     LOAD_BOX_ART = false;
+        //     thumbnail_loaded = false;
+        // } else {
+        //     printf("Loaded box art\n");
+        // }
 
         waitForStart();
     }
@@ -936,13 +987,16 @@ void start_shell(void) {
         IS_EMULATOR = true;
     }
 
-    // IS_EMULATOR = true;
+    IS_EMULATOR = false;
 
     if (IS_EMULATOR) {
         printf("Running in an emulator?\n");
     } else {
         printf("Running on real hardware?\n");
     }
+
+    // printf("PC64_CIBASE_ADDRESS_START: %08x\n", PC64_CIBASE_ADDRESS_START);
+    pc64_debug_print();
 
     // Alloc global holding variables
     temp_serial = malloc(sizeof(char) * 5);
