@@ -278,8 +278,6 @@ void load_new_rom(char* filename) {
     // TODO exit quad mode on every chip
     exitQuadMode();
 
-    return;
-
     // Now turn off the hardware
     current_mcu_enable_demux(false);
     ssi_hw->ssienr = 0;

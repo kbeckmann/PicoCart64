@@ -182,7 +182,7 @@ void loadRomAtSelection(int selection) {
 
     g_isLoading = true;
 
-    wait_ms(1000);
+    wait_ms(100);
 }
 
 static uint16_t pc64_sd_wait_single() {
