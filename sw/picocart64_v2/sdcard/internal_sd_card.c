@@ -46,6 +46,7 @@
 
 #define PRINT_BUFFER_AFTER_SEND 0
 #define MCU1_ECHO_RECEIVED_DATA 0
+#define MCU2_PRINT_UART 0
 
 int PC64_MCU_ID = -1;
 
@@ -66,19 +67,10 @@ volatile bool sd_is_busy = false;
 volatile bool waitingForRomLoad = false;
 volatile bool sendDataReady = false;
 volatile uint32_t sectorToSendRegisters[2];
-// volatile uint64_t sectorToSend = 0;
 volatile uint32_t numSectorsToSend = 0;
 volatile bool startRomLoad = false;
 volatile bool romLoading = false;
 
-// void pc64_set_sd_read_sector(uint64_t sector) {
-//     #if SD_CARD_RX_READ_DEBUG == 1
-//         printf("set read sector = %ld", sector);
-//     #endif
-//     sd_read_sector_start = sector;
-// }
-
-#define QWTRE 0x08000000
 
 void pc64_set_sd_read_sector_part(int index, uint32_t value) {
     #if SD_CARD_RX_READ_DEBUG == 1
@@ -133,10 +125,6 @@ void pc64_send_sd_read_command(void) {
     uart_tx_program_putc((char)((sectorCount & 0x00FF0000) >> 16));
     uart_tx_program_putc((char)((sectorCount & 0x0000FF00) >> 8));
     uart_tx_program_putc((char) (sectorCount & 0x000000FF));
-
-    // Signal finish
-    // uart_tx_program_putc(COMMAND_FINISH);
-    // uart_tx_program_putc(COMMAND_FINISH2);
 }
 
 // Send command from MCU1 to MCU2 to start loading a rom
@@ -155,20 +143,12 @@ void pc64_send_load_new_rom_command() {
     // command
     uart_tx_program_putc(COMMAND_LOAD_ROM);
 
-    // TODO NUM_BYTES_TO_READ
     uint16_t numBytes = strlen(sd_selected_rom_title);
-    // uart_tx_program_putc(numBytes >> 8);
-    // uart_tx_program_putc(numBytes);
-    // uint16_t numBytes = 256;
     uart_tx_program_putc(numBytes >> 8);
     uart_tx_program_putc(numBytes);
 
     // Send the title to load
     uart_tx_program_puts(sd_selected_rom_title);
-
-    // Signal finish
-    // uart_tx_program_putc(COMMAND_FINISH);
-    // uart_tx_program_putc(COMMAND_FINISH2);
 }
 
 void load_selected_rom() {
@@ -384,7 +364,9 @@ void mcu2_process_rx_buffer() {
     while (rx_uart_buffer_has_data()) {
         char ch = rx_uart_buffer_get();
         
+        #if MCU2_PRINT_UART == 1
         printf("%02x ", ch);
+        #endif
 
         if (receivingData) {
             ((uint8_t*)(pc64_uart_tx_buf))[bufferIndex] = ch;
@@ -399,7 +381,6 @@ void mcu2_process_rx_buffer() {
 
             if (command_headerBufferIndex >= COMMAND_HEADER_LENGTH) {
                 command_numBytesToRead = (commandHeaderBuffer[1] << 8) | commandHeaderBuffer[2];
-                // printf("reading %u bytes\n", command_numBytesToRead);
                 isReadingCommandHeader = false;
                 receivingData = true;
                 command_headerBufferIndex = 0;
@@ -444,11 +425,13 @@ void mcu2_process_rx_buffer() {
             echoIndex = 0;
             printf("\n");
         } else {
+            #if MCU2_PRINT_UART == 1
             echoIndex++;
             if (echoIndex >= 32) {
                 printf("\n");
                 echoIndex = 0;
             }
+            #endif
         }
     }
 }

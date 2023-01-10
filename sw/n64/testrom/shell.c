@@ -131,7 +131,7 @@ char* g_fileInfo[] = {
 
 int NUM_ENTRIES = 0;
 bool g_sendingSelectedRom = false;
-int g_lastSelection = 0;
+int g_lastSelection = -1;
 char g_infoPanelTextBuf[256];
 bool g_isLoading = false;
 bool g_isRenderingMenu = false;
@@ -186,12 +186,7 @@ void loadRomAtSelection(int selection) {
 }
 
 static uint16_t pc64_sd_wait_single() {
-    
-    // uint16_t read_buf[] = { 1 };
-    // data_cache_hit_writeback_invalidate(read_buf, sizeof(read_buf));
-    // pi_read_raw(read_buf, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_BUSY, sizeof(uint16_t));
     uint32_t isBusy = io_read(PC64_CIBASE_ADDRESS_START + PC64_REGISTER_SD_BUSY);
-
     return isBusy;
 }
 
@@ -397,11 +392,8 @@ static void render_info_panel(display_context_t display, int currently_selected)
             LOAD_BOX_ART = true;
         }
 
-        // TODO load more information from the rom header, Game name, crc, serial, country
-        // read_rom_header_serial_number(temp_serial, g_fileEntries[currently_selected]);
-
         // TODO if part of the string is longer than the number of characters that can fit in in the info panel width, split or clip it
-        sprintf(g_infoPanelTextBuf, "%s\n%s\nSize: ?M\nCountry\nReleased ?\n%d", g_fileEntries[currently_selected], temp_serial, currently_selected);
+        sprintf(g_infoPanelTextBuf, "%s\n%s\nSize: ?M\nCountry xxx\nReleased xxxx", g_fileEntries[currently_selected], temp_serial);
         if (!g_isRenderingMenu) {
             printf("rom: %s, serial: %s\n",g_fileEntries[currently_selected], temp_serial);
         }
@@ -439,7 +431,7 @@ static void draw_bottom_bar(display_context_t display) {
     graphics_draw_box(display, 0, BOTTOM_BAR_Y, SCREEN_WIDTH - INFO_PANEL_WIDTH, BOTTOM_BAR_HEIGHT, graphics_convert_color(BOTTOM_BAR_COLOR));
     #endif
     
-    //graphics_draw_sprite_trans(display, MARGIN_PADDING, BOTTOM_BAR_Y, a_button_icon);
+    graphics_draw_sprite_trans(display, MARGIN_PADDING, BOTTOM_BAR_Y, a_button_icon);
     graphics_draw_text(display, MARGIN_PADDING + 32, BOTTOM_BAR_Y + BOTTOM_BAR_HEIGHT/2 - 4, "Load ROM");
 }
 
@@ -886,7 +878,7 @@ int load_boxart_for_rom(char* filename) {
 static void init_sprites(void) {
     printf("init sprites\n");
 
-    // a_button_icon = read_sprite("a-button-icon.sprite");
+    a_button_icon = read_sprite("a-button-icon.sprite");
 
     if (IS_EMULATOR) {
         // g_thumbnail_cache = malloc(sizeof(sprite_t*) * 4); // alloc the buffer
@@ -908,21 +900,9 @@ static void init_sprites(void) {
         }
     } else {
         LOAD_BOX_ART = true;
-        printf("Loading box art\n");
-        // silentWaitForStart();
-        // current_thumbnail = load_sprite_from_sd("sd:/mudkip.sprite");
-        // load_boxart_for_rom("sd:/Doom 64 (USA) (Rev 1).z64");
-        int success = load_boxart_for_rom("GoldenEye 007 (U) [!].z64");
-        printf("box art load success: %d. thumbnail_loaded:%d\n", success, thumbnail_loaded);
-        // if(load_boxart_for_rom("sd:/GoldenEye 007 (U) [!].z64") != 0) {
-        //     printf("Failed to load boxart\n");
-        //     LOAD_BOX_ART = false;
-        //     thumbnail_loaded = false;
-        // } else {
-        //     printf("Loaded box art\n");
-        // }
-
-        // silentWaitForStart();
+        // printf("Loading box art\n");
+        // int success = load_boxart_for_rom("GoldenEye 007 (U) [!].z64");
+        // printf("box art load success: %d. thumbnail_loaded:%d\n", success, thumbnail_loaded);
     }
 
     // char buf[512];
