@@ -532,22 +532,30 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 						// Upper 16 bits are just 0
 						pio_sm_put(pio, 0, 0x0000);
 
-						last_addr += 2;
+						// last_addr += 2;
 
-						// Get the next command/address
-						addr = n64_pi_get_value(pio);
-						if (addr != 0) {
-							continue;
-						}
+						// // Get the next command/address
+						// addr = n64_pi_get_value(pio);
+						// if (addr != 0) {
+						// 	continue;
+						// }
 
-						// now we can send the actual busy bit
+						// // now we can send the actual busy bit
+						// if (sd_is_busy) {
+						// 	pio_sm_put(pio, 0, 0x0001);
+						// } else {
+						// 	pio_sm_put(pio, 0, 0x0000);
+						// }
+						
+						break;
+					case (PC64_REGISTER_SD_BUSY + 2):
 						if (sd_is_busy) {
 							pio_sm_put(pio, 0, 0x0001);
 						} else {
 							pio_sm_put(pio, 0, 0x0000);
 						}
-						
 						break;
+
 					default:
 						next_word = 0;
 					}
@@ -560,61 +568,64 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 					// Read two 16-bit half-words and merge them to a 32-bit value
 					uint32_t write_word = addr & 0xFFFF0000;
 					// uint16_t half_word = addr >> 16;
-					uint addr_advance = 4;
+					uint addr_advance = 2;
 
 					switch (last_addr - PC64_CIBASE_ADDRESS_START) {
 					case PC64_REGISTER_UART_TX:
 						write_word |= n64_pi_get_value(pio) >> 16;
 						//stdio_uart_out_chars((const char *)pc64_uart_tx_buf, write_word & (sizeof(pc64_uart_tx_buf) - 1));
+						addr_advance = 4;
 						break;
 
 					case PC64_REGISTER_RAND_SEED:
 						write_word |= n64_pi_get_value(pio) >> 16;
 						pc64_rand_seed(write_word);
+						addr_advance = 4;
 						break;
 
 					case PC64_COMMAND_SD_READ:
-						write_word |= n64_pi_get_value(pio) >> 16;
+						// write_word |= n64_pi_get_value(pio) >> 16;
+						// multicore_fifo_push_blocking(CORE1_SEND_SD_READ_CMD);
+						break;
+
+					case (PC64_COMMAND_SD_READ + 2):
 						multicore_fifo_push_blocking(CORE1_SEND_SD_READ_CMD);
 						break;
 
-					// case (PC64_COMMAND_SD_READ + 2):
-					// 	uart_tx_program_putc(0xBB);
-					// 	multicore_fifo_push_blocking(CORE1_SEND_SD_READ_CMD);
-					// 	break;
-
 					case PC64_REGISTER_SD_READ_SECTOR0:
-						write_word |= n64_pi_get_value(pio) >> 16;
-						pc64_set_sd_read_sector_part(0, write_word);
+						// write_word |= n64_pi_get_value(pio) >> 16;
 						// pc64_set_sd_read_sector_part(0, write_word);
+						pc64_set_sd_read_sector_part(0, write_word);
 						break;
 
-					// case (PC64_REGISTER_SD_READ_SECTOR0+2):
-					// 	pc64_set_sd_read_sector_part(1, write_word);
-					// 	break;
+					case (PC64_REGISTER_SD_READ_SECTOR0+2):
+						pc64_set_sd_read_sector_part(1, write_word);
+						break;
 
 					case PC64_REGISTER_SD_READ_SECTOR1:
-						write_word |= n64_pi_get_value(pio) >> 16;
-						pc64_set_sd_read_sector_part(1, write_word);
-						// pc64_set_sd_read_sector_part(2, write_word);
+						// write_word |= n64_pi_get_value(pio) >> 16;
+						// pc64_set_sd_read_sector_part(1, write_word);
+						pc64_set_sd_read_sector_part(2, write_word);
 						break;
 
-					// case (PC64_REGISTER_SD_READ_SECTOR1 + 2):
-					// 	pc64_set_sd_read_sector_part(3, write_word);
-					// 	break;
+					case (PC64_REGISTER_SD_READ_SECTOR1 + 2):
+						pc64_set_sd_read_sector_part(3, write_word);
+						break;
 
 					case PC64_REGISTER_SD_READ_NUM_SECTORS:
-						write_word |= n64_pi_get_value(pio) >> 16;
+						// write_word |= n64_pi_get_value(pio) >> 16;
+						// pc64_set_sd_read_sector_count(1, write_word);
 						pc64_set_sd_read_sector_count(1, write_word);
-						// pc64_set_sd_read_sector_count(0, write_word);
 						break;
 
-					// case (PC64_REGISTER_SD_READ_NUM_SECTORS + 2):
-					// 	pc64_set_sd_read_sector_count(1, write_word);
-					// 	break;
+					case (PC64_REGISTER_SD_READ_NUM_SECTORS + 2):
+						pc64_set_sd_read_sector_count(0, write_word);
+						break;
 
 					case PC64_REGISTER_SD_SELECT_ROM:
-						write_word |= n64_pi_get_value(pio) >> 16;
+						// write_word |= n64_pi_get_value(pio) >> 16;
+						break;
+					case (PC64_REGISTER_SD_SELECT_ROM + 2):
 						pc64_set_sd_rom_selection((char *)pc64_uart_tx_buf, write_word);
 						multicore_fifo_push_blocking(CORE1_LOAD_NEW_ROM_CMD);
 						break;

@@ -64,4 +64,4 @@ void load_rom(const char *filename);
 void pc64_send_load_new_rom_command();
 void load_new_rom(char* filename);
 
-uint32_t xcrc32 (const unsigned char *buf, int len, uint32_t init);
+void testFunction();

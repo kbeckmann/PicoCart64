@@ -17,6 +17,9 @@
         "diskio.h": "c",
         "my_debug.h": "c",
         "stdlib.h": "c",
-        "systick.h": "c"
+        "systick.h": "c",
+        "pins_mcu1.h": "c",
+        "pio_uart.h": "c",
+        "pio.h": "c"
     }
 }

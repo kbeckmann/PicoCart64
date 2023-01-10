@@ -170,14 +170,15 @@ void loadRomAtSelection(int selection) {
     uint32_t len_aligned32 = (strlen(g_fileEntries[selection]) + 3) & (-4);
     data_cache_hit_writeback_invalidate(g_fileEntries[selection], len_aligned32);
     pi_write_raw(g_fileEntries[selection], PC64_BASE_ADDRESS_START, 0, len_aligned32);
+    // pi_write_raw
 	// io_write(PC64_BASE_ADDRESS_START, fileToLoad);
 
-    uint16_t sdSelectRomFilenameLength[] = { strlen(fileToLoad) };
+    uint32_t sdSelectRomFilenameLength = strlen(fileToLoad);
     // data_cache_hit_writeback_invalidate(&sdSelectRomFilenameLength, sizeof(sdSelectRomFilenameLength));
     // Send command to start the load, the cart will check the pc64 buffer for the filename 
-    data_cache_hit_writeback_invalidate(sdSelectRomFilenameLength, sizeof(uint16_t));
-    pi_write_raw(sdSelectRomFilenameLength, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_SELECT_ROM, sizeof(uint16_t));
-    // io_write(PC64_CIBASE_ADDRESS_START + PC64_REGISTER_SD_SELECT_ROM, &sdSelectRomFilenameLength);
+    // data_cache_hit_writeback_invalidate(sdSelectRomFilenameLength, sizeof(uint16_t));
+    // pi_write_raw(sdSelectRomFilenameLength, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_SD_SELECT_ROM, sizeof(uint16_t));
+    io_write(PC64_CIBASE_ADDRESS_START + PC64_REGISTER_SD_SELECT_ROM, sdSelectRomFilenameLength);
 
     g_isLoading = true;
 
@@ -211,7 +212,7 @@ static uint8_t pc64_sd_wait() {
 			return -1;
 		}
     }
-    while(isBusy == 1);
+    while(isBusy != 0);
     (void) timeout; // Needed to stop unused variable warning
 
     // Success
@@ -382,25 +383,28 @@ static void render_info_panel(display_context_t display, int currently_selected)
         memset(g_infoPanelTextBuf, 0, 256);
         memset(temp_serial, 0, 5);
 
+        // TODO fix the below code, loading thumbnails is causing a crash.
+        // Free the last thumbnail
+        if (thumbnail_loaded) {
+            free(current_thumbnail);
+            thumbnail_loaded = false;
+        }
+
+        // Try to load a thumbnail, if this isn't a rom, don't load box art
+        if(load_boxart_for_rom(g_fileEntries[currently_selected]) != 0) {
+            LOAD_BOX_ART = false;
+        } else {
+            LOAD_BOX_ART = true;
+        }
+
         // TODO load more information from the rom header, Game name, crc, serial, country
-        read_rom_header_serial_number(temp_serial, g_fileEntries[currently_selected]);
+        // read_rom_header_serial_number(temp_serial, g_fileEntries[currently_selected]);
 
         // TODO if part of the string is longer than the number of characters that can fit in in the info panel width, split or clip it
         sprintf(g_infoPanelTextBuf, "%s\n%s\nSize: ?M\nCountry\nReleased ?\n%d", g_fileEntries[currently_selected], temp_serial, currently_selected);
-
-        // TODO fix the below code, loading thumbnails is causing a crash.
-        // Free the last thumbnail
-        // if (thumbnail_loaded) {
-        //     free(current_thumbnail);
-        //     thumbnail_loaded = false;
-        // }
-
-        // Try to load a thumbnail, if this isn't a rom, don't load box art
-        // if(load_boxart_for_rom(g_fileEntries[currently_selected]) != 0) {
-        //     LOAD_BOX_ART = false;
-        // } else {
-        //     LOAD_BOX_ART = true;
-        // }
+        if (!g_isRenderingMenu) {
+            printf("rom: %s, serial: %s\n",g_fileEntries[currently_selected], temp_serial);
+        }
 
         g_lastSelection = currently_selected;
     }
@@ -568,7 +572,9 @@ static void show_list(void) {
 
     // display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
     // display_init(RESOLUTION_320x240, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE);
-    display_init(RESOLUTION_512x240, DEPTH_16_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
+    
+    display_init(RESOLUTION_512x240, DEPTH_32_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
+
     // display_init(RESOLUTION_512x240, DEPTH_32_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
     // display_init(RESOLUTION_512x480, DEPTH_32_BPP, 3, GAMMA_NONE, ANTIALIAS_RESAMPLE); //Jumpy and janky, do not use
 
@@ -629,6 +635,7 @@ static void show_list(void) {
 
         /* Force the backbuffer flip */
         display_show(display);
+        //console_render(); // use if not rendering with display, also disable g_isRenderingMenu
 
         // If we are loading, then don't allow anymore input
         if (g_isLoading) {
@@ -764,53 +771,18 @@ sprite_t* load_sprite_from_sd(const char* const spritename) {
     if (!g_isRenderingMenu) {
     printf("loading sprite from sd : %s\n", spritename);
     }
+
     FILE *fp = fopen(spritename, "r");
     if (fp) {
         const long size = filesize(fp);
-        // int bytesRead = 0;
         int totalRead = 0;
         sprite_t *sp = malloc(size);
-        // do {
-        //     bytesRead = fread(sp+totalRead, 1, 512, fp);
-        //     totalRead += bytesRead;
-        // } while(bytesRead > 0);
         fread(sp, 1, size, fp);
-        
-        // rewind(fp);
-        // for(int i = 0; i < size; i++) {
-        //     if (i % 32 == 0) {
-        //         silentWaitForStart();
-        //     }
-        //     if (i % 8 == 0) {
-        //         printf("\n%04x: ", i);
-        //     }
-        //     printf("%02x ", ((uint8_t*)(sp))[i]);
-        // }
-
         fclose(fp);
-
-        // silentWaitForStart();
-
-        // do a crc check
-        // fp = fopen(spritename, "r");
-        // uint8_t buf[512];
-        // uint32_t crc = 0xFFFFFFFFUL;
-        // int total = 0;
-        // int bytesRead = 0;
-        // do {
-        //     bytesRead = fread(buf, 1, sizeof(buf), fp);
-        //     crc = xcrc32(buf, bytesRead, crc);
-        //     total += bytesRead;
-        // } while(bytesRead > 0);
-        // printf("crc: %lu. totalbytes: %d\n", crc, total);
-        // fclose(fp);
-        // waitForStart();
 
         if (!g_isRenderingMenu) {
         printf("bytesRead: %d, size: %ld, width: %d, height: %d\n", totalRead, size, sp->width, sp->height);
         }
-
-        // silentWaitForStart();
 
         return sp;
     } else {
@@ -836,54 +808,61 @@ sprite_t* load_sprite_from_sd(const char* const spritename) {
  *
  */
 int read_rom_header_serial_number(char* buf, const char* const filename) {
+    // printf("Loading header info for: %s\n", filename);
     FILE* fp = fopen(filename, "r");
 
     if (!fp) {
-        fclose(fp);
         if (!g_isRenderingMenu) {
         printf("Unable to open file %s\n", filename);
         }
+        fclose(fp);
         return -1;
     }
 
-    // TODO check if a valid rom (maybe using the janky method of checking for 80 37 12 40 bytes)
-
-    // Doing a filesize on rom files keep returning -1 size... wth?
+    // This is still coming back wrong
     // const long size = filesize(fp);
-    // if (size < 1024) {
+    // if (size < 64) {
     //     printf("failed to read rom %s\nSize: %ld\n", filename, size);
     //     return -1;
     // }
 
-    int r = fseek(fp, 0x3B, SEEK_SET);
-    if (r != 0) {
-        fclose(fp);
-        if (!g_isRenderingMenu) {
-        printf("Unable to seek rom file.\n");
-        }
-        return -1;
-    }
-
-    int numRead = fread(buf, 1, 4, fp);
+    uint8_t* b = malloc(64);    
+    uint numRead = fread(b, 1, 64, fp);
     if (numRead == 0) {
-        fclose(fp);
         if (!g_isRenderingMenu) {
-        printf("Unable to read rom file header serial number.\n");
+            printf("Unable to read rom file header serial number.\n");
         }
+        fclose(fp);
         return -1;
     }
-
     fclose(fp);
 
+    // janky method of checking for 80 37 12 40 bytes
+    if (b[0] != 0x80 && b[1] != 0x37 && b[2] != 0x12 && b[3] != 0x40) {
+        if (!g_isRenderingMenu) {
+            printf("Not a rom file.\n");
+        }
+        return -1;
+    }
+
+    buf[0] = b[0x3B];
+    buf[1] = b[0x3C];
+    buf[2] = b[0x3D];
+    buf[3] = b[0x3E];
     buf[4] = '\0';
+
+    free(b);
     
     return 0;
 }
 
 // Loads box art into cache and returns the index it was added to, -1 if it couldn't be added
 int load_boxart_for_rom(char* filename) {
-    memset(temp_serial, 0, 5);
-    int ret = read_rom_header_serial_number(temp_serial, filename);
+    memset(temp_serial, 0, 8);
+    char* prefixedFilename = malloc(256);
+    sprintf(prefixedFilename, "sd:/%s", filename);
+    int ret = read_rom_header_serial_number(temp_serial, prefixedFilename);
+    free(prefixedFilename);
 
     if (ret != 0) {
         thumbnail_loaded = false;
@@ -891,11 +870,12 @@ int load_boxart_for_rom(char* filename) {
     }
 
     if(!g_isRenderingMenu) {
-    printf("Loading sprite...\n");
+        printf("Loading sprite...\n");
     }
     
     memset(temp_spritename, 0, 256);
-    sprintf(temp_spritename, "sd:/N64/sprites/%s.sprite", temp_serial);
+    // sprintf(temp_spritename, "sd:/N64/sprites/%s.sprite", temp_serial);
+    sprintf(temp_spritename, "sd:/N64/boxart_sprites_32/%s.sprite", temp_serial);
 
     current_thumbnail = load_sprite_from_sd(temp_spritename);
     thumbnail_loaded = true;
@@ -928,9 +908,12 @@ static void init_sprites(void) {
         }
     } else {
         LOAD_BOX_ART = true;
-        current_thumbnail = load_sprite_from_sd("sd:/mudkip.sprite");
+        printf("Loading box art\n");
+        // silentWaitForStart();
+        // current_thumbnail = load_sprite_from_sd("sd:/mudkip.sprite");
         // load_boxart_for_rom("sd:/Doom 64 (USA) (Rev 1).z64");
-        //if(load_boxart_for_rom("sd:/GoldenEye 007 (U) [!].z64") != 0) {
+        int success = load_boxart_for_rom("GoldenEye 007 (U) [!].z64");
+        printf("box art load success: %d. thumbnail_loaded:%d\n", success, thumbnail_loaded);
         // if(load_boxart_for_rom("sd:/GoldenEye 007 (U) [!].z64") != 0) {
         //     printf("Failed to load boxart\n");
         //     LOAD_BOX_ART = false;
@@ -939,7 +922,7 @@ static void init_sprites(void) {
         //     printf("Loaded box art\n");
         // }
 
-        waitForStart();
+        // silentWaitForStart();
     }
 
     // char buf[512];
@@ -999,7 +982,7 @@ void start_shell(void) {
     pc64_debug_print();
 
     // Alloc global holding variables
-    temp_serial = malloc(sizeof(char) * 5);
+    temp_serial = malloc(sizeof(char) * 8);
     temp_spritename = malloc(sizeof(char) * 256);
 
     int ret = dfs_init(DFS_DEFAULT_LOCATION);
@@ -1034,7 +1017,7 @@ void start_shell(void) {
             }
         }
 
-        console_clear();
+        // console_clear();
 
         // waitForStart();
 
