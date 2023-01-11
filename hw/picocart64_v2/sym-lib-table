@@ -1,0 +1,8 @@
+(sym_lib_table
+  (lib (name "n64-cartridge")(type "KiCad")(uri "${KIPRJMOD}/../symbols/n64-cartridge.kicad_sym")(options "")(descr ""))
+  (lib (name "RP2040_Stamp")(type "KiCad")(uri "${KIPRJMOD}/../symbols/RP2040_Stamp.kicad_sym")(options "")(descr ""))
+  (lib (name "spiram")(type "KiCad")(uri "${KIPRJMOD}/../symbols/spiram.kicad_sym")(options "")(descr ""))
+  (lib (name "MCU_RaspberryPi")(type "KiCad")(uri "${KIPRJMOD}/../symbols/MCU_RaspberryPi.kicad_sym")(options "KiCad")(descr ""))
+  (lib (name "Espressif")(type "KiCad")(uri "${KIPRJMOD}/../symbols/Espressif.kicad_sym")(options "")(descr ""))
+  (lib (name "LED_Extra")(type "KiCad")(uri "${KIPRJMOD}/../symbols/LED_Extra.kicad_sym")(options "")(descr ""))
+)

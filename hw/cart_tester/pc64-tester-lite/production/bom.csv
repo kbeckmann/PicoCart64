@@ -1,0 +1,10 @@
+Designator,Footprint,Quantity,Value,LCSC Part #
+CON3,N64-CONN,1,N64-CONN,
+H1,MountingHole_2.2mm_M2_DIN965_Pad_TopBottom,1,MountingHole_Pad,
+SWD1,PinHeader_1x03_P2.54mm_Vertical,1,SWD,
+UART0,PinHeader_1x02_P2.54mm_Vertical,1,UART0,
+H4,MountingHole_2.2mm_M2_DIN965_Pad_TopBottom,1,MountingHole_Pad,
+RESET1,SW_SPST_FSMSM,1,RESET,
+H3,MountingHole_2.2mm_M2_DIN965_Pad_TopBottom,1,MountingHole_Pad,
+U1,RPi_Pico_SMD_TH,1,Pico,
+H2,MountingHole_2.2mm_M2_DIN965_Pad_TopBottom,1,MountingHole_Pad,

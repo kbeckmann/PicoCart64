@@ -1,0 +1,149 @@
+;
+; SPDX-License-Identifier: BSD-2-Clause
+;
+; Copyright (c) 2022 Konrad Beckmann
+;
+
+.program n64_pi
+
+n64_pi_start:
+
+    ; Clear ISR (needed when jumping here manually from C-code quickly)
+    mov isr, null
+
+    ; Change IO dir of all pins to INPUT
+    mov osr, null
+    out pindirs, 32
+
+
+    ; state => STATE_START
+
+    ; wait for N64_ALEH
+    wait 1 gpio 17
+
+    ; wait for N64_ALEL
+    wait 1 gpio 16
+
+    ; state => STATE_WAIT_ADDR_H
+
+    ; wait for ~N64_ALEH
+    wait 0 gpio 17
+    ; Sample AD0 -> AD15, put in ISR
+    in pins, 16
+
+    ; state => STATE_WAIT_ADDR_L
+
+    ; wait for ~N64_ALEL
+    wait 0 gpio 16
+
+    ; Sample AD0 -> AD15, put in ISR
+    in pins, 16
+
+    ; push 32 bits of high and low parts
+    ; TODO: Can we use autopush?
+    push
+
+    ; TODO: Pull to check if address should be handled or not
+
+.wrap_target
+wait_for_not_read_or_aleh:
+
+    ; Pseudo-code of the loop below:
+    ; if (N64_ALEH)
+    ;   goto n64_pi_start
+    ; else if (~N64_WRITE):
+    ;   goto handle_write
+    ; else if (N64_READ):
+    ;   goto wait_for_not_read_or_aleh
+
+    jmp pin n64_pi_start
+
+    ; Read all pins into OSR
+    mov osr, pins
+    ; Dump 18 bits of OSR contents
+    out null, 18
+
+    ; Effectively read gpio 18 into y, so we can branch on it
+    out y, 1 ;; N64_WRITE
+
+    ; if (!y) goto handle_write
+    jmp !y handle_write
+
+    ; Effectively read gpio 19 into x, so we can branch on it
+    out x, 1 ;; N64_READ
+
+    ; if (x): goto wait_for_not_read_or_aleh;
+    jmp x-- wait_for_not_read_or_aleh
+
+    ; Send a "give me 16 bits!" command (null address)
+    ; ISR is 0 at this moment
+    push
+
+    ; Read data from c code into OSR
+    pull
+
+    ; Write 16 bits from OSR to pins
+    out pins, 16
+
+    ; Set pindirs to 0xFFFFFFFF
+    ; Note that only the pins set up in sm_config_set_out_pins() are affected,
+    ; i.e. GPIO0-GPIO15
+    mov osr, ~null
+    out pindirs, 32
+
+    ; wait for N64_READ
+    wait 1 gpio 19
+
+    ; state => WAIT_READ_H
+
+    jmp wait_for_not_read_or_aleh
+
+
+handle_write:
+
+    ; Sample AD0 -> AD15, put in ISR
+    in pins, 16
+
+    ; encode 1 in lsb
+    mov x, ~null
+    in x, 16
+
+    ; wait for N64_WRITE
+    wait 1 gpio 18
+
+    push
+
+.wrap             ; Handle PI transactions forever!
+
+
+% c-sdk {
+void n64_pi_program_init(PIO pio, uint sm, uint offset) {
+
+    // Init gpios [gpio0, gpio19] as inputs
+    for (int i = 0; i <= 19; i++) {
+        pio_gpio_init(pio, i);
+    }
+
+    // Set [AD0, AD15] as input
+    pio_sm_set_consecutive_pindirs(pio, sm, 0, 16, false);
+
+    pio_sm_config c = n64_pi_program_get_default_config(offset);
+
+    // shift_right=false, autopush=false, push_threshold=32
+    sm_config_set_in_shift(&c, false, false, 32);
+
+    // shift_right=true, autopull=false, pull_threshold=32
+    sm_config_set_out_shift(&c, true, false, 32);
+
+    // Set [AD0, AD15] as in pins
+    sm_config_set_in_pins(&c, 0);
+
+    // Set [AD0, AD15] as out pins
+    sm_config_set_out_pins(&c, 0, 16);
+
+    // Set ALEH as JMP pin
+    sm_config_set_jmp_pin(&c, 17);
+
+    pio_sm_init(pio, sm, offset, &c);
+}
+%}

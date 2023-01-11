@@ -1,0 +1,6 @@
+[submodule "sw/lib/freertos-kernel"]
+	path = sw/lib/freertos-kernel
+	url = https://github.com/FreeRTOS/FreeRTOS-Kernel
+[submodule "sw/lib/no-OS-FatFS-SD-SPI-RPi-Pico"]
+	path = sw/lib/no-OS-FatFS-SD-SPI-RPi-Pico
+	url = https://github.com/kbeckmann/no-OS-FatFS-SD-SPI-RPi-Pico

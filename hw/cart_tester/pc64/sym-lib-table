@@ -1,0 +1,3 @@
+(sym_lib_table
+  (lib (name "n64-cartridge")(type "KiCad")(uri "C:/Users/kaili/Documents/PicoCart64/hw/symbols/n64-cartridge.kicad_sym")(options "")(descr ""))
+)

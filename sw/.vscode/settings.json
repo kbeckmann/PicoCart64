@@ -1,0 +1,25 @@
+{
+    "cmake.configureOnOpen": true,
+    "files.associations": {
+        "rom_vars.h": "c",
+        "n64_pi_task.h": "c",
+        "n64_defs.h": "c",
+        "n64_pi.h": "c",
+        "n64_pi.pio.h": "c",
+        "internal_sd_card.h": "c",
+        "psram.h": "c",
+        "array": "c",
+        "string": "c",
+        "string_view": "c",
+        "ranges": "c",
+        "program_flash_array.h": "c",
+        "utils.h": "c",
+        "diskio.h": "c",
+        "my_debug.h": "c",
+        "stdlib.h": "c",
+        "systick.h": "c",
+        "pins_mcu1.h": "c",
+        "pio_uart.h": "c",
+        "pio.h": "c"
+    }
+}
