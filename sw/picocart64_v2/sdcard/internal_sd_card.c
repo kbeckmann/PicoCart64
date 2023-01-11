@@ -46,7 +46,7 @@
 
 #define PRINT_BUFFER_AFTER_SEND 0
 #define MCU1_ECHO_RECEIVED_DATA 0
-#define MCU2_PRINT_UART 0
+#define MCU2_PRINT_UART 1
 
 int PC64_MCU_ID = -1;
 
@@ -422,8 +422,10 @@ void mcu2_process_rx_buffer() {
             receivingData = false;
             command_numBytesToRead = 0;
 
-            echoIndex = 0;
-            printf("\n");
+            #if MCU2_PRINT_UART == 1
+                echoIndex = 0;
+                printf("\n");
+            #endif
         } else {
             #if MCU2_PRINT_UART == 1
             echoIndex++;
@@ -445,7 +447,7 @@ void send_data(uint32_t sectorCount) {
     numberOfSendDataCalls++;
     uint64_t sectorFront = sectorToSendRegisters[0];
     uint64_t sector = (sectorFront << 32) | sectorToSendRegisters[1];
-    // printf("Count: %u, Sector: %llu\n", sectorCount, sector);
+    printf("Count: %u, Sector: %llu\n", sectorCount, sector);
     int loopCount = 0;
     uint32_t startTime = time_us_32();
     do {
