@@ -25,8 +25,9 @@ In development Nintendo 64 flash cart based around Raspberry Pi RP2040s.
 
 # Join in on the fun!
 Dreamcraft Industries discord
+
 [![Join the Discord!](https://discordapp.com/api/guilds/989902502063398982/widget.png?style=banner3)](https://discord.gg/yawWMcv6tC)
 
 Original PicoCart64 discord
 Join the Discord server to participate in the discussion and development of this project.
-[![Join the Discord!](https://discordapp.com/api/guilds/989902502063398982/widget.png?style=banner3)](https://discord.gg/2Gb3jWqqja)
+[!Dubious Technology Discord](https://discord.gg/2Gb3jWqqja)
