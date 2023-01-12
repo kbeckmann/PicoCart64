@@ -32,6 +32,8 @@
 
 #include "rom_vars.h"
 
+#include "eeprom.h"
+
 static const gpio_config_t mcu1_gpio_config[] = {
 	// PIO0 pins
 	{PIN_N64_AD0, GPIO_IN, false, false, false, GPIO_DRIVE_STRENGTH_4MA, GPIO_FUNC_PIO0},
@@ -127,12 +129,8 @@ void process_log_buffer() {
 
 uint32_t last_rom_cache_update_address = 0;
 void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
-	pio_uart_init(PIN_MCU2_DIO, PIN_MCU2_CS);
-
-	printf("MCU1 core1 booted!\n");
-	uart_tx_program_putc(0xA);
-	uart_tx_program_putc(0xB);
-	uart_tx_program_putc(0xC);
+	init_joybus(); // start listening for joybus data
+	pio_uart_init(PIN_MCU2_DIO, PIN_MCU2_CS); // turn on inter-mcu comms
 	
 	bool readingData = false;
 	volatile bool hasInit = false;
@@ -146,34 +144,39 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 		tight_loop_contents();
 
 		// Tick every second
-		if(time_us_32() - t > 1000000) {
-			t = time_us_32();
-			t2++;
-		}
+		// if(time_us_32() - t > 1000000) {
+		// 	t = time_us_32();
+		// 	t2++;
+		// }
 
 	// Do a rom load test after x seconds
-		if(test_load && t2 > 3) {
-			test_load = false;
+		// if(test_load && t2 > 3) {
+		// 	test_load = false;
 
-			pc64_set_sd_rom_selection("GoldenEye 007 (U) [!].z64", 25);
-			sd_is_busy = true;
-			romLoading = true;
-			isWaitingForRomLoad = true;
+		// 	pc64_set_sd_rom_selection("GoldenEye 007 (U) [!].z64", 25);
+		// 	sd_is_busy = true;
+		// 	romLoading = true;
+		// 	isWaitingForRomLoad = true;
 			
-			readingData = true;
-			rx_uart_buffer_reset();
+		// 	readingData = true;
+		// 	rx_uart_buffer_reset();
 
-			// Turn off the qspi hardware so mcu2 can use it
-			current_mcu_enable_demux(false);
-			ssi_hw->ssienr = 0;
-			qspi_disable();
+		// 	// Turn off the qspi hardware so mcu2 can use it
+		// 	current_mcu_enable_demux(false);
+		// 	ssi_hw->ssienr = 0;
+		// 	qspi_disable();
 
-			// Something about the above code to turn off qspi
-			// causing the pi loop to behave oddly.
-			// This will restart the loop.
-			g_restart_pi_handler = true;
+		// 	// Something about the above code to turn off qspi
+		// 	// causing the pi loop to behave oddly.
+		// 	// This will restart the loop.
+		// 	g_restart_pi_handler = true;
 
-			pc64_send_load_new_rom_command();
+		// 	pc64_send_load_new_rom_command();
+		// }
+
+		// Handle joy_bus requests
+		if (process_joybus_buf) {
+			read_joybus();
 		}
 
 		if (readingData) {

@@ -7,6 +7,7 @@ add_executable(picocart64_v2
     qspi_helper.c
     sha256.c
     sram.c
+    eeprom.c
 
     esp32/esp32_task.c
 
