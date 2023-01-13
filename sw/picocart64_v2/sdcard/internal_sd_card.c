@@ -183,22 +183,25 @@ void load_new_rom(char* filename) {
     // Set output enable (OE) to normal mode on all QSPI IO pins
 	// qspi_enable();
     current_mcu_enable_demux(true);
-    psram_set_cs(3); // Use the PSRAM chip
+    psram_set_cs(START_ROM_LOAD_CHIP_INDEX); // Use the PSRAM chip
     program_connect_internal_flash();
     program_flash_exit_xip();
 
 	int len = 0;
 	int total = 0;
 	uint64_t t0 = to_us_since_boot(get_absolute_time());
-    int currentPSRAMChip = 3;
+    int currentPSRAMChip = START_ROM_LOAD_CHIP_INDEX;
+
 	do {
         fr = f_read(&fil, buf, sizeof(buf), &len);
-        program_write_buf(total, buf, len);
+        uint32_t addr = total - ((currentPSRAMChip - START_ROM_LOAD_CHIP_INDEX) * PSRAM_CHIP_CAPACITY_BYTES);
+        program_write_buf(addr, buf, len);
 		total += len;
 
         int newChip = psram_addr_to_chip(total);
         if (newChip != currentPSRAMChip && newChip <= MAX_MEMORY_ARRAY_CHIP_INDEX) {
-            printf("Changing psram chip. Was: %d, now: %d\n", currentPSRAMChip, newChip);
+            printf("Last addr: %u\n", addr);
+            printf("Changing memory array chip. Was: %d, now: %d\n", currentPSRAMChip, newChip);
             printf("Total bytes: %d. Bytes remaining = %ld\n", total, (filinfo.fsize - total));
             currentPSRAMChip = newChip;
             psram_set_cs(currentPSRAMChip); // Switch the PSRAM chip
@@ -217,46 +220,57 @@ void load_new_rom(char* filename) {
 	}
 	printf("---- read file done -----\n\n\n");
 
-    // Set back to starting PSRAM chip to read a few bytes
-    psram_set_cs(3); // Use the PSRAM chip
-    
-    // program_flash_read_data(0, buf, 32);
-    // for(int i = 0; i < 16; i++) {
-    //     printf("%02x\n", buf[i]);
-    // }
-
-    // Send command to enter quad mode
+    psram_set_cs(START_ROM_LOAD_CHIP_INDEX);
     program_flash_do_cmd(0x35, NULL, NULL, 0);
+
+    sleep_ms(100);
+
+    psram_set_cs(START_ROM_LOAD_CHIP_INDEX+1);
+    program_flash_do_cmd(0x35, NULL, NULL, 0);
+
+    sleep_ms(100);
+
+    psram_set_cs(START_ROM_LOAD_CHIP_INDEX+2);
+    program_flash_do_cmd(0x35, NULL, NULL, 0);
+
+    sleep_ms(100);
+
+    psram_set_cs(START_ROM_LOAD_CHIP_INDEX+3);
+    program_flash_do_cmd(0x35, NULL, NULL, 0);
+
+    sleep_ms(100);
+
     program_flash_flush_cache();
 
     // Now enable xip and try to read
-    program_flash_enter_cmd_xip(true);
-    psram_set_cs(3); // Use the PSRAM chip
+    // program_flash_enter_cmd_xip(true);
+    for (int o = 0; o < 4; o++) {
+        
+        psram_set_cs(START_ROM_LOAD_CHIP_INDEX+o); // Use the PSRAM chip
+        program_flash_enter_cmd_xip(true);
 
-    printf("\n\nWITH qspi_enter_cmd_xip\n");
-    // volatile uint32_t *ptr = (volatile uint32_t *)0x10000000;
-    volatile uint32_t *ptr = (volatile uint32_t *)0x13000000;
-    uint32_t cycleCountStart = 0;
-    uint32_t totalTime = 0;
-    int psram_csToggleTime = 0;
-    int total_memoryAccessTime = 0;
-    int totalReadTime = 0;
-    for (int i = 0; i < 128; i++) {
-        uint32_t modifiedAddress = i;
-        uint32_t startTime_us = time_us_32();
-        uint32_t word = ptr[modifiedAddress];
-        totalReadTime += time_us_32() - startTime_us;
+        printf("\n\nCheck data from U%u...\n", START_ROM_LOAD_CHIP_INDEX + o);
+        volatile uint32_t *ptr = (volatile uint32_t *)0x13000000;
+        uint32_t cycleCountStart = 0;
+        uint32_t totalTime = 0;
+        int psram_csToggleTime = 0;
+        int total_memoryAccessTime = 0;
+        int totalReadTime = 0;
+        for (int i = 0; i < 128; i++) {
+            uint32_t modifiedAddress = i;
+            uint32_t startTime_us = time_us_32();
+            uint32_t word = ptr[modifiedAddress];
+            totalReadTime += time_us_32() - startTime_us;
 
-        if (i < 16) { // only print the first 16 words
-            printf("PSRAM-MCU2[%d]: %08x\n",i, word);
+            if (i < 16) { // only print the first 16 words
+                printf("PSRAM-MCU2[%08x]: %08x\n",i * 4 + (o * 8 * 1024 * 1024), word);
+            }
         }
+        printf("\n128 32bit reads @ 0x13000000 reads took %d us\n", totalReadTime);
+
+        exitQuadMode();
+        sleep_ms(100);
     }
-
-    printf("\n128 32bit reads @ 0x10000000 reads took %d us\n", totalReadTime);
-
-    // Send exit quad mode command
-    // TODO exit quad mode on every chip
-    exitQuadMode();
 
     // Now turn off the hardware
     current_mcu_enable_demux(false);
@@ -594,4 +608,71 @@ void testFunction() {
 		printf("f_close error: %s (%d)\n", FRESULT_str(fr), fr);
 	}
 	printf("---- read file done -----\n\n\n");
+}
+
+// If we want to use any flash chips this will erase
+// Do this before writing any data to the flash chips
+// If any of the chips are flash, erase sectors in advance
+void prepare_memory_array_for_rom_data(uint startChipIndex, uint64_t filesize) {
+
+    // uint numPSRAMChips = 0;
+    // uint numFlashChips = 0;
+    // uint64_t fs = filesize;
+    // uint i = 0;
+    // do {
+    //     uint8_t isFlashChip = isChipIndexFlash(i + startChipIndex);
+    //     uint32_t chipSize;
+    //     if (isFlashChip) {
+    //         numFlashChips++;
+    //         chipSize = FLASH_CHIP_CAPACITY_BYTES;
+    //     } else {
+    //         numPSRAMChips++;
+    //         chipSize = PSRAM_CHIP_CAPACITY_BYTES;
+    //     }
+
+    //     // Avoid negative numbers, this means we reached the end
+    //     if (chipSize > fs) {
+    //         fs = 0;
+    //     } else {
+    //         fs -= chipSize;
+    //     }
+    //     i++;
+    // } while(fs > 0);
+    
+    uint endChipIndex = (filesize / 1024 / 1024);
+    uint index = 0;
+    uint64_t remainingFilesize = filesize;
+    do {
+        psram_set_cs(index + startChipIndex);
+
+        // If this is a flash chip we have to erase it (or a portion of it)
+        if (isChipIndexFlash(index + startChipIndex)) {
+            uint32_t address = 0;
+            uint32_t bytesRemaining;
+            if (FLASH_CHIP_CAPACITY_BYTES > remainingFilesize) {
+                bytesRemaining = remainingFilesize;
+            } else {
+                bytesRemaining = FLASH_CHIP_CAPACITY_BYTES;
+            }
+
+            printf("Erasing %uMB of flash chip U%u\n", bytesRemaining / 1024 / 1024, index + startChipIndex);
+            uint32_t start = time_us_32();
+            do {
+                program_flash_range_erase(address, FLASH_BLOCK_SIZE, FLASH_BLOCK_SIZE, 0xd8);
+                address += FLASH_BLOCK_SIZE;
+            } while (address < bytesRemaining);
+            uint32_t timeTook = time_us_32() - start;
+            uint32_t KB_per_sec = (bytesRemaining / 1024) / (timeTook / 1000000);
+            printf("Erased %uMB in %usec [%ukB/s]\n", bytesRemaining / 1024 / 1024, timeTook / 1000000, KB_per_sec);
+            remainingFilesize -= bytesRemaining;
+
+        } else {
+            printf("PSRAM chip at U%u, no need to erase\n", index + startChipIndex);
+            remainingFilesize -= PSRAM_CHIP_CAPACITY_BYTES;
+        }
+
+        index++;
+    } while(remainingFilesize > 0);
+
+    psram_set_cs(startChipIndex);
 }

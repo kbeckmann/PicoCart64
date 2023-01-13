@@ -22,9 +22,13 @@ extern const uint32_t PSRAM_CHIP_CAPACITY_BYTES;
 extern const uint32_t FLASH_CHIP_CAPACITY_BYTES;
 // Starting chip index(U?) of the chip where a rom is first loaded
 extern const int START_ROM_LOAD_CHIP_INDEX;
+// Starting index of first flash chip used to store rom data
+extern const int FLASH_CHIP_INDEX;
 
 uint8_t psram_addr_to_chip(uint32_t address);
 void psram_set_cs(uint8_t chip);
 
 void set_demux_mcu_variables(int demux_pin0, int demux_pin1, int demux_pin2, int demux_pinIE);
 void current_mcu_enable_demux(bool enabled);
+
+bool isChipIndexFlash(uint index);

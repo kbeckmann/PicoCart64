@@ -74,24 +74,6 @@ uint16_t rom_mapping[MAPPING_TABLE_LEN];
 static const uint16_t *rom_file_16 = (uint16_t *) rom_chunks;
 #endif
 
-
-// static inline void psram_set_cs2(uint8_t chip)
-// {
-// 	uint32_t mask = (1 << PIN_DEMUX_IE) | (1 << PIN_DEMUX_A0) | (1 << PIN_DEMUX_A1) | (1 << PIN_DEMUX_A2);
-// 	uint32_t new_mask;
-
-// 	if (chip >= 1 && chip <= 8) {
-// 		chip--;					// convert to 0-indexed
-// 		new_mask = (1 << PIN_DEMUX_IE) | (chip << PIN_DEMUX_A0);
-// 	} else {
-// 		// Set PIN_DEMUX_IE = 0 to pull all PSRAM CS-lines high
-// 		new_mask = 0;
-// 	}
-
-// 	uint32_t old_gpio_out = sio_hw->gpio_out;
-// 	sio_hw->gpio_out = (old_gpio_out & (~mask)) | new_mask;
-// }
-
 volatile uint32_t update_rom_cache_for_address = 0;
 void update_rom_cache(uint32_t address) {
 	#if USE_ROM_CACHE == 1
@@ -132,80 +114,23 @@ inline uint16_t rom_read(uint32_t rom_address) {
 		const uint16_t *chunk_16 = (const uint16_t *)rom_chunks[chunk_index];
 		return chunk_16[(rom_address & COMPRESSION_MASK) >> 1];
 	} else {
-if (psram_addr_to_chip((rom_address)) != g_currentMemoryArrayChip) {
-	g_currentMemoryArrayChip = psram_addr_to_chip((rom_address));
+		if (psram_addr_to_chip((rom_address)) != g_currentMemoryArrayChip) {
+			g_currentMemoryArrayChip = psram_addr_to_chip((rom_address));
+			// uart_tx_program_putc(0xC);
+			// uart_tx_program_putc((uint8_t)g_currentMemoryArrayChip);
 
-	// uart_tx_program_putc(0xC);
-	// uart_tx_program_putc((uint8_t)g_currentMemoryArrayChip);
-	
-	// set address modifier
-	address_modifier = (g_currentMemoryArrayChip - START_ROM_LOAD_CHIP_INDEX) * PSRAM_CHIP_CAPACITY_BYTES;
+			// set address modifier
+			address_modifier = (g_currentMemoryArrayChip - START_ROM_LOAD_CHIP_INDEX) * PSRAM_CHIP_CAPACITY_BYTES;
 
-	// Set the new chip
-	psram_set_cs(g_currentMemoryArrayChip);
-	
-	// xip_ctrl_hw->flush = 1;
-    // // Read blocks until flush completion
-    // (void) xip_ctrl_hw->flush;
-    // // Enable the cache
-    // hw_set_bits(&xip_ctrl_hw->ctrl, XIP_CTRL_EN_BITS);
-	// Flush cache
-	// program_flash_flush_cache();
-}
-return ptr16[(((rom_address - address_modifier) & 0xFFFFFF) >> 1)];
+			// Set the new chip
+			psram_set_cs(g_currentMemoryArrayChip);
+		}
+	return ptr16[(((rom_address - address_modifier) & 0xFFFFFF) >> 1)];
 	}
 #else
 	return rom_file_16[(last_addr & 0xFFFFFF) >> 1];
 #endif
 }
-
-// static inline uint16_t read_from_psram(uint32_t rom_address) {
-// 	// convert the rom_address into an address we can use for getting data out of the cache
-// 	// rom_address should be 2 byte aligned, which means we are likely to get address 0,2,4
-// 	// and what we really want are 4 byte aligned addresses
-	
-// 	uint32_t index = (rom_address & 0xFFFFFF) >> 1; // address / 2 (works when storing 16bit values per index)
-// 	// uint32_t index = (rom_address & 0xFFFFFF) >> 2; // address / 4 (works when storing 32bit values per index)
-// 	#if USE_ROM_CACHE == 1
-// 	/* If we are already have way through the current cache, start updating for the next set of values */
-// 	if (index >= cache_startingAddress && index <= cache_endingAddress && index >= cache_endingAddress >> 2) {
-// 		if (update_rom_cache_for_address != cache_endingAddress) {
-// 			update_rom_cache_for_address = cache_endingAddress;
-// 			multicore_fifo_push_blocking(CORE1_UPDATE_ROM_CACHE);
-// 		}
-
-// 		// Calculate the index into the cache
-// 		uint32_t cache_index = index - cache_startingAddress;
-// 		return swap16(rom_cache[cache_index]);
-
-// 	/* Use the cached value*/
-// 	} else if (index >= cache_startingAddress && index <= cache_endingAddress) {
-// 		// Calculate the index into the cache
-// 		uint32_t cache_index = index - cache_startingAddress;
-// 		return swap16(rom_cache[cache_index]);
-
-// 	/* If we have cached these values, use those*/
-// 	} else if 
-// 	(
-// 		index >= cache_endingAddress || index <= cache_startingAddress &&
-// 		index >= back_cache_startingAddress && index <= back_cache_endingAddress
-// 	) {
-// 		swap_rom_cache();
-
-// 		uint32_t cache_index = index - cache_startingAddress;
-// 		return swap16(rom_cache[cache_index]);
-
-// 	} else {
-// 		// A total cache miss, update
-// 		add_log_to_buffer(rom_address);
-// 		update_rom_cache_for_address = index;
-// 		multicore_fifo_push_blocking(CORE1_UPDATE_ROM_CACHE);
-// 	}
-// 	#endif
-	
-// 	uint16_t word = ptr16[index];
-// 	return word;
-// }
 
 void load_rom_cache(uint32_t startingAt) {
 	#if USE_ROM_CACHE == 1
@@ -271,6 +196,8 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 	// Probably already restarted or first time start, we want to run the loop
 	// until this is true, so always reset it
 	g_restart_pi_handler = false;
+
+	g_currentMemoryArrayChip = START_ROM_LOAD_CHIP_INDEX;
 
 	// Init PIO
 	PIO pio = pio0;

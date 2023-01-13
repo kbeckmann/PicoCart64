@@ -19,7 +19,9 @@ U8 = FLASH 16M
 const int MAX_MEMORY_ARRAY_CHIP_INDEX = 8;
 const uint32_t PSRAM_CHIP_CAPACITY_BYTES = 8 * 1024 * 1024;
 const uint32_t FLASH_CHIP_CAPACITY_BYTES = 16 * 1024 * 1024;
-const int START_ROM_LOAD_CHIP_INDEX = 3;
+const int START_ROM_LOAD_CHIP_INDEX = 3; // U?
+const int FLASH_CHIP_INDEX = 7; // U?
+// static uint CURRENTLY_SELECTED_CHIP = 0;
 
 volatile int current_mcu_demux_pin_0 =  -1;
 volatile int current_mcu_demux_pin_1 =  -1;
@@ -48,18 +50,14 @@ void set_demux_mcu_variables(int demux_pin0, int demux_pin1, int demux_pin2, int
 
 inline uint8_t psram_addr_to_chip(uint32_t address)
 {
-	// return ((address >> 23) & 0x7) + 1;
-	return ((address >> 23) & 0x7) + 3; // +3 since psram is soldered starting at 3 on my test board
+	return ((address >> 23) & 0x7) + START_ROM_LOAD_CHIP_INDEX;
 }
-
 //   0: Deassert all CS
 // 1-8: Assert the specific PSRAM CS (1 indexed, matches U1, U2 ... U8)
-void psram_set_cs(uint8_t chip)
+inline void psram_set_cs(uint8_t chip)
 {
 	uint32_t mask = (1 << current_mcu_demux_pin_ie) | (1 << current_mcu_demux_pin_0) | (1 << current_mcu_demux_pin_1) | (1 << current_mcu_demux_pin_2);
 	uint32_t new_mask;
-
-	// printf("qspi_set_cs(%d)\n", chip);
 
 	if (chip >= 1 && chip <= 8) {
 		chip--;					// convert to 0-indexed
@@ -78,5 +76,13 @@ void current_mcu_enable_demux(bool enabled) {
 		gpio_configure(current_demux_enabled_config, ARRAY_SIZE(current_demux_enabled_config));
 	} else {
 		gpio_configure(current_demux_disabled_config, ARRAY_SIZE(current_demux_disabled_config));
+	}
+}
+
+inline bool isChipIndexFlash(uint index) {
+	if (index >= FLASH_CHIP_INDEX) {
+		return true;
+	} else {
+		return false;
 	}
 }

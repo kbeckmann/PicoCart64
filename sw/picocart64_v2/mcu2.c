@@ -167,9 +167,9 @@ void main_task_entry(__unused void *params)
 	// testFunction();
 
 	// Setup PIO UART
-	// printf("Initing MCU1<->MCU2 serial bridge...");
-	// pio_uart_init(PIN_SPI1_CS, PIN_SPI1_RX);
-	// printf("Finshed!\n");
+	printf("Initing MCU1<->MCU2 serial bridge...");
+	pio_uart_init(PIN_SPI1_CS, PIN_SPI1_RX);
+	printf("Finshed!\n");
 
 	// vTaskDelay(1000);
 	
@@ -200,12 +200,11 @@ void main_task_entry(__unused void *params)
 		if(time_us_32() - t > 1000000) {
 			t = time_us_32();
 			t2++;	
-
-			if (t2 % 30 == 0) {
-				uint32_t totalDataInLastPeriod = 512 * totalSectorsRead;
-				uint32_t kBps = (uint32_t) ((float)(totalDataInLastPeriod / 1024.0f) / (float)(totalTimeOfSendData_ms / 1000.0f));
-    			printf("Sent %d bytes in %d ms (%d kB/s)\n", totalDataInLastPeriod, totalTimeOfSendData_ms, kBps);
-			}
+			// if (t2 % 30 == 0) {
+			// 	uint32_t totalDataInLastPeriod = 512 * totalSectorsRead;
+			// 	uint32_t kBps = (uint32_t) ((float)(totalDataInLastPeriod / 1024.0f) / (float)(totalTimeOfSendData_ms / 1000.0f));
+    		// 	printf("Sent %d bytes in %d ms (%d kB/s)\n", totalDataInLastPeriod, totalTimeOfSendData_ms, kBps);
+			// }
 		}
 
 #if 0
