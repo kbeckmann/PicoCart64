@@ -352,7 +352,6 @@ int main(void)
 	// #else
 	// printf("Running on emulator... Skipping picocart tests.\n");
 	// #endif
-    
     start_shell();
 	//#endif
 }

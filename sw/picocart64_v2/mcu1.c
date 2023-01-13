@@ -130,7 +130,7 @@ void process_log_buffer() {
 uint32_t last_rom_cache_update_address = 0;
 void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 	init_joybus(); // start listening for joybus data
-	pio_uart_init(PIN_MCU2_DIO, PIN_MCU2_CS); // turn on inter-mcu comms
+	// pio_uart_init(PIN_MCU2_DIO, PIN_MCU2_CS); // turn on inter-mcu comms
 	
 	bool readingData = false;
 	volatile bool hasInit = false;
@@ -144,12 +144,18 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 		tight_loop_contents();
 
 		// Tick every second
-		// if(time_us_32() - t > 1000000) {
-		// 	t = time_us_32();
-		// 	t2++;
-		// }
+		if(time_us_32() - t > 1000000) {
+			t = time_us_32();
+			t2++;
+		}
 
-	// Do a rom load test after x seconds
+		if (t2 == 10 && !hasInit) {
+			hasInit = true;
+			printf("Dumping debug data\n");
+			joybus_dump_debug_data();
+		}
+
+		// Do a rom load test after x seconds
 		// if(test_load && t2 > 3) {
 		// 	test_load = false;
 
@@ -179,92 +185,92 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 			read_joybus();
 		}
 
-		if (readingData) {
-			// Process anything that might be on the uart buffer
-			mcu1_process_rx_buffer();
+		// if (readingData) {
+		// 	// Process anything that might be on the uart buffer
+		// 	mcu1_process_rx_buffer();
 
-			if (sendDataReady && !isWaitingForRomLoad) {
-				// Now that the data is written to the array, go ahead and release the lock
-				sd_is_busy = false;
-				readingData = false;
-			} else if (sendDataReady && isWaitingForRomLoad) {
-				set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
-				current_mcu_enable_demux(true);
-				psram_set_cs(3);
-				program_connect_internal_flash();
-				program_flash_exit_xip();
+		// 	if (sendDataReady && !isWaitingForRomLoad) {
+		// 		// Now that the data is written to the array, go ahead and release the lock
+		// 		sd_is_busy = false;
+		// 		readingData = false;
+		// 	} else if (sendDataReady && isWaitingForRomLoad) {
+		// 		set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
+		// 		current_mcu_enable_demux(true);
+		// 		psram_set_cs(3);
+		// 		program_connect_internal_flash();
+		// 		program_flash_exit_xip();
 
-				// Send command to enter quad mode
-				program_flash_do_cmd(0x35, NULL, NULL, 0);
+		// 		// Send command to enter quad mode
+		// 		program_flash_do_cmd(0x35, NULL, NULL, 0);
 
-				// send the command to enter quad mode for next chip as well
-				psram_set_cs(4);
-				program_flash_do_cmd(0x35, NULL, NULL, 0);
+		// 		// send the command to enter quad mode for next chip as well
+		// 		psram_set_cs(4);
+		// 		program_flash_do_cmd(0x35, NULL, NULL, 0);
 
-				// Flush cache
-				program_flash_flush_cache();
+		// 		// Flush cache
+		// 		program_flash_flush_cache();
 
-				program_flash_enter_cmd_xip(true); // psram quad mode
-				psram_set_cs(3); // Use the PSRAM chip
+		// 		program_flash_enter_cmd_xip(true); // psram quad mode
+		// 		psram_set_cs(3); // Use the PSRAM chip
 
-				// rom is loaded now
-				g_loadRomFromMemoryArray = true; // read from psram
-				isWaitingForRomLoad = false;
-				sd_is_busy = false;
-				readingData = false;
+		// 		// rom is loaded now
+		// 		g_loadRomFromMemoryArray = true; // read from psram
+		// 		isWaitingForRomLoad = false;
+		// 		sd_is_busy = false;
+		// 		readingData = false;
 
-				// Not sure if we would need to re-restart it.
-				// g_restart_pi_handler = true;
+		// 		// Not sure if we would need to re-restart it.
+		// 		// g_restart_pi_handler = true;
 
-				// Sanity chirp to mcu2 just to know that this completed
-				uart_tx_program_putc(0xAB);
-			}
-		}
+		// 		// Sanity chirp to mcu2 just to know that this completed
+		// 		uart_tx_program_putc(0xAB);
+		// 	}
+		// }
 
-		if (multicore_fifo_rvalid()) {
-			int32_t cmd = multicore_fifo_pop_blocking();
-			switch (cmd) {
-				case CORE1_SEND_SD_READ_CMD:
-					// Block cart while waiting for data
-					sd_is_busy = true;
+		// if (multicore_fifo_rvalid()) {
+		// 	int32_t cmd = multicore_fifo_pop_blocking();
+		// 	switch (cmd) {
+		// 		case CORE1_SEND_SD_READ_CMD:
+		// 			// Block cart while waiting for data
+		// 			sd_is_busy = true;
 
-					// Finally start processing the uart buffer
-					readingData = true;
-					rx_uart_buffer_reset();
+		// 			// Finally start processing the uart buffer
+		// 			readingData = true;
+		// 			rx_uart_buffer_reset();
 					
-					pc64_send_sd_read_command();
-				case CORE1_UPDATE_ROM_CACHE:
-					printf("Not using cache. Uncomment code to load cache...\n");
-					// if (last_rom_cache_update_address != update_rom_cache_for_address) {
-					// 	update_rom_cache(update_rom_cache_for_address);
-					// 	last_rom_cache_update_address = update_rom_cache_for_address;
-					// 	printf("Cache update %08x\n", update_rom_cache_for_address);
-					// }
-					break;
-				case CORE1_LOAD_NEW_ROM_CMD:
-					sd_is_busy = true;
-					romLoading = true;
-					isWaitingForRomLoad = true;
+		// 			pc64_send_sd_read_command();
+		// 		case CORE1_UPDATE_ROM_CACHE:
+		// 			printf("Not using cache. Uncomment code to load cache...\n");
+		// 			// if (last_rom_cache_update_address != update_rom_cache_for_address) {
+		// 			// 	update_rom_cache(update_rom_cache_for_address);
+		// 			// 	last_rom_cache_update_address = update_rom_cache_for_address;
+		// 			// 	printf("Cache update %08x\n", update_rom_cache_for_address);
+		// 			// }
+		// 			break;
+		// 		case CORE1_LOAD_NEW_ROM_CMD:
+		// 			sd_is_busy = true;
+		// 			romLoading = true;
+		// 			isWaitingForRomLoad = true;
 					
-					readingData = true;
-					rx_uart_buffer_reset();
+		// 			readingData = true;
+		// 			rx_uart_buffer_reset();
 
-					// Turn off the qspi hardware so mcu2 can use it
-					current_mcu_enable_demux(false);
-    				ssi_hw->ssienr = 0;
-    				qspi_disable();
+		// 			// Turn off the qspi hardware so mcu2 can use it
+		// 			current_mcu_enable_demux(false);
+    	// 			ssi_hw->ssienr = 0;
+    	// 			qspi_disable();
 
-					// Something about the above code to turn off qspi
-					// causing the pi loop to behave oddly.
-					// This will restart the loop.
-					g_restart_pi_handler = true;
+		// 			// Something about the above code to turn off qspi
+		// 			// causing the pi loop to behave oddly.
+		// 			// This will restart the loop.
+		// 			g_restart_pi_handler = true;
 
-					pc64_send_load_new_rom_command();
+		// 			pc64_send_load_new_rom_command();
 
-				default:
-					break;
-			}
-		}
+		// 		default:
+		// 			break;
+		// 	}
+		// }
 	}
 }
 
@@ -381,7 +387,7 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 
 	// Enable STDIO
 	// stdio_async_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
-	// stdio_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
+	stdio_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
 
 	printf("\n\nMCU1: Was%s able to set clock to %d MHz\n", clockWasSet ? "" : " not", freq_khz/1000);
 
