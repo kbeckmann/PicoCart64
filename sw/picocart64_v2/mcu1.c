@@ -151,6 +151,7 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 
 		if (t2 == 10 && !hasInit) {
 			hasInit = true;
+			read_joybus();
 			printf("Dumping debug data\n");
 			joybus_dump_debug_data();
 		}

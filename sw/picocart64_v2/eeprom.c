@@ -12,6 +12,7 @@
 #include "eeprom.h"
 #include "hardware/gpio.h"
 #include "pico/time.h"
+#include "hardware/structs/systick.h"
 
 #include "pio_uart/pio_uart.h"
 
@@ -69,7 +70,8 @@ uint8_t commandsProcessedIndex = 0;
 
 volatile uint8_t process_joybus_buf = false;
 
-#define JOYBUS_BUFFER_SIZE 40
+// increase for debugging
+#define JOYBUS_BUFFER_SIZE 100 //40
 const uint32_t zero_bit_low_time_us = 3;
 const uint32_t one_bit_low_time_us = 1;
 
@@ -78,13 +80,6 @@ static uint32_t lastFallingEdgeTime = 0;
 static uint8_t joybus_buffer[JOYBUS_BUFFER_SIZE];
 static uint8_t joybusBufferIndex = 0; // index of item in joybus_buffer
 static uint8_t bitIndex = 0; // index of the current bit we are reading
-
-static uint32_t risingEdgeEventCount = 0;
-static uint32_t fallingEdgeEventCount = 0;
-
-static uint32_t lowTimes[1024] = {0};
-static uint32_t lowTimesIndex = 0;
-
 
 static uint8_t isInitialRise = true;
 
@@ -100,12 +95,6 @@ int64_t joybus_stop_bit_timer_callback(alarm_id_t id, void *user_data) {
 void joybus_rising_edge(uint gpio, uint32_t events) {
     lastRisingEdgeTime = time_us_32();
     uint32_t lowTime = lastRisingEdgeTime - lastFallingEdgeTime;
-
-    lowTimes[lowTimesIndex++] = lowTime;
-    if(lowTimesIndex >= 128) {
-        lowTimesIndex = 0;
-    }
-
     uint8_t value = 0; // TODO error handling, in case neither of these cases are true
     // If low was quick, this is a 1
     if(lowTime <= one_bit_low_time_us) {
@@ -131,8 +120,6 @@ void joybus_rising_edge(uint gpio, uint32_t events) {
 
     // start the stop bit timer
     joybus_stop_bit_timer_id = add_alarm_in_us(5, joybus_stop_bit_timer_callback, NULL, false);
-
-    risingEdgeEventCount++;
 }
 
 void joybus_falling_edge(uint gpio, uint32_t events) {
@@ -140,65 +127,71 @@ void joybus_falling_edge(uint gpio, uint32_t events) {
 
     // stop the stop bit timer. Safe to call if we never started the alarm
     cancel_alarm(joybus_stop_bit_timer_id);
-
-    fallingEdgeEventCount++;
 }
 
-uint32_t e_l[64] = {0};
-uint32_t t_l[64] = {0};
+uint32_t e_l[128] = {0};
+uint32_t t_l[128] = {0};
 uint32_t e_i = 0;
 void joybus_pulse_callback(uint gpio, uint32_t events) {
     uint32_t pulseTime = time_us_32();
-    e_l[e_i] = events;
-    t_l[e_i++] = pulseTime;
+    if (events == 12) {
+        e_l[e_i] = 4;
+        t_l[e_i++] = systick_hw->cvr;
+        e_l[e_i] = 8;
+        t_l[e_i++] = systick_hw->cvr;
 
-    if (events & GPIO_IRQ_EDGE_RISE) {
-        risingEdgeEventCount++;
-        lastRisingEdgeTime = pulseTime;
-
-        // If this is the first rising edge, it's likely the n64 starting up
-        // so ignore it
-        if (lastFallingEdgeTime == 0) {return;}
-
-        // DEBUG /////
-        uint32_t lowTime = lastRisingEdgeTime - lastFallingEdgeTime;
-        lowTimes[lowTimesIndex++] = lowTime;
-        if(lowTimesIndex >= 128) {
-            lowTimesIndex = 0;
-        }
-        //////////////
-
-        uint8_t value = 0; // TODO error handling, in case neither of these cases are true
-        // If low was quick, this is a 1
-        if(lowTime <= zero_bit_low_time_us) {
-            value = 1;
-
-        // If low was longer, this is a zero
-        } else {
-            value = 0;
-        }
-
-        if (bitIndex >= 8) {
-            // bit index == 8, this byte is finished
-            bitIndex = 0;
-            joybusBufferIndex++;
-        }
-
-        if (value == 1) {
-            joybus_buffer[joybusBufferIndex] |= 1U << bitIndex++;
-        } else {
-            joybus_buffer[joybusBufferIndex] &= ~(1U << bitIndex++);
-        }
-
-        // start the stop bit timer
-        joybus_stop_bit_timer_id = add_alarm_in_us(5, joybus_stop_bit_timer_callback, NULL, false);
     } else {
-        fallingEdgeEventCount++;
-        lastFallingEdgeTime = pulseTime;
-
-        // stop the stop bit timer. Safe to call if we never started the alarm
-        cancel_alarm(joybus_stop_bit_timer_id);
+        e_l[e_i] = events;
+        t_l[e_i++] = systick_hw->cvr;
     }
+
+    // if (events & GPIO_IRQ_EDGE_RISE) {
+    //     risingEdgeEventCount++;
+    //     lastRisingEdgeTime = pulseTime;
+
+    //     // If this is the first rising edge, it's likely the n64 starting up
+    //     // so ignore it
+    //     if (lastFallingEdgeTime == 0) {return;}
+
+    //     // DEBUG /////
+    //     uint32_t lowTime = lastRisingEdgeTime - lastFallingEdgeTime;
+    //     lowTimes[lowTimesIndex++] = lowTime;
+    //     if(lowTimesIndex >= 128) {
+    //         lowTimesIndex = 0;
+    //     }
+    //     //////////////
+
+    //     uint8_t value = 0; // TODO error handling, in case neither of these cases are true
+    //     // If low was quick, this is a 1
+    //     if(lowTime <= zero_bit_low_time_us) {
+    //         value = 1;
+
+    //     // If low was longer, this is a zero
+    //     } else {
+    //         value = 0;
+    //     }
+
+    //     if (bitIndex >= 8) {
+    //         // bit index == 8, this byte is finished
+    //         bitIndex = 0;
+    //         joybusBufferIndex++;
+    //     }
+
+    //     if (value == 1) {
+    //         joybus_buffer[joybusBufferIndex] |= 1U << bitIndex++;
+    //     } else {
+    //         joybus_buffer[joybusBufferIndex] &= ~(1U << bitIndex++);
+    //     }
+
+    //     // start the stop bit timer
+    //     joybus_stop_bit_timer_id = add_alarm_in_us(5, joybus_stop_bit_timer_callback, NULL, false);
+    // } else {
+    //     fallingEdgeEventCount++;
+    //     lastFallingEdgeTime = pulseTime;
+
+    //     // stop the stop bit timer. Safe to call if we never started the alarm
+    //     cancel_alarm(joybus_stop_bit_timer_id);
+    // }
 }
 
 inline void start_joybus_irq() {
@@ -230,6 +223,9 @@ void init_joybus() {
     process_joybus_buf = false;
     
     start_joybus_irq(); // wait for data
+
+    systick_hw->csr = 0x5;
+    systick_hw->rvr = 0x00FFFFFF;
 }
 
 static bool isFirstBit = true;
@@ -274,13 +270,142 @@ static inline void readData() {
     }
 }
 
+        /*
+on falling edge:
+    falling_time = now
+    if not first:
+        lo_pulse = rising_time - starting_time
+        hi_pulse = falling_time - rising_time
+        if lo_pulse < hi_pulse:
+            new bit = 1
+        else:
+            new bit = 0
+    starting_time = falling_time
+
+on rising edge:
+    rising_time = now
+        */
+void parse_irq_data() {
+    uint32_t nsPerCycle = 6;
+
+    uint32_t lastTimeStart = 0;
+    uint32_t lastEvent = 0;
+
+    uint32_t startingTime = 0;
+    uint32_t fallingTime = 0;
+    uint32_t risingTime = 0;
+    uint8_t isFirstTime = true;
+    uint8_t isInfoByte = true;
+    uint8_t didSkipJunk = false;
+    uint8_t shouldSkipBit = false;
+    uint8_t skipBit = 0;
+    for(int i = 0; i < e_i; i++) {
+        uint32_t t = t_l[i]; 
+        uint32_t e = e_l[i]; 
+
+        // Skip the junk 
+        if (i == 0 && e == GPIO_IRQ_EDGE_RISE) {
+            didSkipJunk = true;
+            continue;
+        }
+
+        if (e == GPIO_IRQ_EDGE_FALL) {
+            fallingTime = t;
+            if (!isFirstTime && bitIndex < 8) {
+                uint32_t lowPulse  = startingTime - risingTime;
+                uint32_t highPulse = risingTime - fallingTime;
+                if (lowPulse < highPulse) {
+                    printf("1 ");
+                    joybus_buffer[joybusBufferIndex] |= 1U << (7-bitIndex++);
+                } else {
+                    printf("0 ");
+                    joybus_buffer[joybusBufferIndex] &= ~(1U << (7-bitIndex++));
+                }
+                if (bitIndex >= 8 && !isInfoByte) {
+                    bitIndex = 0;
+                    joybusBufferIndex++;
+                    printf("\n");
+                }
+            } else if (!isFirstTime && bitIndex == 8 && isInfoByte) {
+                isInfoByte = false;
+
+                if (bitIndex >= 8) {
+                    bitIndex = 0;
+                    joybusBufferIndex++;
+                    printf("\n");
+                }
+            }
+
+            isFirstTime = false;
+            startingTime = t;
+        }
+
+        if (e == GPIO_IRQ_EDGE_RISE) {
+            risingTime = t;
+        }
+
+        
+
+        // if (e == 12 && bitIndex < 8) {
+        //     printf("!! ");
+        //     // stop bit probably
+        //     // startingTime = t;
+        //     // risingTime = t;
+        // }
+
+        // uint32_t timeDiff = lastTimeStart - timeStart;
+        // if (event == GPIO_IRQ_EDGE_RISE && lastEvent == GPIO_IRQ_EDGE_FALL) {
+        //     printf("Low time [%d] %fms [%u]\n", i, ((float)(timeDiff*nsPerCycle))/1000.0, timeDiff);
+        //     // Set bit if 1
+        //     if (timeDiff < 350) {
+        //         joybus_buffer[joybusBufferIndex] |= 1U << bitIndex++;
+        //     } else if (timeDiff >= 350 && timeDiff <=500) {
+        //         joybus_buffer[joybusBufferIndex] &= ~(1U << bitIndex++);
+        //     } else {
+                
+        //     }
+
+        //     if (bitIndex >= 8) {
+        //         bitIndex = 0;
+        //         joybusBufferIndex++;
+        //     }
+        // } 
+        // if (lastEvent == GPIO_IRQ_EDGE_RISE && event == GPIO_IRQ_EDGE_FALL) {
+        //     printf("High time [%d] %fms [%u]\n", i, ((float)(timeDiff*nsPerCycle))/1000.0, timeDiff);
+        //     // Set bit if 1
+        //     if (timeDiff < 350) {
+        //         joybus_buffer[joybusBufferIndex] |= 1U << bitIndex++;
+        //     } else if (timeDiff >= 350 && timeDiff <=500) {
+        //         joybus_buffer[joybusBufferIndex] &= ~(1U << bitIndex++);
+        //     } else {
+                
+        //     }
+
+        //     if (bitIndex >= 8) {
+        //         bitIndex = 0;
+        //         joybusBufferIndex++;
+        //     }
+        // }
+
+        // if (event == 12) {
+        //     // bit is stop bit or a 1?
+        //     printf("??????????????? [%d] %fms [%u]\n", i, ((float)(timeDiff*nsPerCycle))/1000.0, timeDiff);
+        //     stopBitIndexes[stopBitIndexesIndex++] = bitIndex;
+        // }
+
+        // lastEvent = event;
+        // lastTimeStart = timeStart;
+    }
+}
+
 void read_joybus() {
     process_joybus_buf = false;
 
     // Read data until stop bit
     // readData();
-    joybusBufferIndex = 0;
-    bitIndex = 0;
+    parse_irq_data();
+    // joybusBufferIndex = 0;
+    // bitIndex = 0;
     isFirstBit = true;
 
     uint8_t cmd = joybus_buffer[0];
@@ -289,21 +414,21 @@ void read_joybus() {
         commandsProcessedIndex = 0;
     }
 
-    switch (cmd) {
-    case INFO:
-        send_joybus_info();
-        break;
-    case READ_EEPROM: 
-        // Read eeprom at offset
-        read_eeprom(joybus_buffer[1]);
-        break;
-    case WRITE_EEPROM:
-        // Buffer to read from starts at offset 2, cmd=0, block=1, followed by 8 bytes of data
-        write_eeprom(joybus_buffer[1], joybus_buffer+2);
-        break;
-    default:
-        break;
-    }
+    // switch (cmd) {
+    // case INFO:
+    //     send_joybus_info();
+    //     break;
+    // case READ_EEPROM: 
+    //     // Read eeprom at offset
+    //     read_eeprom(joybus_buffer[1]);
+    //     break;
+    // case WRITE_EEPROM:
+    //     // Buffer to read from starts at offset 2, cmd=0, block=1, followed by 8 bytes of data
+    //     write_eeprom(joybus_buffer[1], joybus_buffer+2);
+    //     break;
+    // default:
+    //     break;
+    // }
 }
 
 // static uint8_t is_sending_bit = 0;
@@ -402,21 +527,20 @@ void write_eeprom(uint8_t block, uint8_t* buf) {
 static uint32_t lastPrintIndex = 0;
 static uint32_t lastTimePrintIndex = 0;
 void joybus_dump_debug_data() {
-    printf("falling:%u, rising:%u\n", fallingEdgeEventCount, risingEdgeEventCount);
     for (int i = lastPrintIndex; i < commandsProcessedIndex; i++) {
         printf("cmd[%d]: %02x\n", i, commandsProcessed[i]);
-    }
-    for (int i = lastTimePrintIndex; i < lowTimesIndex; i++) {
-        printf("time[%d]: %d\n", i, lowTimes[i]);
     }
     for (int i = 0; i < stopBitIndexesIndex; i++) {
         printf("[%d]stopBitIndex: %d\n", i, stopBitIndexes[i]);
     }
 
-    for(int i = 0; i < e_i; i ++) {
-        printf("e: %d, t: %d\n", e_l[i], t_l[i]);
+    // for(int i = 0; i < e_i; i ++) {
+    //     printf("e: %u, t: %u\n", e_l[i], t_l[i]);
+    // }
+
+    for (int i = 0; i < joybusBufferIndex; i++) {
+        printf("%02x ", joybus_buffer[i]);
     }
     
     lastPrintIndex = commandsProcessedIndex;
-    lastTimePrintIndex = lowTimesIndex;
 }

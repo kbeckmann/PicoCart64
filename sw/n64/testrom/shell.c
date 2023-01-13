@@ -1047,7 +1047,7 @@ void start_shell(void) {
     eeprom_type_t eeprom = eeprom_present();
     uint8_t* eepromBuf = malloc(8);
     printf("EEPROM type %d\n", (int)eeprom);
-    eeprom_read(0, eepromBuf);
+    eeprom_read(7, eepromBuf);
     for(int i = 0; i < 8; i++) {
         printf("%02x ", eepromBuf[i]);
     }
