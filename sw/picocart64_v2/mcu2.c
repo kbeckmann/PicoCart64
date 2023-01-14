@@ -247,13 +247,14 @@ void vLaunch(void)
 void mcu2_main(void)
 {
 	// const int freq_khz = 133000;
-	const int freq_khz = 166000;
+	// const int freq_khz = 166000;
 	// const int freq_khz = 200000;
 	// const int freq_khz = 210000;
 	// const int freq_khz = 220000;
 	// const int freq_khz = 230000;
 	// const int freq_khz = 240000;
-	// const int freq_khz = 266000;
+	const int freq_khz = 266000;
+	// const int freq_khz = 332000;
 
 	// Note that this might call set_sys_clock_pll,
 	// which might set clk_peri to 48 MHz
@@ -266,7 +267,7 @@ void mcu2_main(void)
 
 	set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
 
-	printf("MCU2: Was%s able to set clock to %d MHz\n", clockWasSet ? "" : " not", freq_khz/1000);
+	// printf("MCU2: Was%s able to set clock to %d MHz\n", clockWasSet ? "" : " not", freq_khz/1000);
 
 	// Enable a 12MHz clock output on GPIO21 / clk_gpout0
 	clock_gpio_init(PIN_MCU2_GPIO21, CLOCKS_CLK_GPOUT0_CTRL_AUXSRC_VALUE_XOSC_CLKSRC, 1);
@@ -277,6 +278,17 @@ void mcu2_main(void)
 	printf("clk_sys: %d Hz\n", clock_get_hz(clk_sys));
 	printf("clk_peri: %d Hz\n", clock_get_hz(clk_peri));
 	printf("----------------------------------------\n\n");
+
+	// for (int fkhz = 125000; fkhz < 400000;) {
+	// 	uint vco, postdiv1, postdiv2;
+	// 	if (check_sys_clock_khz(fkhz, &vco, &postdiv1, &postdiv2)) {
+	// 		// set_sys_clock_pll(vco, postdiv1, postdiv2);
+			
+	// 	} else {
+	// 		printf("%dMhz NOT available\n", fkhz/1000);
+	// 	}
+	// 	fkhz += 1000;
+	// }
 
 	// printf("\n\n");
 	// uint32_t timeBuffer[32];

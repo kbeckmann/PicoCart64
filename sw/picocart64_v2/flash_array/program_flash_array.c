@@ -497,7 +497,7 @@ void inline program_flash_flush_cache() {
 
 void enterPSRAMQuadMode() {
     ssi->ssienr = 0;
-    ssi->baudr = 2;
+    ssi->baudr = 4;
     ssi->ctrlr0 =
             (SSI_CTRLR0_SPI_FRF_VALUE_QUAD << SSI_CTRLR0_SPI_FRF_LSB) |  // Quad SPI serial frames
             (31 << SSI_CTRLR0_DFS_32_LSB) |                             // 32 clocks per data frame

@@ -380,13 +380,14 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 {
 	int count = 0;
 	// const int freq_khz = 133000;
-	const int freq_khz = 166000;
+	// const int freq_khz = 166000;
 	// const int freq_khz = 200000;
 	// const int freq_khz = 210000;
 	// const int freq_khz = 220000;
 	// const int freq_khz = 230000;
 	// const int freq_khz = 240000;
-	// const int freq_khz = 266000;
+	const int freq_khz = 266000;
+	// const int freq_khz = 332000;
 	// const int freq_khz = 166000 * 2;
 
 	bool clockWasSet = set_sys_clock_khz(freq_khz, false);
@@ -404,7 +405,7 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 	// IF READING FROM FROM FLASH... (works for compressed roms)
 	qspi_oeover_normal(true);
 	ssi_hw->ssienr = 0;
-	ssi_hw->baudr = 4; // change baud
+	ssi_hw->baudr = 6; // change baud
 	ssi_hw->ssienr = 1;
 
 	// current_mcu_enable_demux(true);
