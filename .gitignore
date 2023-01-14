@@ -93,6 +93,7 @@ ENV/
 
 *.swp
 
+.vscode/
 
 *.vcd
 *.gtkw
