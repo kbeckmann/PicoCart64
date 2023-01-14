@@ -672,7 +672,7 @@ static void show_list(void) {
 		render_list(display, g_current_selected_list_item, g_first_visible_list_item, max_on_screen);
 
         /* Render info about the currently selected rom including box art */
-        render_info_panel(display, g_current_selected_list_item);
+        //render_info_panel(display, g_current_selected_list_item);
 
         /* A little debug text at the bottom of the screen */
         //snprintf(debugTextBuffer, 100, "g_current_selected_list_item=%d, g_first_visible_list_item=%d, max_per_page=%d", g_current_selected_list_item, g_first_visible_list_item, max_on_screen);
@@ -726,7 +726,6 @@ static void show_list(void) {
 		} else if (keys.c[0].A) {
             switch (g_current_dir_entries[g_current_selected_list_item]->type) {
                 case TYPE_FILE:
-                    break;
                 case TYPE_ROM:
                     // Load the selected from
                     loadRomAtSelection(g_current_selected_list_item);
@@ -1005,7 +1004,7 @@ static void init_sprites(void) {
         //     // printf("height: %d, width: %d\n", g_thumbnail_cache[i]->height, g_thumbnail_cache[i]->width);
         // }
     } else {
-        LOAD_BOX_ART = true;
+        LOAD_BOX_ART = false;
         // printf("Loading box art\n");
         // int success = load_boxart_for_rom("GoldenEye 007 (U) [!].z64");
         // silentWaitForStart();
@@ -1052,7 +1051,7 @@ void start_shell(void) {
         printf("%02x ", eepromBuf[i]);
     }
     
-    silentWaitForStart();
+    // silentWaitForStart();
 
     // Alloc global holding variables
     temp_serial = malloc(sizeof(char) * 8);

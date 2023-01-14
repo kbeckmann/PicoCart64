@@ -186,6 +186,8 @@
 int main(void)
 {
 
+	// sys_set_boot_cic(6105);
+
 	//#if BUILD_FOR_EMULATOR == 1
 	//start_shell();
 	//#else

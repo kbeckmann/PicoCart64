@@ -41,22 +41,7 @@
 
 #include "rom_vars.h"
 
-#define USE_ROM_CACHE 0
 #define DMA_READ_CMD 0x0B
-
-#if USE_ROM_CACHE == 1
-#define ROM_CACHE_SIZE 512 // in 32bit values
-static volatile uint32_t rom_cache0[ROM_CACHE_SIZE];
-static volatile uint32_t rom_cache1[ROM_CACHE_SIZE];
-static volatile uint32_t *rom_cache; // pointer to current cache
-static int rom_cache_index = 0;
-
-static volatile uint32_t cache_startingAddress = 0;
-static volatile uint32_t cache_endingAddress = 0;
-
-static volatile uint32_t back_cache_startingAddress = 0;
-static volatile uint32_t back_cache_endingAddress = 0;
-#endif
 
 volatile int g_currentMemoryArrayChip = 3;
  // Used when addressing chips outside the starting one
@@ -73,39 +58,6 @@ uint16_t rom_mapping[MAPPING_TABLE_LEN];
 #else
 static const uint16_t *rom_file_16 = (uint16_t *) rom_chunks;
 #endif
-
-volatile uint32_t update_rom_cache_for_address = 0;
-void update_rom_cache(uint32_t address) {
-	#if USE_ROM_CACHE == 1
-	back_cache_startingAddress = address;
-	back_cache_endingAddress = address + ROM_CACHE_SIZE;
-
-	// Load the values into other rom cache, so if current index is 0, load in 1, and if 1 load into 0
-	if (rom_cache_index == 0) {
-		psram_set_cs2(DEBUG_CS_CHIP_USE);
-		flash_bulk_read(DMA_READ_CMD, (uint32_t*)rom_cache1, address, ROM_CACHE_SIZE, 0);
-		psram_set_cs2(0);
-	} else {
-		psram_set_cs2(DEBUG_CS_CHIP_USE);
-		flash_bulk_read(DMA_READ_CMD, (uint32_t*)rom_cache0, 0, ROM_CACHE_SIZE, 0);
-		psram_set_cs2(0);
-	}
-	#endif
-}
-
-static inline void swap_rom_cache() {
-	#if USE_ROM_CACHE == 1
-	cache_startingAddress = back_cache_startingAddress;
-	cache_endingAddress = back_cache_endingAddress;
-	if (rom_cache_index == 0) {
-		rom_cache = rom_cache1;
-		rom_cache_index = 1;
-	} else if (rom_cache_index == 1) {
-		rom_cache = rom_cache0;
-		rom_cache_index = 0;
-	}
-	#endif
-}
 
 inline uint16_t rom_read(uint32_t rom_address) {
 #if COMPRESSED_ROM
@@ -130,29 +82,6 @@ inline uint16_t rom_read(uint32_t rom_address) {
 #else
 	return rom_file_16[(last_addr & 0xFFFFFF) >> 1];
 #endif
-}
-
-void load_rom_cache(uint32_t startingAt) {
-	#if USE_ROM_CACHE == 1
-	cache_startingAddress = startingAt;
-	cache_endingAddress = startingAt + ROM_CACHE_SIZE;
-	rom_cache = rom_cache0;
-	rom_cache_index = 0;
-
-	uint32_t totalTime = 0;
-	uint32_t now = time_us_32();
-	psram_set_cs2(DEBUG_CS_CHIP_USE);
-	flash_bulk_read(DMA_READ_CMD, (uint32_t*)rom_cache, startingAt, ROM_CACHE_SIZE, 0);
-	psram_set_cs2(0);
-	totalTime += time_us_32() - now;
-	for(int i = 0; i < 16; i++) {
-        printf("ROM_CACHE[%d]: %08x\n",i, rom_cache[i]);
-    }
-
-	printf("Loaded %d (32-bit values) of data in %d us.\n", ROM_CACHE_SIZE, totalTime);
-	#else
-	printf("No rom cache in use. Set USE_ROM_CACHE to 1 to use.\n");
-	#endif
 }
 
 void restart_n64_pi_pio() {
@@ -258,13 +187,13 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 			// next_word = 0x2040;
 			// if (g_loadRomFromMemoryArray) {
 			// 	// Official SDK standard speed
-			// 	next_word = 0x1240;
+				// next_word = 0x1240;
 			// } else {
-			// 	next_word = 0xFF40;
+				next_word = 0xFF40;
 			// }
 
 			// Slowest speed
-			next_word = 0xFF40;
+			// next_word = 0xFF40;
 
 			// next_word = 0x2040;
 		

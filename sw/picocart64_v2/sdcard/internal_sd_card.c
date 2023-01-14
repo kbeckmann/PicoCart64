@@ -180,8 +180,6 @@ void load_new_rom(char* filename) {
 
     for(int i = 0; i < 10000; i++) { tight_loop_contents(); }
 
-    // Set output enable (OE) to normal mode on all QSPI IO pins
-	// qspi_enable();
     current_mcu_enable_demux(true);
     psram_set_cs(START_ROM_LOAD_CHIP_INDEX); // Use the PSRAM chip
     program_connect_internal_flash();
@@ -200,14 +198,13 @@ void load_new_rom(char* filename) {
 
         int newChip = psram_addr_to_chip(total);
         if (newChip != currentPSRAMChip && newChip <= MAX_MEMORY_ARRAY_CHIP_INDEX) {
-            printf("Last addr: %u\n", addr);
             printf("Changing memory array chip. Was: %d, now: %d\n", currentPSRAMChip, newChip);
             printf("Total bytes: %d. Bytes remaining = %ld\n", total, (filinfo.fsize - total));
             currentPSRAMChip = newChip;
             psram_set_cs(currentPSRAMChip); // Switch the PSRAM chip
         }
 
-	} while (len > 0); //007C8240 just lets us cut off some empty space
+	} while (len > 0);
 	uint64_t t1 = to_us_since_boot(get_absolute_time());
 	uint32_t delta = (t1 - t0) / 1000;
 	uint32_t kBps = (uint32_t) ((float)(total / 1024.0f) / (float)(delta / 1000.0f));
@@ -243,7 +240,6 @@ void load_new_rom(char* filename) {
     program_flash_flush_cache();
 
     // Now enable xip and try to read
-    // program_flash_enter_cmd_xip(true);
     for (int o = 0; o < 4; o++) {
         
         psram_set_cs(START_ROM_LOAD_CHIP_INDEX+o); // Use the PSRAM chip
@@ -268,7 +264,7 @@ void load_new_rom(char* filename) {
         }
         printf("\n128 32bit reads @ 0x13000000 reads took %d us\n", totalReadTime);
 
-        exitQuadMode();
+        exitQuadMode(); // exit quad mode once finished
         sleep_ms(100);
     }
 
