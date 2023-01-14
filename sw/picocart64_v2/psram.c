@@ -16,11 +16,6 @@ U7 = FLASH 16M
 U8 = FLASH 16M
 */ 
 
-const int MAX_MEMORY_ARRAY_CHIP_INDEX = 8;
-const uint32_t PSRAM_CHIP_CAPACITY_BYTES = 8 * 1024 * 1024;
-const uint32_t FLASH_CHIP_CAPACITY_BYTES = 16 * 1024 * 1024;
-const int START_ROM_LOAD_CHIP_INDEX = 3; // U?
-const int FLASH_CHIP_INDEX = 7; // U?
 // static uint CURRENTLY_SELECTED_CHIP = 0;
 
 volatile int current_mcu_demux_pin_0 =  -1;
@@ -50,7 +45,7 @@ void set_demux_mcu_variables(int demux_pin0, int demux_pin1, int demux_pin2, int
 
 inline uint8_t psram_addr_to_chip(uint32_t address)
 {
-	return ((address >> 23) & 0x7) + 3;//START_ROM_LOAD_CHIP_INDEX;
+	return ((address >> 23) & 0x7) + START_ROM_LOAD_CHIP_INDEX;
 }
 //   0: Deassert all CS
 // 1-8: Assert the specific PSRAM CS (1 indexed, matches U1, U2 ... U8)

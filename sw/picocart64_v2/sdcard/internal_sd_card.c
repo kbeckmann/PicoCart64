@@ -190,26 +190,26 @@ void load_new_rom(char* filename) {
 	uint64_t t0 = to_us_since_boot(get_absolute_time());
     int currentPSRAMChip = START_ROM_LOAD_CHIP_INDEX;
 
-	do {
-        fr = f_read(&fil, buf, sizeof(buf), &len);
-        uint32_t addr = total - ((currentPSRAMChip - START_ROM_LOAD_CHIP_INDEX) * PSRAM_CHIP_CAPACITY_BYTES);
-        program_write_buf(addr, buf, len);
-		total += len;
+	// do {
+    //     fr = f_read(&fil, buf, sizeof(buf), &len);
+    //     uint32_t addr = total - ((currentPSRAMChip - START_ROM_LOAD_CHIP_INDEX) * PSRAM_CHIP_CAPACITY_BYTES);
+    //     program_write_buf(addr, buf, len);
+	// 	total += len;
 
-        int newChip = psram_addr_to_chip(total);
-        if (newChip != currentPSRAMChip && newChip <= MAX_MEMORY_ARRAY_CHIP_INDEX) {
-            printf("Changing memory array chip. Was: %d, now: %d\n", currentPSRAMChip, newChip);
-            printf("Total bytes: %d. Bytes remaining = %ld\n", total, (filinfo.fsize - total));
-            currentPSRAMChip = newChip;
-            psram_set_cs(currentPSRAMChip); // Switch the PSRAM chip
-        }
+    //     int newChip = psram_addr_to_chip(total);
+    //     if (newChip != currentPSRAMChip && newChip <= MAX_MEMORY_ARRAY_CHIP_INDEX) {
+    //         printf("Changing memory array chip. Was: %d, now: %d\n", currentPSRAMChip, newChip);
+    //         printf("Total bytes: %d. Bytes remaining = %ld\n", total, (filinfo.fsize - total));
+    //         currentPSRAMChip = newChip;
+    //         psram_set_cs(currentPSRAMChip); // Switch the PSRAM chip
+    //     }
 
-	} while (len > 0);
-	uint64_t t1 = to_us_since_boot(get_absolute_time());
-	uint32_t delta = (t1 - t0) / 1000;
-	uint32_t kBps = (uint32_t) ((float)(total / 1024.0f) / (float)(delta / 1000.0f));
+	// } while (len > 0);
+	// uint64_t t1 = to_us_since_boot(get_absolute_time());
+	// uint32_t delta = (t1 - t0) / 1000;
+	// uint32_t kBps = (uint32_t) ((float)(total / 1024.0f) / (float)(delta / 1000.0f));
 
-	printf("Read %d bytes and programmed PSRAM in %d ms (%d kB/s)\n\n\n", total, delta, kBps);
+	// printf("Read %d bytes and programmed PSRAM in %d ms (%d kB/s)\n\n\n", total, delta, kBps);
 
 	fr = f_close(&fil);
 	if (FR_OK != fr) {

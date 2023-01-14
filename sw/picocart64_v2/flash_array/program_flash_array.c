@@ -496,27 +496,6 @@ void inline program_flash_flush_cache() {
 }
 
 void enterPSRAMQuadMode() {
-    // printf("Configuring for spi to send psram into quad mode\n");
-    // ssi->ssienr = 0;
-    // ssi->baudr = 8;
-    // ssi->ctrlr0 =
-    //         (SSI_CTRLR0_SPI_FRF_VALUE_STD << SSI_CTRLR0_SPI_FRF_LSB) |  // Standard 1-bit SPI serial frames
-    //         (7 << SSI_CTRLR0_DFS_32_LSB) |                             // 32 clocks per data frame
-    //         (SSI_CTRLR0_TMOD_VALUE_EEPROM_READ << SSI_CTRLR0_TMOD_LSB); // Send instr + addr, receive data
-    // ssi->spi_ctrlr0 =
-    //         (0 << SSI_SPI_CTRLR0_WAIT_CYCLES_LSB) |
-    //         (2u << SSI_SPI_CTRLR0_INST_L_LSB) |    // 8-bit instruction prefix
-    //         (8u << SSI_SPI_CTRLR0_ADDR_L_LSB) |    // 24-bit addressing for 03h commands
-    //         (SSI_SPI_CTRLR0_TRANS_TYPE_VALUE_1C2A  // Command in serial format address in quad
-    //                 << SSI_SPI_CTRLR0_TRANS_TYPE_LSB);
-    // ssi->ssienr = 1;
-
-    // psram_set_cs(3); // shouldn't need to manually for the cs pin
-    // ssi->dr0 = 0x35;
-    // psram_set_cs(0);
-
-    // while ((ssi_hw->sr & SSI_SR_BUSY_BITS) != 0) { tight_loop_contents(); }  
-
     ssi->ssienr = 0;
     ssi->baudr = 2;
     ssi->ctrlr0 =

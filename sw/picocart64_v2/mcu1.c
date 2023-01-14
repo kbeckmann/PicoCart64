@@ -157,7 +157,7 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 		// }
 
 		// Do a rom load test after x seconds
-		if(test_load && t2 > 3) {
+		if(test_load && t2 > 1) {
 			test_load = false;
 
 			// pc64_set_sd_rom_selection("Donkey Kong 64 (U) [!].z64", 27);

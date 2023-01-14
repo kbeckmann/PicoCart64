@@ -1041,15 +1041,15 @@ void start_shell(void) {
     }
 
     // printf("PC64_CIBASE_ADDRESS_START: %08x\n", PC64_CIBASE_ADDRESS_START);
-    pc64_debug_print();
+    // pc64_debug_print();
 
-    eeprom_type_t eeprom = eeprom_present();
-    uint8_t* eepromBuf = malloc(8);
-    printf("EEPROM type %d\n", (int)eeprom);
-    eeprom_read(7, eepromBuf);
-    for(int i = 0; i < 8; i++) {
-        printf("%02x ", eepromBuf[i]);
-    }
+    // eeprom_type_t eeprom = eeprom_present();
+    // uint8_t* eepromBuf = malloc(8);
+    // printf("EEPROM type %d\n", (int)eeprom);
+    // eeprom_read(7, eepromBuf);
+    // for(int i = 0; i < 8; i++) {
+    //     printf("%02x ", eepromBuf[i]);
+    // }
     
     // silentWaitForStart();
 

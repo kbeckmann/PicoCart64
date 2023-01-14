@@ -20,6 +20,7 @@
         "systick.h": "c",
         "pins_mcu1.h": "c",
         "pio_uart.h": "c",
-        "pio.h": "c"
+        "pio.h": "c",
+        "cstdlib": "c"
     }
 }

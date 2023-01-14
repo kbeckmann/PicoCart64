@@ -59,6 +59,24 @@ uint16_t rom_mapping[MAPPING_TABLE_LEN];
 static const uint16_t *rom_file_16 = (uint16_t *) rom_chunks;
 #endif
 
+#define PSRAM_ADDRESS_MODIFIER_0 (0)
+#define PSRAM_ADDRESS_MODIFIER_1 (PSRAM_CHIP_CAPACITY_BYTES)
+#define PSRAM_ADDRESS_MODIFIER_2 (PSRAM_CHIP_CAPACITY_BYTES * 2) 
+#define PSRAM_ADDRESS_MODIFIER_3 (PSRAM_CHIP_CAPACITY_BYTES * 3) 
+#define PSRAM_ADDRESS_MODIFIER_4 (PSRAM_CHIP_CAPACITY_BYTES * 4) 
+#define PSRAM_ADDRESS_MODIFIER_5 (PSRAM_CHIP_CAPACITY_BYTES * 5) 
+#define PSRAM_ADDRESS_MODIFIER_6 (PSRAM_CHIP_CAPACITY_BYTES * 6)
+uint32_t g_addressModifierTable[] = {
+	0, // chip 1 
+	0, 
+	PSRAM_ADDRESS_MODIFIER_0, // currently psram starts at chip 3
+	PSRAM_ADDRESS_MODIFIER_1,
+	PSRAM_ADDRESS_MODIFIER_2,
+	PSRAM_ADDRESS_MODIFIER_3,
+	PSRAM_ADDRESS_MODIFIER_4,
+	PSRAM_ADDRESS_MODIFIER_5
+};
+volatile uint32_t tempChip = 0;
 inline uint16_t rom_read(uint32_t rom_address) {
 #if COMPRESSED_ROM
 	if (!g_loadRomFromMemoryArray) {
@@ -66,18 +84,14 @@ inline uint16_t rom_read(uint32_t rom_address) {
 		const uint16_t *chunk_16 = (const uint16_t *)rom_chunks[chunk_index];
 		return chunk_16[(rom_address & COMPRESSION_MASK) >> 1];
 	} else {
-		if (psram_addr_to_chip((rom_address)) != g_currentMemoryArrayChip) {
-			g_currentMemoryArrayChip = psram_addr_to_chip((rom_address));
-			// uart_tx_program_putc(0xC);
-			// uart_tx_program_putc((uint8_t)g_currentMemoryArrayChip);
-
-			// set address modifier
-			address_modifier = (g_currentMemoryArrayChip - START_ROM_LOAD_CHIP_INDEX) * PSRAM_CHIP_CAPACITY_BYTES;
+		tempChip = psram_addr_to_chip(rom_address);
+		if (tempChip != g_currentMemoryArrayChip) {
+			g_currentMemoryArrayChip = tempChip;
 
 			// Set the new chip
 			psram_set_cs(g_currentMemoryArrayChip);
 		}
-	return ptr16[(((rom_address - address_modifier) & 0xFFFFFF) >> 1)];
+		return ptr16[(((rom_address - g_addressModifierTable[g_currentMemoryArrayChip]) & 0xFFFFFF) >> 1)];
 	}
 #else
 	return rom_file_16[(last_addr & 0xFFFFFF) >> 1];
