@@ -50,7 +50,7 @@ void set_demux_mcu_variables(int demux_pin0, int demux_pin1, int demux_pin2, int
 
 inline uint8_t psram_addr_to_chip(uint32_t address)
 {
-	return ((address >> 23) & 0x7) + START_ROM_LOAD_CHIP_INDEX;
+	return ((address >> 23) & 0x7) + 3;//START_ROM_LOAD_CHIP_INDEX;
 }
 //   0: Deassert all CS
 // 1-8: Assert the specific PSRAM CS (1 indexed, matches U1, U2 ... U8)

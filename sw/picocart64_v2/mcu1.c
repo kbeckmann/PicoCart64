@@ -139,7 +139,7 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 	volatile uint32_t it = 0;
 	volatile uint32_t t2 = 0;
 
-	volatile bool test_load = false;
+	volatile bool test_load = true;
 	while (1) {
 		tight_loop_contents();
 
@@ -161,8 +161,8 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 			test_load = false;
 
 			// pc64_set_sd_rom_selection("Donkey Kong 64 (U) [!].z64", 27);
-			pc64_set_sd_rom_selection("GoldenEye 007 (U) [!].z64", 27);
-			// pc64_set_sd_rom_selection("007 - The World Is Not Enough (USA).n64", 40);
+			// pc64_set_sd_rom_selection("GoldenEye 007 (U) [!].z64", 27);
+			pc64_set_sd_rom_selection("007 - The World is Not Enough (U) [!].z64", 42);
 			sd_is_busy = true;
 			romLoading = true;
 			isWaitingForRomLoad = true;
