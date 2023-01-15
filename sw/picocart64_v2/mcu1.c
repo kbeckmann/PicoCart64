@@ -132,6 +132,8 @@ uint32_t last_rom_cache_update_address = 0;
 void __no_inline_not_in_flash_func(mcu1_core1_entry)() {	
 	// pio_uart_init(PIN_MCU2_DIO, PIN_MCU2_CS); // turn on inter-mcu comms
 
+	enable_joybus();
+
 	bool readingData = false;
 	volatile bool hasInit = true;
 	volatile bool isWaitingForRomLoad = false;
@@ -443,8 +445,6 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 	multicore_launch_core1(mcu1_core1_entry);
 
 	printf("launching n64_pi_run...\n");
-
-	enable_joybus();
 
 	n64_pi_run();
 
