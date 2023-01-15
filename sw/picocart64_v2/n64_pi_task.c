@@ -142,6 +142,8 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 
 	g_currentMemoryArrayChip = START_ROM_LOAD_CHIP_INDEX;
 
+	sleep_ms(4000);
+
 	// Init PIO
 	PIO pio = pio0;
 	n64_pi_pio_offset = pio_add_program(pio, &n64_pi_program);

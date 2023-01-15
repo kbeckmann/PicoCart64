@@ -167,14 +167,15 @@ void main_task_entry(__unused void *params)
 	// testFunction();
 
 	// Setup PIO UART
-	printf("Initing MCU1<->MCU2 serial bridge...");
-	pio_uart_init(PIN_SPI1_CS, PIN_SPI1_RX);
-	printf("Finshed!\n");
+	// printf("Initing MCU1<->MCU2 serial bridge...");
+	// pio_uart_init(PIN_SPI1_CS, PIN_SPI1_RX);
+	// printf("Finshed!\n");
 
 	// vTaskDelay(1000);
 	
 	//pc64_load_new_rom_command("Doom 64 (USA) (Rev 1).z64");
 	// load_new_rom("Doom 64 (USA) (Rev 1).z64");
+	// load_new_rom("GoldenEye 007 (U) [!].z64");
 
 	volatile uint32_t t = 0;
 	volatile uint32_t t2 = 0;
@@ -248,12 +249,12 @@ void mcu2_main(void)
 {
 	// const int freq_khz = 133000;
 	// const int freq_khz = 166000;
-	// const int freq_khz = 200000;
+	const int freq_khz = 200000;
 	// const int freq_khz = 210000;
 	// const int freq_khz = 220000;
 	// const int freq_khz = 230000;
 	// const int freq_khz = 240000;
-	const int freq_khz = 266000;
+	// const int freq_khz = 266000;
 	// const int freq_khz = 332000;
 
 	// Note that this might call set_sys_clock_pll,

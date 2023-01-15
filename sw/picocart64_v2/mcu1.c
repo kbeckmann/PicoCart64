@@ -130,10 +130,12 @@ void process_log_buffer() {
 
 uint32_t last_rom_cache_update_address = 0;
 void __no_inline_not_in_flash_func(mcu1_core1_entry)() {	
-	pio_uart_init(PIN_MCU2_DIO, PIN_MCU2_CS); // turn on inter-mcu comms
+	// pio_uart_init(PIN_MCU2_DIO, PIN_MCU2_CS); // turn on inter-mcu comms
 	
+	enable_joybus();
+
 	bool readingData = false;
-	volatile bool hasInit = false;
+	volatile bool hasInit = true;
 	volatile bool isWaitingForRomLoad = false;
 	volatile uint32_t t = 0;
 	volatile uint32_t it = 0;
@@ -147,11 +149,72 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 		if(time_us_32() - t > 1000000) {
 			t = time_us_32();
 			t2++;
+
+			if (t2 % 15 == 0) {
+				dump_joybus_debug_info();
+			}
 		}
 
-		// if (t2 == 10 && !hasInit) {
-		// 	hasInit = true;
-		// }
+		if (t2 == 1 && !hasInit) {
+			hasInit = true;
+
+			current_mcu_enable_demux(false);
+			ssi_hw->ssienr = 0;
+			qspi_disable();
+
+			set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
+			uint currentChipIndex = START_ROM_LOAD_CHIP_INDEX;
+			current_mcu_enable_demux(true);
+			psram_set_cs(currentChipIndex);
+			program_connect_internal_flash();
+			program_flash_exit_xip();
+
+			psram_set_cs(currentChipIndex);
+			program_flash_do_cmd(0x35, NULL, NULL, 0);
+
+			psram_set_cs(currentChipIndex + 1);
+			program_flash_do_cmd(0x35, NULL, NULL, 0);
+
+			psram_set_cs(currentChipIndex + 2);
+			program_flash_do_cmd(0x35, NULL, NULL, 0);
+
+			psram_set_cs(currentChipIndex + 3);
+			program_flash_do_cmd(0x35, NULL, NULL, 0);
+
+			// Flush cache
+			program_flash_flush_cache();
+
+			program_flash_enter_cmd_xip(true); // psram quad mode
+
+			psram_set_cs(START_ROM_LOAD_CHIP_INDEX); // Set back to start index
+
+			volatile uint32_t *ptr = (volatile uint32_t *)0x13000000;
+			uint32_t cycleCountStart = 0;
+			uint32_t totalTime = 0;
+			int psram_csToggleTime = 0;
+			int total_memoryAccessTime = 0;
+			int totalReadTime = 0;
+			for (int i = 0; i < 128; i++) {
+				uint32_t modifiedAddress = i;
+				uint32_t startTime_us = time_us_32();
+				uint32_t word = ptr[modifiedAddress];
+				totalReadTime += time_us_32() - startTime_us;
+
+				if (i < 16) { // only print the first 16 words
+					printf("PSRAM-MCU1[%08x]: %08x\n",i , word);
+				}
+			}
+
+			// rom is loaded now
+			g_loadRomFromMemoryArray = true; // read from psram
+			isWaitingForRomLoad = false;
+			sd_is_busy = false;
+			readingData = false;
+
+			enable_joybus();
+
+			printf("MCU1 Ready to read from PSRAM\n");
+		}
 
 		// Do a rom load test after x seconds
 		if(test_load && t2 > 2) {
@@ -220,9 +283,6 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 
 				psram_set_cs(START_ROM_LOAD_CHIP_INDEX); // Set back to start index
 
-				pio_uart_stop();
-				enable_joybus();
-
 				// rom is loaded now
 				g_loadRomFromMemoryArray = true; // read from psram
 				isWaitingForRomLoad = false;
@@ -234,6 +294,9 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 
 				// Sanity chirp to mcu2 just to know that this completed
 				uart_tx_program_putc(0xAB);
+
+				// pio_uart_stop();
+				// enable_joybus();
 			}
 		}
 
@@ -381,12 +444,12 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 	int count = 0;
 	// const int freq_khz = 133000;
 	// const int freq_khz = 166000;
-	// const int freq_khz = 200000;
+	const int freq_khz = 200000;
 	// const int freq_khz = 210000;
 	// const int freq_khz = 220000;
 	// const int freq_khz = 230000;
 	// const int freq_khz = 240000;
-	const int freq_khz = 266000;
+	// const int freq_khz = 266000;
 	// const int freq_khz = 332000;
 	// const int freq_khz = 166000 * 2;
 
@@ -398,7 +461,7 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 
 	// Enable STDIO
 	// stdio_async_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
-	// stdio_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
+	stdio_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
 
 	printf("\n\nMCU1: Was%s able to set clock to %d MHz\n", clockWasSet ? "" : " not", freq_khz/1000);
 

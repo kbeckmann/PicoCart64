@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #include <hardware/clocks.h>
 #include <hardware/dma.h>
@@ -13,7 +14,7 @@ void joybus_init (PIO pio, uint8_t channels, uint *pins, joybus_callback_t callb
 bool joybus_check_address_crc (uint16_t address);
 uint8_t joybus_calculate_data_crc (uint8_t *buffer);
 
-uint8_t eeprom[2048];
+uint8_t eeprom[512];
 uint16_t eeprom_type = EEPROM_TYPE_4K;
 
 
@@ -234,8 +235,17 @@ uint8_t __time_critical_func(joybus_calculate_data_crc) (uint8_t *buffer) {
     return crc;
 }
 
+volatile uint8_t processedCommands[128];
+volatile uint8_t processedCommandsIndex = 0;
+volatile uint8_t processedCommandsLooped = 0;
 static uint8_t __time_critical_func(joybus_callback) (uint8_t ch, uint8_t cmd, uint8_t rx_length, uint8_t *rx_buffer, uint8_t *tx_buffer) {
     uint8_t tx_length = 0;
+
+    processedCommands[processedCommandsIndex++] = cmd;
+    if (processedCommandsIndex >= 128) {
+        processedCommandsIndex = 0;
+        processedCommandsLooped++;
+    }
 
     if (ch > 0) {
         return 0;
@@ -244,7 +254,6 @@ static uint8_t __time_critical_func(joybus_callback) (uint8_t ch, uint8_t cmd, u
     switch (cmd) {
         case JOYBUS_CMD_INFO:
             if (rx_length == 0) {
-                // uint32_t info = 0x050002;
                 uint32_t info = 0x008000;
                 tx_length = 3;
                 tx_buffer[0] = ((info >> 16) & 0xFF);
@@ -253,71 +262,40 @@ static uint8_t __time_critical_func(joybus_callback) (uint8_t ch, uint8_t cmd, u
             }
             break;
 
-        // case JOYBUS_CMD_STATE:
-        //     if (rx_length == 0) {
-        //         uint32_t state = 0;
-        //         queue_try_remove(&joybus_read_queue, &state);
-        //         tx_length = 4;
-        //         tx_buffer[0] = ((state >> 24) & 0xFF);
-        //         tx_buffer[1] = ((state >> 16) & 0xFF);
-        //         tx_buffer[2] = ((state >> 8) & 0xFF);
-        //         tx_buffer[3] = (state & 0xFF);
-        //         queue_try_add(&joybus_write_queue, &state);
-        //     }
-        //     break;
-
         case JOYBUS_CMD_EEPROM_READ:
-        
             if (rx_length != 0) {
-                uint8_t blockToRead = rx_buffer[0];
+                uint8_t blockToRead = rx_buffer[0] * 8;
                 tx_length = 8;
-                tx_buffer[0] = 0xA0;
-                tx_buffer[1] = 0xA1;
-                tx_buffer[2] = 0xA2;
-                tx_buffer[3] = 0xA3;
-                tx_buffer[4] = 0xA4;
-                tx_buffer[5] = 0xA5;
-                tx_buffer[6] = 0xA6;
-                tx_buffer[7] = 0xA7;
+                for (int i = 0; i < 8; i++) {
+                    tx_buffer[i] = eeprom[blockToRead+i];
+                }
             }
             break;
 
         case JOYBUS_CMD_EEPROM_WRITE:
             if (rx_length != 0) {
+                tx_length = 1;
+                tx_buffer[0] = 0x00;
+
                 uint8_t blockToWrite = rx_buffer[0];
                 // 8 bytes of data
                 for(int i = 0; i < 8; i++) {
                     eeprom[blockToWrite+i] = rx_buffer[i];
                 }
-                tx_length = 1;
-                tx_buffer[0] = 0x00;
             }
             break;
 
         case JOYBUS_CMD_RESET:
-            // if (rx_length == 0) {
-            //     uint32_t state = 0;
-            //     queue_try_peek(&joybus_read_queue, &state);
-            //     tx_length = 4;
-            //     tx_buffer[0] = ((state >> 24) & 0xFF);
-            //     tx_buffer[1] = ((state >> 16) & 0xFF);
-            //     tx_buffer[2] = ((state >> 8) & 0xFF);
-            //     tx_buffer[3] = (state & 0xFF);
-            // }
             break;
     }
 
     return tx_length;
 }
 
-void initJoybus() {
+void enable_joybus() {
+    printf("Enabling joybus\n");
     uint joybus_pins[1] = { 21 };
     joybus_init(pio1, 1, joybus_pins, joybus_callback);
-}
-
-static bool joybusHasInitialInit = false;
-void enable_joybus() {
-    initJoybus();
 }
 
 void disable_joybus() {
@@ -331,4 +309,14 @@ void change_eeprom_type(uint16_t newType) {
     } else {
         eeprom_type = newType;
     }
+}
+
+void dump_joybus_debug_info() {
+    printf("Processed %u commands, looped %u times.\n", processedCommandsIndex, processedCommandsLooped);
+    for (int i = 0; i < processedCommandsIndex; i++) {
+        printf("%02x ", processedCommands[processedCommandsIndex]);
+    }
+
+    processedCommandsIndex = 0;
+    processedCommandsLooped = 0;
 }

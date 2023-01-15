@@ -22,6 +22,7 @@
         "pio_uart.h": "c",
         "pio.h": "c",
         "cstdlib": "c",
-        "pio_uart.pio.h": "c"
+        "pio_uart.pio.h": "c",
+        "joybus.pio.h": "c"
     }
 }

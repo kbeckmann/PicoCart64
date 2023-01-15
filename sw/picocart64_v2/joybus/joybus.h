@@ -28,3 +28,4 @@ void change_eeprom_type(uint16_t newType);
 
 void enable_joybus();
 void disable_joybus();
+void dump_joybus_debug_info();
