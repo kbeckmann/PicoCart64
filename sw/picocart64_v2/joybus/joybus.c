@@ -238,21 +238,17 @@ uint8_t __time_critical_func(joybus_calculate_data_crc) (uint8_t *buffer) {
 volatile uint8_t processedCommands[128];
 volatile uint8_t processedCommandsIndex = 0;
 volatile uint8_t processedCommandsLooped = 0;
-static uint8_t __time_critical_func(joybus_callback) (uint8_t ch, uint8_t cmd, uint8_t rx_length, uint8_t *rx_buffer, uint8_t *tx_buffer) {
+uint8_t __time_critical_func(joybus_callback) (uint8_t ch, uint8_t cmd, uint8_t rx_length, uint8_t *rx_buffer, uint8_t *tx_buffer) {
     uint8_t tx_length = 0;
 
-    processedCommands[processedCommandsIndex++] = cmd;
-    if (processedCommandsIndex >= 128) {
-        processedCommandsIndex = 0;
-        processedCommandsLooped++;
-    }
-
     if (ch > 0) {
+        processedCommands[processedCommandsIndex++] = 0xFA;
         return 0;
     }
 
     switch (cmd) {
         case JOYBUS_CMD_INFO:
+            processedCommands[processedCommandsIndex++] = JOYBUS_CMD_INFO;
             if (rx_length == 0) {
                 uint32_t info = 0x008000;
                 tx_length = 3;
@@ -263,6 +259,7 @@ static uint8_t __time_critical_func(joybus_callback) (uint8_t ch, uint8_t cmd, u
             break;
 
         case JOYBUS_CMD_EEPROM_READ:
+            processedCommands[processedCommandsIndex++] = JOYBUS_CMD_EEPROM_READ;
             if (rx_length != 0) {
                 uint8_t blockToRead = rx_buffer[0] * 8;
                 tx_length = 8;
@@ -273,11 +270,12 @@ static uint8_t __time_critical_func(joybus_callback) (uint8_t ch, uint8_t cmd, u
             break;
 
         case JOYBUS_CMD_EEPROM_WRITE:
+            processedCommands[processedCommandsIndex++] = JOYBUS_CMD_EEPROM_WRITE;
             if (rx_length != 0) {
                 tx_length = 1;
                 tx_buffer[0] = 0x00;
 
-                uint8_t blockToWrite = rx_buffer[0];
+                uint8_t blockToWrite = rx_buffer[0] * 8;
                 // 8 bytes of data
                 for(int i = 0; i < 8; i++) {
                     eeprom[blockToWrite+i] = rx_buffer[i];
@@ -287,6 +285,11 @@ static uint8_t __time_critical_func(joybus_callback) (uint8_t ch, uint8_t cmd, u
 
         case JOYBUS_CMD_RESET:
             break;
+    }
+
+    if (processedCommandsIndex >= 128) {
+        processedCommandsIndex = 0;
+        processedCommandsLooped++;
     }
 
     return tx_length;
