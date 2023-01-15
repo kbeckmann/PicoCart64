@@ -1,0 +1,35 @@
+.program joybus
+
+rx_stop:
+    irq set 0 rel
+rx_good_data:
+    push iffull noblock
+.wrap_target
+public rx_start:
+    wait 1 pin 0
+    wait 0 pin 0
+    mov isr, null
+    set x, 7 [13]
+rx_bit_loop:
+    in pins, 1
+    jmp !x rx_data [8]
+    nop [8]
+    jmp pin rx_stop
+    jmp x-- rx_bit_loop [12]
+rx_data:
+    jmp pin rx_good_data
+rx_bad_data:
+    jmp rx_start
+public tx_start:
+    out isr, 8
+    in null, 3
+    mov x, isr
+tx_bit_loop:
+    set pindirs, 0 [7]
+    jmp !x tx_stop
+    out pindirs, 1 [14]
+    set pindirs, 1 [7]
+    jmp x-- tx_bit_loop
+tx_stop:
+    set pindirs, 1
+.wrap

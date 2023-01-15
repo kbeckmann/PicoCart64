@@ -45,9 +45,11 @@ void rx_uart_buffer_reset() {
     rxRingBuffer.tail = 0;
 }
 
+uint pioUartRXOffset = 0;
+uint pioUartTXOffset = 0;
 void pio_uart_init(uint rxPin, uint txPin) {
-	uint pioUartRXOffset = pio_add_program(uart_rx.pio, &uart_rx_program);
-	uint pioUartTXOffset = pio_add_program(uart_tx.pio, &uart_tx_program);
+	pioUartRXOffset = pio_add_program(uart_rx.pio, &uart_rx_program);
+	pioUartTXOffset = pio_add_program(uart_tx.pio, &uart_tx_program);
 
     // uint baudRate = (115200 * 8) * 8;
     uint baudRate = 8; // CLock divider
@@ -58,6 +60,14 @@ void pio_uart_init(uint rxPin, uint txPin) {
     irq_set_exclusive_handler(PIO1_IRQ_0, rx_uart_interrupt);
 	pio_set_irq0_source_enabled(pio1, pis_sm0_rx_fifo_not_empty, true);
     irq_set_enabled(PIO1_IRQ_0, true);  
+}
+
+void pio_uart_stop() {
+    pio_sm_set_enabled(uart_rx.pio, uart_rx.sm, false);
+    pio_sm_set_enabled(uart_tx.pio, uart_tx.sm, false);
+
+    pio_remove_program(uart_rx.pio, &uart_rx_program, pioUartRXOffset);
+    pio_remove_program(uart_tx.pio, &uart_tx_program, pioUartTXOffset);
 }
 
 void uart_tx_program_putc(char c) {

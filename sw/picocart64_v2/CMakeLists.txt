@@ -7,7 +7,7 @@ add_executable(picocart64_v2
     qspi_helper.c
     sha256.c
     sram.c
-    eeprom.c
+    # eeprom.c
 
     esp32/esp32_task.c
 
@@ -23,6 +23,8 @@ add_executable(picocart64_v2
     flash_array/program_flash_array.c
 
     pio_uart/pio_uart.c
+
+    joybus/joybus.c
 )
 
 if(NOT DEFINED REGION)
@@ -91,6 +93,7 @@ target_include_directories(picocart64_v2 PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/sdcard
     ${CMAKE_CURRENT_LIST_DIR}/ws2812
     ${CMAKE_CURRENT_LIST_DIR}/flash_array
+    ${CMAKE_CURRENT_LIST_DIR}/joybus
 
     ${CMAKE_CURRENT_LIST_DIR}/../generated
     ${CMAKE_CURRENT_BINARY_DIR}
@@ -123,6 +126,12 @@ pico_enable_stdio_uart(picocart64_v2 1)
 pico_generate_pio_header(picocart64_v2 
     ${CMAKE_CURRENT_LIST_DIR}/pio_uart/pio_uart.pio
 )
+
+pico_generate_pio_header(picocart64_v2 
+${CMAKE_CURRENT_LIST_DIR}/joybus/joybus.pio
+)
+
+#OUTPUT_DIR ${CMAKE_CURRENT_LIST_DIR})
 
 # use custom linker script
 pico_set_linker_script(picocart64_v2 ${CMAKE_CURRENT_LIST_DIR}/memmap_custom.ld)

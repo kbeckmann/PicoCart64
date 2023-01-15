@@ -1042,16 +1042,23 @@ void start_shell(void) {
 
     // printf("PC64_CIBASE_ADDRESS_START: %08x\n", PC64_CIBASE_ADDRESS_START);
     // pc64_debug_print();
+    eeprom_type_t eeprom = eeprom_present();
 
-    // eeprom_type_t eeprom = eeprom_present();
-    // uint8_t* eepromBuf = malloc(8);
-    // printf("EEPROM type %d\n", (int)eeprom);
-    // eeprom_read(7, eepromBuf);
-    // for(int i = 0; i < 8; i++) {
-    //     printf("%02x ", eepromBuf[i]);
+    // while(eeprom == EEPROM_NONE) {
+    //     eeprom = eeprom_present();
     // }
+    uint8_t* eepromBuf = malloc(8);
+    printf("EEPROM type %d\n", (int)eeprom);
     
-    // silentWaitForStart();
+    // eeprom = eeprom_present();
+    // printf("Checking again... EEPROM type %d\n", (int)eeprom);
+
+    eeprom_read(7, eepromBuf);
+    for(int i = 0; i < 8; i++) {
+        printf("%02x ", eepromBuf[i]);
+    }
+    
+    silentWaitForStart();
 
     // Alloc global holding variables
     temp_serial = malloc(sizeof(char) * 8);

@@ -32,7 +32,8 @@
 
 #include "rom_vars.h"
 
-#include "eeprom.h"
+// #include "eeprom.h"
+#include "joybus/joybus.h"
 
 static const gpio_config_t mcu1_gpio_config[] = {
 	// PIO0 pins
@@ -128,8 +129,7 @@ void process_log_buffer() {
 }
 
 uint32_t last_rom_cache_update_address = 0;
-void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
-	// init_joybus(); // start listening for joybus data
+void __no_inline_not_in_flash_func(mcu1_core1_entry)() {	
 	pio_uart_init(PIN_MCU2_DIO, PIN_MCU2_CS); // turn on inter-mcu comms
 	
 	bool readingData = false;
@@ -139,7 +139,7 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 	volatile uint32_t it = 0;
 	volatile uint32_t t2 = 0;
 
-	volatile bool test_load = true;
+	volatile bool test_load = false;
 	while (1) {
 		tight_loop_contents();
 
@@ -151,18 +151,15 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 
 		// if (t2 == 10 && !hasInit) {
 		// 	hasInit = true;
-		// 	read_joybus();
-		// 	printf("Dumping debug data\n");
-		// 	joybus_dump_debug_data();
 		// }
 
 		// Do a rom load test after x seconds
-		if(test_load && t2 > 1) {
+		if(test_load && t2 > 2) {
 			test_load = false;
 
 			// pc64_set_sd_rom_selection("Donkey Kong 64 (U) [!].z64", 27);
-			// pc64_set_sd_rom_selection("GoldenEye 007 (U) [!].z64", 27);
-			pc64_set_sd_rom_selection("007 - The World is Not Enough (U) [!].z64", 42);
+			pc64_set_sd_rom_selection("GoldenEye 007 (U) [!].z64", 27);
+			// pc64_set_sd_rom_selection("007 - The World is Not Enough (U) [!].z64", 42);
 			sd_is_busy = true;
 			romLoading = true;
 			isWaitingForRomLoad = true;
@@ -184,9 +181,9 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 		}
 
 		// Handle joy_bus requests
-		if (process_joybus_buf) {
-			read_joybus();
-		}
+		// if (process_joybus_buf) {
+		// 	read_joybus();
+		// }
 
 		if (readingData) {
 			// Process anything that might be on the uart buffer
@@ -222,6 +219,9 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 				program_flash_enter_cmd_xip(true); // psram quad mode
 
 				psram_set_cs(START_ROM_LOAD_CHIP_INDEX); // Set back to start index
+
+				pio_uart_stop();
+				enable_joybus();
 
 				// rom is loaded now
 				g_loadRomFromMemoryArray = true; // read from psram
@@ -405,7 +405,7 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 	// IF READING FROM FROM FLASH... (works for compressed roms)
 	qspi_oeover_normal(true);
 	ssi_hw->ssienr = 0;
-	ssi_hw->baudr = 6; // change baud
+	ssi_hw->baudr = 8; // change baud
 	ssi_hw->ssienr = 1;
 
 	// current_mcu_enable_demux(true);

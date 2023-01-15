@@ -21,6 +21,7 @@
         "pins_mcu1.h": "c",
         "pio_uart.h": "c",
         "pio.h": "c",
-        "cstdlib": "c"
+        "cstdlib": "c",
+        "pio_uart.pio.h": "c"
     }
 }
