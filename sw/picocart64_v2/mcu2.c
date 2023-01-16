@@ -171,7 +171,7 @@ void main_task_entry(__unused void *params)
 	// pio_uart_init(PIN_SPI1_CS, PIN_SPI1_RX);
 	// printf("Finshed!\n");
 
-	// vTaskDelay(1000);
+	// vTaskDelay(5000);
 	
 	//pc64_load_new_rom_command("Doom 64 (USA) (Rev 1).z64");
 	// load_new_rom("Doom 64 (USA) (Rev 1).z64");

@@ -1044,11 +1044,13 @@ void start_shell(void) {
     // pc64_debug_print();
     eeprom_type_t eeprom = eeprom_present();
 
+    const size_t eeprom_capacity = eeprom_total_blocks();
+
     // while(eeprom == EEPROM_NONE) {
     //     eeprom = eeprom_present();
     // }
     uint8_t* eepromBuf = malloc(8);
-    printf("EEPROM type %d\n", (int)eeprom);
+    printf("EEPROM type %d, capacity %lu\n", (int)eeprom, eeprom_capacity);
     
     // eeprom = eeprom_present();
     // printf("Checking again... EEPROM type %d\n", (int)eeprom);

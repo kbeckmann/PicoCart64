@@ -97,11 +97,12 @@ void __time_critical_func(enterMode)(int dataPin) {
         processedCommandsIndex++;
 
         if (buffer[0] == 0) { // Probe
+            // uint8_t probeResponse[3] = { 0x00, 0x80, 0x00 };
             uint8_t probeResponse[3] = { 0x00, 0xC0, 0x00 };
             uint32_t result[2];
             int resultLen;
             convertToPio(probeResponse, 3, result, &resultLen);
-            sleep_us(6); // 3.75us into the bit before end bit => 6.25 to wait if the end-bit is 5us long
+            sleep_us(5); // 3.75us into the bit before end bit => 6.25 to wait if the end-bit is 5us long
 
             pio_sm_set_enabled(pio, 0, false);
             pio_sm_init(pio, 0, offset+joybus_offset_outmode, &config);
@@ -111,11 +112,16 @@ void __time_critical_func(enterMode)(int dataPin) {
         }
         else if (buffer[0] == JOYBUS_CMD_EEPROM_READ) {
             buffer[0] = pio_sm_get_blocking(pio, 0); // read the block number to read
-            uint8_t blockToRead = buffer[0] * 8;
+            uint8_t blockToRead = buffer[0];
+            uint32_t eepromOffset = blockToRead * 8;
+            uint8_t dataToSend[8];
+            for(int i = 0; i < 8; i++) {
+                dataToSend[i] = eeprom[eepromOffset + i];
+            }
 
             uint32_t result[9];
             int resultLen;
-            convertToPio(&eeprom[blockToRead], 8, result, &resultLen);
+            convertToPio(dataToSend, 8, result, &resultLen);
 
             pio_sm_set_enabled(pio, 0, false);
             pio_sm_init(pio, 0, offset+joybus_offset_outmode, &config);
@@ -123,16 +129,17 @@ void __time_critical_func(enterMode)(int dataPin) {
 
             for (int i = 0; i<resultLen; i++) pio_sm_put_blocking(pio, 0, result[i]);
             // if (blockToRead != 0) {
-            //     printf("Read from eeprom. Block %u\n", blockToRead);
+            //     printf("%u ", blockToRead);
             // }
         }
         else if (buffer[0] == JOYBUS_CMD_EEPROM_WRITE) {
             buffer[0] = pio_sm_get_blocking(pio, 0); // read the block number to write
-            uint8_t blockToWrite = buffer[0] * 8;
+            uint8_t blockToWrite = buffer[0];
 
+            uint32_t eepromBlockStartingIndex = blockToWrite * 8;
             for (int i = 0; i < 8; i++) {
                 buffer[0] = pio_sm_get_blocking(pio, 0);
-                eeprom[blockToWrite + i] = (uint8_t)(buffer[0] & 0xFF);
+                eeprom[eepromBlockStartingIndex + i] = (uint8_t)(buffer[0] & 0xFF);
             }
             
             uint8_t probeResponse[1] = { 0x00 };
@@ -194,15 +201,18 @@ void __time_critical_func(enterMode)(int dataPin) {
             printf("Other cmd: %02x\n", buffer[0]);
         }
 
-        // if (processedCommandsIndex == 262) {
-        //     // printf("%u ", processedCommandsIndex);
-        //     for(int i = 0; i < 2048; i++) {
-        //         if (i % 64 == 0) {
-        //             printf("\n");
-        //         }
-        //         printf("%02x ", eeprom[i]);
-        //     }
-        // }
+        if (processedCommandsIndex == 869) {
+            // printf("%u ", processedCommandsIndex);
+            for(int i = 0; i < 2048; i++) {
+                if (i % 64 == 0) {
+                    printf("\n");
+                }
+                printf("%02x ", eeprom[i]);
+            }
+        }
+        if (processedCommandsIndex > 869) {
+            printf("%u ", processedCommandsIndex);
+        }
     }
 }
 
@@ -507,7 +517,7 @@ void enable_joybus() {
     // joybus_init(pio1, 1, joybus_pins, joybus_callback);
 
     for(int i = 0; i < 2048; i++) {
-        eeprom[i] = i;
+        eeprom[i] = i / 8;
     }
 
     enterMode(21);

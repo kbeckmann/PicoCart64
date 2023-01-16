@@ -135,13 +135,14 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 	enable_joybus();
 
 	bool readingData = false;
-	volatile bool hasInit = true;
 	volatile bool isWaitingForRomLoad = false;
 	volatile uint32_t t = 0;
 	volatile uint32_t it = 0;
 	volatile uint32_t t2 = 0;
-
-	volatile bool test_load = false;
+	
+	bool startJoybus = false;
+	volatile bool hasInit = true;
+	volatile bool test_load = true;
 	while (1) {
 		tight_loop_contents();
 
@@ -150,28 +151,66 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 			t = time_us_32();
 			t2++;
 
-			if (t2 % 15 == 0) {
-				dump_joybus_debug_info();
-			}
+			// if (t2 % 15 == 0) {
+			// 	dump_joybus_debug_info();
+			// }
 		}
 
-		if (t2 == 1 && !hasInit) {
+		if (startJoybus) {
+			startJoybus = false;
+			enable_joybus();
+		}
+
+		if (t2 == 45 && !hasInit) {
 			hasInit = true;
+			
+			set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
+				uint currentChipIndex = START_ROM_LOAD_CHIP_INDEX;
+				current_mcu_enable_demux(true);
+				psram_set_cs(currentChipIndex);
+				program_connect_internal_flash();
+				program_flash_exit_xip();
+
+				psram_set_cs(currentChipIndex);
+				program_flash_do_cmd(0x35, NULL, NULL, 0);
+
+				psram_set_cs(currentChipIndex + 1);
+				program_flash_do_cmd(0x35, NULL, NULL, 0);
+
+				psram_set_cs(currentChipIndex + 2);
+				program_flash_do_cmd(0x35, NULL, NULL, 0);
+
+				psram_set_cs(currentChipIndex + 3);
+				program_flash_do_cmd(0x35, NULL, NULL, 0);
+
+				// Flush cache
+				program_flash_flush_cache();
+
+				program_flash_enter_cmd_xip(true); // psram quad mode
+
+				psram_set_cs(START_ROM_LOAD_CHIP_INDEX); // Set back to start index
+
+				// rom is loaded now
+				g_loadRomFromMemoryArray = true; // read from psram
+				isWaitingForRomLoad = false;
+				sd_is_busy = false;
+				readingData = false;
+				startJoybus = true;
 		}
 
 		// Do a rom load test after x seconds
-		if(test_load && t2 > 2) {
+		if(test_load && t2 > 1) {
 			test_load = false;
-
+			printf("Disabling mcu1 qspi\n");
 			// pc64_set_sd_rom_selection("Donkey Kong 64 (U) [!].z64", 27);
-			pc64_set_sd_rom_selection("GoldenEye 007 (U) [!].z64", 27);
+			//pc64_set_sd_rom_selection("GoldenEye 007 (U) [!].z64", 27);
 			// pc64_set_sd_rom_selection("007 - The World is Not Enough (U) [!].z64", 42);
-			sd_is_busy = true;
-			romLoading = true;
-			isWaitingForRomLoad = true;
+			// sd_is_busy = true;
+			// romLoading = true;
+			// isWaitingForRomLoad = true;
 			
-			readingData = true;
-			rx_uart_buffer_reset();
+			// readingData = true;
+			// rx_uart_buffer_reset();
 
 			// Turn off the qspi hardware so mcu2 can use it
 			current_mcu_enable_demux(false);
@@ -183,7 +222,7 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 			// This will restart the loop.
 			g_restart_pi_handler = true;
 
-			pc64_send_load_new_rom_command();
+			// pc64_send_load_new_rom_command();
 		}
 
 		// Handle joy_bus requests
