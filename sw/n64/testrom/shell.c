@@ -1042,25 +1042,36 @@ void start_shell(void) {
 
     // printf("PC64_CIBASE_ADDRESS_START: %08x\n", PC64_CIBASE_ADDRESS_START);
     // pc64_debug_print();
-    eeprom_type_t eeprom = eeprom_present();
 
-    const size_t eeprom_capacity = eeprom_total_blocks();
+    // EEPROM tests
+    // eeprom_type_t eeprom = eeprom_present();
+    // const size_t eeprom_capacity = eeprom_total_blocks();
 
-    // while(eeprom == EEPROM_NONE) {
-    //     eeprom = eeprom_present();
+    // uint8_t* eepromBuf = malloc(512);
+    // printf("EEPROM type %d, capacity %u\n", (int)eeprom, eeprom_capacity);
+
+    // for(int i = 0; i < 512; i++) {
+    //     eepromBuf[i] = i;
     // }
-    uint8_t* eepromBuf = malloc(8);
-    printf("EEPROM type %d, capacity %lu\n", (int)eeprom, eeprom_capacity);
-    
-    // eeprom = eeprom_present();
-    // printf("Checking again... EEPROM type %d\n", (int)eeprom);
 
-    eeprom_read(7, eepromBuf);
-    for(int i = 0; i < 8; i++) {
-        printf("%02x ", eepromBuf[i]);
-    }
-    
-    silentWaitForStart();
+    // for(int i = 0; i < 64; i++) {
+    //     eeprom_write(i, &eepromBuf[i*8]);
+    // }    
+
+    // uint8_t* eepromReadBuf = malloc(8);
+    // for(int i = 0; i < 64; i++) {
+    //     eeprom_read(i, eepromReadBuf);
+    //     printf("%04x: ", i);
+    //     for(int i = 0; i < 8; i++) {
+    //         printf("%02x ", eepromReadBuf[i]);
+    //     }
+    //     printf("\n");
+    //     if (i % 16 == 0 && i != 0) {
+    //         silentWaitForStart();
+    //     }
+    // }
+
+    // silentWaitForStart();
 
     // Alloc global holding variables
     temp_serial = malloc(sizeof(char) * 8);

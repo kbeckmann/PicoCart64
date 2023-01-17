@@ -9,11 +9,79 @@
 #include "hardware/pio.h"
 #include "joybus.pio.h"
 
-volatile uint8_t processedCommands[128];
+volatile uint8_t blocksWrittenTo[512];
+volatile uint32_t blocksWrittenToIndex = 0;
 volatile uint32_t processedCommandsIndex = 0;
 volatile uint8_t processedCommandsLooped = 0;
-volatile uint8_t eeprom[16 * 1024 / 8];
-uint16_t eeprom_type = EEPROM_TYPE_16K;
+// volatile uint8_t eeprom[16 * 1024 / 8];
+uint16_t eeprom_type = EEPROM_TYPE_4K;
+
+volatile uint8_t eeprom[] = {
+0x08, 0x01, 0xE7, 0xF2, 0x04, 0xD9, 0xF7, 0x63,
+0x1F, 0x10, 0xFF, 0xCF, 0x7F, 0xFF, 0xFF, 0xFF,
+0xFF, 0x7F, 0x7F, 0x7F, 0xFF, 0x7F, 0x7F, 0xFF,
+0xFF, 0xFF, 0x7F, 0x81, 0x01, 0x01, 0x03, 0x01,
+0x01, 0x01, 0x01, 0x81, 0x00, 0x64, 0x64, 0x64,
+0x6B, 0x64, 0x65, 0x64, 0x64, 0x64, 0x64, 0x64,
+0x64, 0x64, 0x64, 0x64, 0x44, 0x41, 0x18, 0xFB,
+0x08, 0x01, 0xE7, 0xF2, 0x04, 0xD9, 0xF7, 0x63,
+0x1F, 0x10, 0xFF, 0xCF, 0x7F, 0xFF, 0xFF, 0xFF,
+0xFF, 0x7F, 0x7F, 0x7F, 0xFF, 0x7F, 0x7F, 0xFF,
+0xFF, 0xFF, 0x7F, 0x81, 0x01, 0x01, 0x03, 0x01,
+0x01, 0x01, 0x01, 0x81, 0x00, 0x64, 0x64, 0x64,
+0x6B, 0x64, 0x65, 0x64, 0x64, 0x64, 0x64, 0x64,
+0x64, 0x64, 0x64, 0x64, 0x44, 0x41, 0x18, 0xFB,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x44, 0x41, 0x00, 0x85,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x44, 0x41, 0x00, 0x85,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x44, 0x41, 0x00, 0x85,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x44, 0x41, 0x00, 0x85,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x44, 0x41, 0x00, 0x85,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x44, 0x41, 0x00, 0x85,
+0x00, 0x00, 0x00, 0x00, 0x3F, 0xFF, 0xFF, 0xFF,
+0x2A, 0xAA, 0xAA, 0xAA, 0x15, 0x55, 0x55, 0x55,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x48, 0x49, 0x07, 0x09,
+0x00, 0x00, 0x00, 0x00, 0x3F, 0xFF, 0xFF, 0xFF,
+0x2A, 0xAA, 0xAA, 0xAA, 0x15, 0x55, 0x55, 0x55,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x48, 0x49, 0x07, 0x09
+};
 
 
 /* PIOs are separate state machines for handling IOs with high timing precision. You load a program into them and they do their stuff on their own with deterministic timing,
@@ -67,6 +135,26 @@ void __time_critical_func(convertToPio)(const uint8_t* command, const int len, u
 }
 
 void __time_critical_func(enterMode)(int dataPin) {
+
+    // uint8_t tempEmptyPacket[1] = { 0x00 };
+    // uint32_t tempResult[2];
+    // int tempResultLen;
+    // convertToPio(tempEmptyPacket, 1, tempResult, &tempResultLen);
+    // printf("%d result length\n", tempResultLen);
+    // for (int i = 0; i < 2; i++) {
+    //     printf("%08x ", tempResult[i]);
+    // }
+    // result = 0x0003aaaa
+
+    // uint8_t tempEmptyPacket2[2] = { 0x00, 0x00 };
+    // uint32_t tempResult2[3];
+    // int tempResultLen2;
+    // convertToPio(tempEmptyPacket2, 2, tempResult2, &tempResultLen2);
+    // printf("%d result length2\n", tempResultLen2);
+    // for (int i = 0; i < 3; i++) {
+    //     printf("%08x ", tempResult2[i]);
+    // }
+
     gpio_init(dataPin);
     gpio_set_dir(dataPin, GPIO_IN);
     gpio_pull_up(dataPin);
@@ -82,27 +170,53 @@ void __time_critical_func(enterMode)(int dataPin) {
     sm_config_set_out_pins(&config, dataPin, 1);
     sm_config_set_set_pins(&config, dataPin, 1);
     // float div = ((float) (clock_get_hz(clk_sys))) / (32 * 250000);
-    sm_config_set_clkdiv(&config, 8);
+    sm_config_set_clkdiv(&config, 10);
     sm_config_set_out_shift(&config, true, false, 32);
     sm_config_set_in_shift(&config, false, true, 8);
     
     pio_sm_init(pio, 0, offset, &config);
     pio_sm_set_enabled(pio, 0, true);
     
+    bool resetStateChanged = false;
+    bool lastResetState = false;
+    uint32_t waitTime = (1 * 60 * 1000000); 
+    uint32_t startTime = time_us_32();
+    volatile uint8_t buffer[3] = {0};
     while (true) {
-        uint8_t buffer[3];
-        buffer[0] = pio_sm_get_blocking(pio, 0); 
+        if(pio_sm_is_rx_fifo_empty(pio, 0)) {
+            uint32_t now = time_us_32();
+            uint32_t diff = now - startTime;
+            if (diff > waitTime) {
+                printf("Dumping eeprom. Start-time: %u, now: %u, diff: %u\n", startTime, now, diff);
+                startTime = now;
 
-        // processedCommands[processedCommandsIndex++] = buffer[0];
-        processedCommandsIndex++;
+                // Dump eeprom
+                for(int i = 0; i < 512; i++) {
+                    if (i % 8 == 0) {
+                        printf("\n%04x: ", i);
+                    }
+                    printf("%02x ", eeprom[i]);
+                }
+
+                // for(int i = 0; i < blocksWrittenToIndex; i++) {
+                //     if (i % 64 == 0) {
+                //         printf("\n");
+                //     }
+                //     printf("%02x ", blocksWrittenTo[i]);
+                // }
+            }
+            continue; // don't process loop
+        } else {
+            buffer[0] = pio_sm_get(pio, 0); 
+        }
 
         if (buffer[0] == 0) { // Probe
-            // uint8_t probeResponse[3] = { 0x00, 0x80, 0x00 };
-            uint8_t probeResponse[3] = { 0x00, 0xC0, 0x00 };
+            uint8_t probeResponse[3] = { 0x00, 0x80, 0x00 };
+            // uint8_t probeResponse[3] = { 0x00, 0xC0, 0x00 };
             uint32_t result[2];
             int resultLen;
             convertToPio(probeResponse, 3, result, &resultLen);
-            sleep_us(5); // 3.75us into the bit before end bit => 6.25 to wait if the end-bit is 5us long
+            sleep_us(6); // 3.75us into the bit before end bit => 6.25 to wait if the end-bit is 5us long
 
             pio_sm_set_enabled(pio, 0, false);
             pio_sm_init(pio, 0, offset+joybus_offset_outmode, &config);
@@ -128,33 +242,36 @@ void __time_critical_func(enterMode)(int dataPin) {
             pio_sm_set_enabled(pio, 0, true);
 
             for (int i = 0; i<resultLen; i++) pio_sm_put_blocking(pio, 0, result[i]);
-            // if (blockToRead != 0) {
-            //     printf("%u ", blockToRead);
-            // }
         }
-        else if (buffer[0] == JOYBUS_CMD_EEPROM_WRITE) {
-            buffer[0] = pio_sm_get_blocking(pio, 0); // read the block number to write
-            uint8_t blockToWrite = buffer[0];
+else if (buffer[0] == JOYBUS_CMD_EEPROM_WRITE) {
+    buffer[0] = pio_sm_get_blocking(pio, 0); // read the block number to write
+    uint8_t blockToWrite = buffer[0];
+    // if (blockToWrite != 0) {
+    // blocksWrittenTo[blocksWrittenToIndex++] = blockToWrite;
+    // }
 
-            uint32_t eepromBlockStartingIndex = blockToWrite * 8;
-            for (int i = 0; i < 8; i++) {
-                buffer[0] = pio_sm_get_blocking(pio, 0);
-                eeprom[eepromBlockStartingIndex + i] = (uint8_t)(buffer[0] & 0xFF);
-            }
-            
-            uint8_t probeResponse[1] = { 0x00 };
+    uint32_t eepromBlockStartingIndex = blockToWrite * 8;
+    // printf("%04x: ", eepromBlockStartingIndex);
+    for (int i = 0; i < 8; i++) {
+        buffer[0] = pio_sm_get_blocking(pio, 0);
+        eeprom[eepromBlockStartingIndex + i] = buffer[0];
+        printf("%02x ", buffer[0]);
+    }
+    printf("\n");
+
+            // uint8_t sendResponse[1] = { 0x00 };
             uint32_t result[2];
-            int resultLen;
-            convertToPio(probeResponse, 1, result, &resultLen);
-            
-            pio_sm_set_enabled(pio, 0, false);
+            int resultLen = 1;
+            result[0] = 0x0003aaaa;
+            // convertToPio(sendResponse, 1, result, &resultLen);
+        
+            pio_sm_set_enabled(pio, 0, false); // pio1->ctrl = (pio1->ctrl & ~(1u << 0)) | (bool_to_bit(false) << 0);
             pio_sm_init(pio, 0, offset+joybus_offset_outmode, &config);
             pio_sm_set_enabled(pio, 0, true);
 
             for (int i = 0; i<resultLen; i++) pio_sm_put_blocking(pio, 0, result[i]);
-            // if (blockToWrite > 0) {
-            //     printf("\nWrote to eeprom[%u].\n", blockToWrite);
-            // }
+
+            
         }
         // else if (buffer[0] == 0x41) { // Origin (NOT 0x81)
         //     gpio_put(25, 1);
@@ -201,18 +318,20 @@ void __time_critical_func(enterMode)(int dataPin) {
             printf("Other cmd: %02x\n", buffer[0]);
         }
 
-        if (processedCommandsIndex == 869) {
-            // printf("%u ", processedCommandsIndex);
-            for(int i = 0; i < 2048; i++) {
-                if (i % 64 == 0) {
-                    printf("\n");
-                }
-                printf("%02x ", eeprom[i]);
-            }
-        }
-        if (processedCommandsIndex > 869) {
-            printf("%u ", processedCommandsIndex);
-        }
+        // if (processedCommandsIndex == 869) {
+        //     // printf("%u ", processedCommandsIndex);
+        //     for(int i = 0; i < 2048; i++) {
+        //         if (i % 64 == 0) {
+        //             printf("\n");
+        //         }
+        //         printf("%02x ", eeprom[i]);
+        //     }
+        // }
+        // if (processedCommandsIndex > 869) {
+        //     printf("%u ", processedCommandsIndex);
+        // }
+
+        processedCommandsIndex++;
     }
 }
 
@@ -516,9 +635,11 @@ void enable_joybus() {
     // uint joybus_pins[1] = { 21 };
     // joybus_init(pio1, 1, joybus_pins, joybus_callback);
 
-    for(int i = 0; i < 2048; i++) {
-        eeprom[i] = i / 8;
-    }
+    // for(int i = 0; i < 2048; i++) {
+    //     // eeprom[i] = (i / 8) + (i % 8);
+    //     // eeprom[i] = (i / 8);
+    //     eeprom[i] = 0;
+    // }
 
     enterMode(21);
 }
@@ -538,9 +659,9 @@ void change_eeprom_type(uint16_t newType) {
 
 void dump_joybus_debug_info() {
     printf("Processed %u commands, looped %u times.\n", processedCommandsIndex, processedCommandsLooped);
-    for (int i = 0; i < processedCommandsIndex; i++) {
-        printf("%02x ", processedCommands[processedCommandsIndex]);
-    }
+    // for (int i = 0; i < processedCommandsIndex; i++) {
+    //     printf("%02x ", processedCommands[processedCommandsIndex]);
+    // }
 
     processedCommandsIndex = 0;
     processedCommandsLooped = 0;

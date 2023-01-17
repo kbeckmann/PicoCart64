@@ -132,7 +132,7 @@ uint32_t last_rom_cache_update_address = 0;
 void __no_inline_not_in_flash_func(mcu1_core1_entry)() {	
 	// pio_uart_init(PIN_MCU2_DIO, PIN_MCU2_CS); // turn on inter-mcu comms
 
-	enable_joybus();
+	// enable_joybus();
 
 	bool readingData = false;
 	volatile bool isWaitingForRomLoad = false;
@@ -141,8 +141,8 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 	volatile uint32_t t2 = 0;
 	
 	bool startJoybus = false;
-	volatile bool hasInit = true;
-	volatile bool test_load = true;
+	volatile bool hasInit = false;
+	volatile bool test_load = false;
 	while (1) {
 		tight_loop_contents();
 
@@ -161,7 +161,7 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 			enable_joybus();
 		}
 
-		if (t2 == 45 && !hasInit) {
+		if (t2 == 2 && !hasInit) {
 			hasInit = true;
 			
 			set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
@@ -426,12 +426,14 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 	int count = 0;
 	// const int freq_khz = 133000;
 	// const int freq_khz = 166000;
-	const int freq_khz = 200000;
+	// const int freq_khz = 200000;
 	// const int freq_khz = 210000;
 	// const int freq_khz = 220000;
 	// const int freq_khz = 230000;
 	// const int freq_khz = 240000;
+	const int freq_khz = 250000;
 	// const int freq_khz = 266000;
+	// const int freq_khz = 300000;
 	// const int freq_khz = 332000;
 	// const int freq_khz = 166000 * 2;
 
