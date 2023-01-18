@@ -170,7 +170,7 @@ void __time_critical_func(enterMode)(int dataPin) {
     sm_config_set_out_pins(&config, dataPin, 1);
     sm_config_set_set_pins(&config, dataPin, 1);
     // float div = ((float) (clock_get_hz(clk_sys))) / (32 * 250000);
-    sm_config_set_clkdiv(&config, 10);
+    sm_config_set_clkdiv(&config, 10.6);
     sm_config_set_out_shift(&config, true, false, 32);
     sm_config_set_in_shift(&config, false, true, 8);
     
@@ -179,7 +179,7 @@ void __time_critical_func(enterMode)(int dataPin) {
     
     bool resetStateChanged = false;
     bool lastResetState = false;
-    uint32_t waitTime = (1 * 60 * 1000000); 
+    uint32_t waitTime = (3 * 60 * 1000000); 
     uint32_t startTime = time_us_32();
     volatile uint8_t buffer[3] = {0};
     while (true) {
@@ -197,13 +197,6 @@ void __time_critical_func(enterMode)(int dataPin) {
                     }
                     printf("%02x ", eeprom[i]);
                 }
-
-                // for(int i = 0; i < blocksWrittenToIndex; i++) {
-                //     if (i % 64 == 0) {
-                //         printf("\n");
-                //     }
-                //     printf("%02x ", blocksWrittenTo[i]);
-                // }
             }
             continue; // don't process loop
         } else {
@@ -243,29 +236,24 @@ void __time_critical_func(enterMode)(int dataPin) {
 
             for (int i = 0; i<resultLen; i++) pio_sm_put_blocking(pio, 0, result[i]);
         }
-else if (buffer[0] == JOYBUS_CMD_EEPROM_WRITE) {
-    buffer[0] = pio_sm_get_blocking(pio, 0); // read the block number to write
-    uint8_t blockToWrite = buffer[0];
-    // if (blockToWrite != 0) {
-    // blocksWrittenTo[blocksWrittenToIndex++] = blockToWrite;
-    // }
+        else if (buffer[0] == JOYBUS_CMD_EEPROM_WRITE) {
+            buffer[0] = pio_sm_get_blocking(pio, 0); // read the block number to write
+            uint8_t blockToWrite = buffer[0];
 
-    uint32_t eepromBlockStartingIndex = blockToWrite * 8;
-    // printf("%04x: ", eepromBlockStartingIndex);
-    for (int i = 0; i < 8; i++) {
-        buffer[0] = pio_sm_get_blocking(pio, 0);
-        eeprom[eepromBlockStartingIndex + i] = buffer[0];
-        printf("%02x ", buffer[0]);
-    }
-    printf("\n");
+            uint32_t eepromBlockStartingIndex = blockToWrite * 8;
+            // printf("%04x: ", eepromBlockStartingIndex);
+            for (int i = 0; i < 8; i++) {
+                buffer[0] = pio_sm_get_blocking(pio, 0);
+                eeprom[eepromBlockStartingIndex + i] = buffer[0];
+                printf("%02x ", buffer[0]);
+            }
+            printf("\n");
 
-            // uint8_t sendResponse[1] = { 0x00 };
             uint32_t result[2];
             int resultLen = 1;
             result[0] = 0x0003aaaa;
-            // convertToPio(sendResponse, 1, result, &resultLen);
         
-            pio_sm_set_enabled(pio, 0, false); // pio1->ctrl = (pio1->ctrl & ~(1u << 0)) | (bool_to_bit(false) << 0);
+            pio_sm_set_enabled(pio, 0, false);
             pio_sm_init(pio, 0, offset+joybus_offset_outmode, &config);
             pio_sm_set_enabled(pio, 0, true);
 

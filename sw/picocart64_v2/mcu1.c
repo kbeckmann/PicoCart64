@@ -12,6 +12,7 @@
 #include "hardware/structs/ssi.h"
 #include "hardware/structs/systick.h"
 #include "pico/time.h"
+#include "hardware/vreg.h"
 
 #include "pins_mcu1.h"
 #include "n64_pi_task.h"
@@ -150,10 +151,6 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 		if(time_us_32() - t > 1000000) {
 			t = time_us_32();
 			t2++;
-
-			// if (t2 % 15 == 0) {
-			// 	dump_joybus_debug_info();
-			// }
 		}
 
 		if (startJoybus) {
@@ -165,37 +162,37 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 			hasInit = true;
 			
 			set_demux_mcu_variables(PIN_DEMUX_A0, PIN_DEMUX_A1, PIN_DEMUX_A2, PIN_DEMUX_IE);
-				uint currentChipIndex = START_ROM_LOAD_CHIP_INDEX;
-				current_mcu_enable_demux(true);
-				psram_set_cs(currentChipIndex);
-				program_connect_internal_flash();
-				program_flash_exit_xip();
+			uint currentChipIndex = START_ROM_LOAD_CHIP_INDEX;
+			current_mcu_enable_demux(true);
+			psram_set_cs(currentChipIndex);
+			program_connect_internal_flash();
+			program_flash_exit_xip();
 
-				psram_set_cs(currentChipIndex);
-				program_flash_do_cmd(0x35, NULL, NULL, 0);
+			psram_set_cs(currentChipIndex);
+			program_flash_do_cmd(0x35, NULL, NULL, 0);
 
-				psram_set_cs(currentChipIndex + 1);
-				program_flash_do_cmd(0x35, NULL, NULL, 0);
+			psram_set_cs(currentChipIndex + 1);
+			program_flash_do_cmd(0x35, NULL, NULL, 0);
 
-				psram_set_cs(currentChipIndex + 2);
-				program_flash_do_cmd(0x35, NULL, NULL, 0);
+			psram_set_cs(currentChipIndex + 2);
+			program_flash_do_cmd(0x35, NULL, NULL, 0);
 
-				psram_set_cs(currentChipIndex + 3);
-				program_flash_do_cmd(0x35, NULL, NULL, 0);
+			psram_set_cs(currentChipIndex + 3);
+			program_flash_do_cmd(0x35, NULL, NULL, 0);
 
-				// Flush cache
-				program_flash_flush_cache();
+			// Flush cache
+			program_flash_flush_cache();
 
-				program_flash_enter_cmd_xip(true); // psram quad mode
+			program_flash_enter_cmd_xip(true); // psram quad mode
 
-				psram_set_cs(START_ROM_LOAD_CHIP_INDEX); // Set back to start index
+			psram_set_cs(START_ROM_LOAD_CHIP_INDEX); // Set back to start index
 
-				// rom is loaded now
-				g_loadRomFromMemoryArray = true; // read from psram
-				isWaitingForRomLoad = false;
-				sd_is_busy = false;
-				readingData = false;
-				startJoybus = true;
+			// rom is loaded now
+			g_loadRomFromMemoryArray = true; // read from psram
+			isWaitingForRomLoad = false;
+			sd_is_busy = false;
+			readingData = false;
+			startJoybus = true;
 		}
 
 		// Do a rom load test after x seconds
@@ -431,12 +428,16 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 	// const int freq_khz = 220000;
 	// const int freq_khz = 230000;
 	// const int freq_khz = 240000;
-	const int freq_khz = 250000;
-	// const int freq_khz = 266000;
+	// const int freq_khz = 250000;
+	const int freq_khz = 266000;
 	// const int freq_khz = 300000;
 	// const int freq_khz = 332000;
-	// const int freq_khz = 166000 * 2;
+	// const int freq_khz = 375000;
+	// const int freq_khz = 340000;
+	// const int freq_khz = 450000;
 
+	// vreg_set_voltage(VREG_VOLTAGE_1_20);
+	// vreg_set_voltage(VREG_VOLTAGE_1_30);
 	bool clockWasSet = set_sys_clock_khz(freq_khz, false);
 
 	gpio_configure(mcu1_gpio_config, ARRAY_SIZE(mcu1_gpio_config));
@@ -445,15 +446,15 @@ void __no_inline_not_in_flash_func(mcu1_main)(void)
 
 	// Enable STDIO
 	// stdio_async_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
-	stdio_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
+	// stdio_uart_init_full(DEBUG_UART, DEBUG_UART_BAUD_RATE, DEBUG_UART_TX_PIN, DEBUG_UART_RX_PIN);
 
 	printf("\n\nMCU1: Was%s able to set clock to %d MHz\n", clockWasSet ? "" : " not", freq_khz/1000);
 
 	// IF READING FROM FROM FLASH... (works for compressed roms)
-	qspi_oeover_normal(true);
-	ssi_hw->ssienr = 0;
-	ssi_hw->baudr = 8; // change baud
-	ssi_hw->ssienr = 1;
+	// qspi_oeover_normal(true);
+	// ssi_hw->ssienr = 0;
+	// ssi_hw->baudr = 8; // change baud
+	// ssi_hw->ssienr = 1;
 
 	// current_mcu_enable_demux(true);
 	// program_connect_internal_flash();

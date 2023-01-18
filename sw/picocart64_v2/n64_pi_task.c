@@ -146,6 +146,8 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 	PIO pio = pio0;
 	n64_pi_pio_offset = pio_add_program(pio, &n64_pi_program);
 	n64_pi_program_init(pio, 0, n64_pi_pio_offset);
+	// pio_sm_set_clkdiv(pio, 0, 2);
+	
 	pio_sm_set_enabled(pio, 0, true);
 
 	// Wait for reset to be released
@@ -203,13 +205,15 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 			// 	// Official SDK standard speed
 				// next_word = 0x1240;
 			// } else {
-				next_word = 0xFF40;
+				// next_word = 0xFF40;
 			// }
 
 			// Slowest speed
 			// next_word = 0xFF40;
 
-			// next_word = 0x2040;
+			// next_word = 0x8040; // boots @ 266MHz
+			next_word = 0x4040; // boots @ 266
+			// next_word = 0x2040; 
 		
 			addr = n64_pi_get_value(pio);
 
