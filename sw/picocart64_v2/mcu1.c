@@ -131,8 +131,7 @@ void process_log_buffer() {
 
 uint32_t last_rom_cache_update_address = 0;
 void __no_inline_not_in_flash_func(mcu1_core1_entry)() {	
-	// pio_uart_init(PIN_MCU2_DIO, PIN_MCU2_CS); // turn on inter-mcu comms
-	// enable_joybus();
+	pio_uart_init(PIN_MCU2_DIO, PIN_MCU2_CS); // turn on inter-mcu comms
 
 	bool readingData = false;
 	volatile bool isWaitingForRomLoad = false;
@@ -267,8 +266,10 @@ void __no_inline_not_in_flash_func(mcu1_core1_entry)() {
 				sd_is_busy = false;
 				readingData = false;
 
-				// Not sure if we would need to re-restart it.
-				// g_restart_pi_handler = true;
+				// disable uart rx
+				pio_uart_stop(false, true);
+				// start joybus
+				startJoybus = true;
 
 				// Sanity chirp to mcu2 just to know that this completed
 				uart_tx_program_putc(0xAB);

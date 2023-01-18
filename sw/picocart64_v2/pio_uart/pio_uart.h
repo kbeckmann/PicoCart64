@@ -27,8 +27,12 @@ uint8_t rx_uart_buffer_get();
 void rx_uart_buffer_reset();
 
 // Use the rxRingBuffer to read from the uart
-void pio_uart_init(uint rxPin, uint txPin);
-void pio_uart_stop();
+// Pass -1 to not enable that program
+void pio_uart_init(int rxPin, int txPin);
+
+// pass true to stop, and false to do nothing
+void pio_uart_stop(bool tx, bool rx);
+
 void uart_tx_program_putc(char c);
 void uart_tx_program_puts(const char *s);
 char uart_rx_program_getc();

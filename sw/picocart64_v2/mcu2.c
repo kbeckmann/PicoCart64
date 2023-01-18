@@ -167,9 +167,9 @@ void main_task_entry(__unused void *params)
 	// testFunction();
 
 	// Setup PIO UART
-	// printf("Initing MCU1<->MCU2 serial bridge...");
-	// pio_uart_init(PIN_SPI1_CS, PIN_SPI1_RX);
-	// printf("Finshed!\n");
+	printf("Initing MCU1<->MCU2 serial bridge...");
+	pio_uart_init(PIN_SPI1_CS, PIN_SPI1_RX);
+	printf("Finshed!\n");
 
 	// vTaskDelay(5000);
 	
@@ -199,9 +199,8 @@ void main_task_entry(__unused void *params)
 		}
 
 		if (start_saveEeepromData) {
-
-		} else if (start_loadEeepromData) {
-			
+			start_saveEeepromData = false;
+			save_eeprom_to_sd();
 		}
 
 		// Tick every second
@@ -261,8 +260,8 @@ void mcu2_main(void)
 	// const int freq_khz = 220000;
 	// const int freq_khz = 230000;
 	// const int freq_khz = 240000;
-	const int freq_khz = 250000;
-	// const int freq_khz = 266000;
+	// const int freq_khz = 250000;
+	const int freq_khz = 266000;
 	// const int freq_khz = 300000;
 	// const int freq_khz = 332000;
 

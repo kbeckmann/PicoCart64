@@ -25,5 +25,9 @@
         "pio_uart.pio.h": "c",
         "joybus.pio.h": "c",
         "errno.h": "c"
-    }
+    },
+    "cmake.configureArgs": [
+        "-DREGION=NTSC", 
+        "-DFLASH_SIZE_MB=16"
+    ]
 }
