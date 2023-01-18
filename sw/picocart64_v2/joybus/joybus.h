@@ -6,9 +6,7 @@
 
 #include <hardware/pio.h>
 
-
 #define JOYBUS_BUFFER_SIZE      (64)
-
 
 enum joybus_cmd_e {
     JOYBUS_CMD_INFO = 0x00,
@@ -23,6 +21,9 @@ enum joybus_cmd_e {
 #define EEPROM_TYPE_4K (0x0080)
 #define EEPROM_TYPE_16K (0x00C0)
 #define EEPROM_WRITE_IN_PROGRESS (0x80)
+
+extern volatile uint8_t eeprom[];
+extern volatile uint16_t eeprom_type;
 
 void change_eeprom_type(uint16_t newType);
 

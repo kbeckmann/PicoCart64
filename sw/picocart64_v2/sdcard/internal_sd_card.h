@@ -20,6 +20,8 @@ extern int PC64_MCU_ID;
 extern volatile bool sendDataReady;
 extern volatile bool startRomLoad;
 extern volatile bool romLoading;
+extern volatile bool start_saveEeepromData;
+extern volatile bool start_loadEeepromData;
 
 // debug vars
 extern int totalSectorsRead;
@@ -63,5 +65,8 @@ void load_rom(const char *filename);
 
 void pc64_send_load_new_rom_command();
 void load_new_rom(char* filename);
+
+void save_eeprom_to_sd();
+void load_eeprom_from_sd();
 
 void testFunction();

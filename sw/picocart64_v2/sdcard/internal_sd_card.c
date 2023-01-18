@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include "errno.h"
 
 #include "pico/stdlib.h"
 #include "hardware/structs/systick.h"
@@ -21,6 +22,7 @@
 #include "internal_sd_card.h"
 #include "psram.h"
 #include "ringbuf.h"
+#include "joybus/joybus.h"
 
 #include "utils.h"
 
@@ -42,6 +44,9 @@
 #define COMMAND_SD_READ  0x72 // literally the r char
 #define COMMAND_SD_WRITE 0x77 // literally the w char
 #define COMMAND_LOAD_ROM 0x6C // literally the l char
+#define COMMAND_ROM_LOADED 0xC6 // inverse of the load rom command
+#define COMMAND_BACKUP_EEPROM  (0xBE)
+#define COMMAND_SET_EEPROM_TYPE  (0xE7)
 #define DISK_READ_BUFFER_SIZE 512
 
 #define PRINT_BUFFER_AFTER_SEND 0
@@ -70,6 +75,9 @@ volatile uint32_t sectorToSendRegisters[2];
 volatile uint32_t numSectorsToSend = 0;
 volatile bool startRomLoad = false;
 volatile bool romLoading = false;
+volatile uint16_t eeprom_numBytesToBackup = 0;
+volatile bool start_saveEeepromData = false;
+volatile bool start_loadEeepromData = false;
 
 
 void pc64_set_sd_read_sector_part(int index, uint32_t value) {
@@ -313,37 +321,67 @@ void mcu1_process_rx_buffer() {
         #endif
 
         if (romLoading) {
-            // Echo the chars
-            // uart_tx_program_putc(value);
+            
+            if (receivingData) {
+                // Special case to send bytes directly into the eeprom array
+                if (commandHeaderBuffer[0] == COMMAND_BACKUP_EEPROM) {
+                    eeprom[bufferIndex] = value;
+                } else {
+                    ((uint8_t*)(pc64_uart_tx_buf))[bufferIndex] = value;
+                }
 
-            if (value == COMMAND_START) {
-                mayHaveStart = true;
-            } else if (value == COMMAND_START2 && mayHaveStart) {
-                receivingData = true;
-            } else if (value == COMMAND_FINISH && receivingData) {
-                mayHaveFinish = true;
-            } else if (value == COMMAND_FINISH2 && receivingData) {
-                receivingData = false;
-            } else if (receivingData && !mayHaveFinish) {
-                mcu2_cmd_buffer[bufferIndex] = value;
                 bufferIndex++;
-            }
-
-            if (mayHaveFinish && !receivingData) {
-                char command = mcu2_cmd_buffer[0];
-                // TODO check the command? 
-                // May not be needed
-
-                romLoading = false; // signal that the rom is finished loading
-                sendDataReady = true;
+                if (bufferIndex >= command_numBytesToRead) {
+                    command_processBuffer = true;
+                    bufferIndex = 0;
+                }
                 
-                // Reset state 
-                bufferIndex = 0;
-                mayHaveFinish = false;
-                mayHaveStart = false;
-                receivingData = false;
+            } else if (isReadingCommandHeader) {
+                commandHeaderBuffer[command_headerBufferIndex++] = value;
+
+                if (command_headerBufferIndex >= COMMAND_HEADER_LENGTH) {
+                    command_numBytesToRead = (commandHeaderBuffer[1] << 8) | commandHeaderBuffer[2];
+                    isReadingCommandHeader = false;
+                    command_headerBufferIndex = 0;
+
+                    // Special case for num bytes to read 0
+                    if (command_numBytesToRead == 0) {
+                        command_processBuffer = true;
+                        bufferIndex = 0;
+                    } else {
+                        receivingData = true;
+                    }
+                }
+            } else if (value == COMMAND_START && !receivingData) {
+                mayHaveStart = true;
+            } else if (value == COMMAND_START2 && mayHaveStart && !receivingData) {
+                isReadingCommandHeader = true;
             }
 
+            if (command_processBuffer) {
+                command_processBuffer = false;
+                // process what was sent
+                uint8_t* buffer = (uint8_t*)pc64_uart_tx_buf; // cast to char array
+                char command = commandHeaderBuffer[0];
+
+                if (command == COMMAND_SET_EEPROM_TYPE) {
+                    eeprom_type = (pc64_uart_tx_buf[0] << 8 | pc64_uart_tx_buf[1]);
+
+                } else if (command == COMMAND_BACKUP_EEPROM) {
+                    // Already pushed these bits into the eeprom array
+
+                } else if (command == COMMAND_ROM_LOADED) {
+                    romLoading = false; // signal that the rom is finished loading
+                    sendDataReady = true;
+                
+                    // Reset state 
+                    bufferIndex = 0;
+                    mayHaveFinish = false;
+                    mayHaveStart = false;
+                    receivingData = false;
+                }
+
+            }
         } else {
             // Combine two char values into a 16 bit value
             // Only increment bufferIndex when adding a value
@@ -421,6 +459,10 @@ void mcu2_process_rx_buffer() {
                 startRomLoad = true;
                 printf("nbtr: %u\n", command_numBytesToRead);
 
+            } else if (command == COMMAND_BACKUP_EEPROM) {
+                eeprom_numBytesToBackup = command_numBytesToRead;
+                start_saveEeepromData = true;
+
             } else {
                 // not supported yet
                 printf("\nUnknown command: %x\n", command);
@@ -445,6 +487,61 @@ void mcu2_process_rx_buffer() {
             }
             #endif
         }
+    }
+}
+
+void save_eeprom_to_sd() {
+    start_saveEeepromData = false;
+
+    // Open or create file for currently loaded rom
+    char* eepromSaveFilename = malloc(256 + 5); // 256 for max length rom filename + 4 for '.eep' and a terminating character
+    sprintf(eepromSaveFilename, "%s.eep", sd_selected_rom_title, ".eep");
+
+    FILE* eepromFile = fopen(eepromSaveFilename, "wb");
+    int numWritten = fwrite(pc64_uart_tx_buf, eeprom_numBytesToBackup, 1, eepromFile);
+    fclose(eepromFile);
+    if (numWritten != eeprom_numBytesToBackup) {
+        printf("Error saving eeprom. Wrote %d but expected %u\n", numWritten, eeprom_numBytesToBackup);
+    } else {
+        printf("Eeprom saved to %s\n", eepromSaveFilename);
+    }
+
+    free(eepromSaveFilename);
+}
+
+void load_eeprom_from_sd() {
+    start_loadEeepromData = false;
+
+    // Open or create file for currently loaded rom
+    char* eepromSaveFilename = malloc(256 + 5); // 256 for max length rom filename + 4 for '.eep' and a terminating character
+    sprintf(eepromSaveFilename, "%s.eep", sd_selected_rom_title, ".eep");
+
+    uart_tx_program_putc(COMMAND_START);
+    uart_tx_program_putc(COMMAND_START2);
+    uart_tx_program_putc(COMMAND_BACKUP_EEPROM);
+
+    FILE* eepromFile = fopen(eepromSaveFilename, "rb");
+    if (!eepromFile) {
+        printf("\"%s\" Cannot be opened. Error: %d", eepromSaveFilename, eerno());
+        uart_tx_program_putc(0x00);
+        uart_tx_program_putc(0x00);
+        free(eepromSaveFilename);
+        return;
+    }
+
+    uint16_t numBytesToSend = eeprom_type == EEPROM_TYPE_4K ? 512 : 2048;
+    int numRead = fread(pc64_uart_tx_buf, numBytesToSend, 1, eepromFile);
+    fclose(eepromFile);
+    if (numRead != numBytesToSend) {
+        printf("Error reading eeprom. Read %d but expected %u\n", numRead, numBytesToSend);
+    }
+    free(eepromSaveFilename);
+
+    uart_tx_program_putc((uint8_t)(numBytesToSend >> 8));
+    uart_tx_program_putc((uint8_t)(numBytesToSend));
+
+    for(int i = 0; i < numBytesToSend; i++) {
+        uart_tx_program_putc(pc64_uart_tx_buf[i]);
     }
 }
 

@@ -198,6 +198,12 @@ void main_task_entry(__unused void *params)
 			startRomLoad = false;
 		}
 
+		if (start_saveEeepromData) {
+
+		} else if (start_loadEeepromData) {
+			
+		}
+
 		// Tick every second
 		if(time_us_32() - t > 1000000) {
 			t = time_us_32();
