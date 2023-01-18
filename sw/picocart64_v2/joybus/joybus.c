@@ -187,7 +187,7 @@ void __time_critical_func(processJoybus)(int dataPin) {
             for (int i = 0; i < 8; i++) {
                 buffer[0] = pio_sm_get_blocking(pio, 0);
                 eeprom[eepromBlockStartingIndex + i] = buffer[0];
-                printf("%02x ", buffer[0]);
+                printf("%02x ", buffer[0]); // If this print is removed data won't be correctly written
             }
             printf("\n");
 

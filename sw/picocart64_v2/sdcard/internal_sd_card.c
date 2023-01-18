@@ -379,21 +379,20 @@ void mcu1_process_rx_buffer() {
                 char command = commandHeaderBuffer[0];
 
                 if (command == COMMAND_SET_EEPROM_TYPE) {
-                    //eeprom_type = (pc64_uart_tx_buf[0] << 8 | pc64_uart_tx_buf[1]);
-                    uart_tx_program_putc(pc64_uart_tx_buf[0]);
-                    uart_tx_program_putc(pc64_uart_tx_buf[1]);
+                    eeprom_type = (buffer[0] << 8 | buffer[1]);
 
                 } else if (command == COMMAND_LOAD_BACKUP_EEPROM) {
                     // Already pushed these bits into the eeprom array
-                    uart_tx_program_putc(0xA2);
 
                 } else if (command == COMMAND_ROM_LOADED) {
-                    uart_tx_program_putc(0xA3);
                     romLoading = false; // signal that the rom is finished loading
                     sendDataReady = true;
                 }
 
-                // Reset state 
+                // Reset state and empty the command header buffer
+                commandHeaderBuffer[0] = 0;
+                commandHeaderBuffer[1] = 0;
+                commandHeaderBuffer[2] = 0;
                 bufferIndex = 0;
                 mayHaveFinish = false;
                 mayHaveStart = false;
