@@ -186,6 +186,11 @@ void load_new_rom(char* filename) {
 	fr = f_stat(filename, &filinfo);
 	printf("%s [size=%llu]\n", filinfo.fname, filinfo.fsize);
 
+    // TODO read the file header and lookup the eeprom save size
+    // TODO send the eeprom save size to mcu1
+
+    // TODO load eeprom data and send to mcu1
+
     for(int i = 0; i < 10000; i++) { tight_loop_contents(); }
 
     current_mcu_enable_demux(true);
@@ -284,16 +289,12 @@ void load_new_rom(char* filename) {
     printf("Rom Loaded, MCU2 qspi: OFF, sending mcu1 rom loaded command\n");
 
     // Let MCU1 know that we are finished
-    // Signal start
     uart_tx_program_putc(COMMAND_START);
     uart_tx_program_putc(COMMAND_START2);
-
-    // command
-    uart_tx_program_putc(0xAA);
-
-    // Signal finish
-    uart_tx_program_putc(COMMAND_FINISH);
-    uart_tx_program_putc(COMMAND_FINISH2);
+    uart_tx_program_putc(COMMAND_ROM_LOADED);
+    // Zero bytes to read!
+    uart_tx_program_putc(0x00);
+    uart_tx_program_putc(0x00);
 }
 
 // MCU listens for other MCU commands and will respond accordingly
