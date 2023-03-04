@@ -14,8 +14,12 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
 # Check for GCC 12.x or later
-execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
-if(NOT (GCC_VERSION VERSION_GREATER 12.0.0))
+if("${CMAKE_C_COMPILER_ID}" MATCHES "GNU")
+  execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
+  if(NOT (GCC_VERSION VERSION_GREATER 12.0.0))
+    message(FATAL_ERROR "${PROJECT_NAME} requires gcc >= 12.0.0 (older compilers optimizations are not good enough)")
+  endif()
+else()
   message(FATAL_ERROR "${PROJECT_NAME} requires gcc >= 12.0.0 (older compilers optimizations are not good enough)")
 endif()
 
