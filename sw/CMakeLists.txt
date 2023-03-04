@@ -13,6 +13,12 @@ project(picocart64 C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
+# Check for GCC 12.x or later
+execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
+if(NOT (GCC_VERSION VERSION_GREATER 12.0.0))
+  message(FATAL_ERROR "${PROJECT_NAME} requires gcc >= 12.0.0 (older compilers optimizations are not good enough)")
+endif()
+
 if (PICO_SDK_VERSION_STRING VERSION_LESS "1.3.0")
     message(FATAL_ERROR "Raspberry Pi Pico SDK version 1.3.0 (or later) required. Your version is ${PICO_SDK_VERSION_STRING}")
 endif()
