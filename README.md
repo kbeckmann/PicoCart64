@@ -47,6 +47,12 @@ Solder the MOSFET according to the pin markings.
 
 The resistor is optional to solder, but was placed there for good measure. (There is a resistor on the Pico, so it is not strictly needed.)
 
+## Uploading firmware and a ROM
+
+[This website](https://kbeckmann.github.io/PicoCart64/) guides you through the steps to program the required firmware, as well as how to generate and program a ROM file to the PicoCart64 v1 lite.
+
+Please note that this tool can generate programming files that are larger than 2MB, and will not fit in that case on the original Raspberry Pi Pico 2MB.
+
 ## License
 
 The PCB is licensed under the following license: "CERN Open Hardware Licence Version 2 - Permissive" aka "CERN-OHL-P".
