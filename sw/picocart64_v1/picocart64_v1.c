@@ -34,11 +34,14 @@
 // Use same priority to force round-robin scheduling
 #define CIC_TASK_PRIORITY     (tskIDLE_PRIORITY + 1UL)
 #define SECOND_TASK_PRIORITY  (tskIDLE_PRIORITY + 1UL)
+#define PING_TASK_PRIORITY  (tskIDLE_PRIORITY + 1UL)
 
 static StaticTask_t cic_task;
 static StaticTask_t second_task;
+static StaticTask_t ping_task;
 static StackType_t cic_task_stack[4 * 1024 / sizeof(StackType_t)];
 static StackType_t second_task_stack[4 * 1024 / sizeof(StackType_t)];
+static StackType_t ping_task_stack[32 * 1024 / sizeof(StackType_t)];
 
 /*
 
@@ -61,7 +64,7 @@ Time between ~N64_READ and bit output on AD0
 */
 
 // FreeRTOS boilerplate
-void vApplicationGetTimerTaskMemory(StaticTask_t ** ppxTimerTaskTCBBuffer, StackType_t ** ppxTimerTaskStackBuffer, uint32_t * pulTimerTaskStackSize)
+void vApplicationGetTimerTaskMemory(StaticTask_t **ppxTimerTaskTCBBuffer, StackType_t **ppxTimerTaskStackBuffer, uint32_t *pulTimerTaskStackSize)
 {
 	static StaticTask_t xTimerTaskTCB;
 	static StackType_t uxTimerTaskStack[configTIMER_TASK_STACK_DEPTH];
@@ -107,7 +110,7 @@ void second_task_entry(__unused void *params)
 
 		// Set to 1 to print stack watermarks.
 		// Printing is synchronous and interferes with the CIC emulation.
-#if 0
+#if 1
 		// printf("Second task heartbeat: %d\n", count);
 		// vPortYield();
 
@@ -120,16 +123,55 @@ void second_task_entry(__unused void *params)
 
 			printf("watermark cic_task: %d\n", uxTaskGetStackHighWaterMark((TaskHandle_t) & cic_task));
 			vPortYield();
+
+			printf("watermark ping_task: %d\n", uxTaskGetStackHighWaterMark((TaskHandle_t) & ping_task));
+			vPortYield();
 		}
 #endif
 
 	}
 }
 
+#include "pico/cyw43_arch.h"
+
+#include "lwip/ip4_addr.h"
+
+#include "ping.h"
+
+#define PING_ADDR "192.168.5.18"
+
+void ping_task_entry(__unused void *params)
+{
+	if (cyw43_arch_init()) {
+		printf("failed to initialise\n");
+		return;
+	}
+	cyw43_arch_enable_sta_mode();
+	printf("Connecting to WiFi...\n");
+	if (cyw43_arch_wifi_connect_timeout_ms(WIFI_SSID, WIFI_PASSWORD, CYW43_AUTH_WPA2_AES_PSK, 30000)) {
+		printf("failed to connect.\n");
+		exit(1);
+	} else {
+		printf("Connected.\n");
+	}
+
+	ip_addr_t ping_addr;
+	ip4_addr_set_u32(&ping_addr, ipaddr_addr(PING_ADDR));
+	ping_init(&ping_addr);
+
+	while (true) {
+		// not much to do as LED is in another task, and we're using RAW (callback) lwIP API
+		vTaskDelay(10000);
+	}
+
+	cyw43_arch_deinit();
+}
+
 void vLaunch(void)
 {
 	xTaskCreateStatic(cic_task_entry, "CICThread", configMINIMAL_STACK_SIZE, NULL, CIC_TASK_PRIORITY, cic_task_stack, &cic_task);
 	xTaskCreateStatic(second_task_entry, "SecondThread", configMINIMAL_STACK_SIZE, NULL, SECOND_TASK_PRIORITY, second_task_stack, &second_task);
+	xTaskCreateStatic(ping_task_entry, "PingThread", configMINIMAL_STACK_SIZE, NULL, PING_TASK_PRIORITY, ping_task_stack, &ping_task);
 
 	/* Start the tasks and timer running. */
 	vTaskStartScheduler();
@@ -145,7 +187,7 @@ int main(void)
 	// 266 MHz is safe in this regard.
 
 	// set_sys_clock_khz(133000, true);
-	set_sys_clock_khz(266000, true);	// Required for SRAM @ 200ns
+	// set_sys_clock_khz(266000, true); // Required for SRAM @ 200ns
 
 	// Init GPIOs before starting the second core and FreeRTOS
 	for (int i = 0; i <= 27; i++) {
@@ -177,7 +219,7 @@ int main(void)
 	//       otherwise multicore doesn't work properly.
 	//       Alternatively, attach gdb to openocd, run `mon reset halt`, `c`.
 	//       It seems this works around the issue as well.
-	multicore_launch_core1(n64_pi_run);
+	// multicore_launch_core1(n64_pi_run);
 #endif
 
 	// Start FreeRTOS on Core0
