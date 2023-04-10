@@ -71,7 +71,7 @@ static inline uint32_t n64_pi_get_value(PIO pio)
 	return value;
 }
 
-void n64_pi_run(void)
+void __not_in_flash_func(n64_pi_run(void))
 {
 	// Init PIO
 	PIO pio = pio0;

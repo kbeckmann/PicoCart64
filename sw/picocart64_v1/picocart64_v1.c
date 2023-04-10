@@ -187,7 +187,7 @@ int main(void)
 	// 266 MHz is safe in this regard.
 
 	// set_sys_clock_khz(133000, true);
-	// set_sys_clock_khz(266000, true); // Required for SRAM @ 200ns
+	set_sys_clock_khz(266000, true);	// Required for SRAM @ 200ns
 
 	// Init GPIOs before starting the second core and FreeRTOS
 	for (int i = 0; i <= 27; i++) {
@@ -219,7 +219,7 @@ int main(void)
 	//       otherwise multicore doesn't work properly.
 	//       Alternatively, attach gdb to openocd, run `mon reset halt`, `c`.
 	//       It seems this works around the issue as well.
-	// multicore_launch_core1(n64_pi_run);
+	multicore_launch_core1(n64_pi_run);
 #endif
 
 	// Start FreeRTOS on Core0
