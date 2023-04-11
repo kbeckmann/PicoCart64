@@ -192,9 +192,9 @@ if __name__ == '__main__':
                 old_joy_y = joy_y
 
                 joy_x_adjusted = joy_x / 64.0
-                joy_x_adjusted = max(-1, min(joy_x_adjusted, 1))
-                joy_y_adjusted = joy_y / 64.0
-                joy_y_adjusted = max(-1, min(joy_y_adjusted, 1))
+                joy_x_adjusted = max(-0.95, min(joy_x_adjusted, 0.95))
+                joy_y_adjusted = -joy_y / 64.0
+                joy_y_adjusted = max(-0.95, min(joy_y_adjusted, 0.95))
                 print("joy_x", joy_x_adjusted)
                 print("joy_y", joy_y_adjusted)
                 
