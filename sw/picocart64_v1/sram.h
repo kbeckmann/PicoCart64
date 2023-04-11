@@ -8,12 +8,10 @@
 
 #include <stdint.h>
 
-#define SRAM_256KBIT_SIZE         0x00008000
-#define SRAM_768KBIT_SIZE         0x00018000
-#define SRAM_1MBIT_SIZE           0x00020000
+#define SRAM_FB_SIZE_16 (320 * 240)
+// #define SRAM_FB_SIZE_16 (320 * 180)
 
-// extern uint16_t sram[SRAM_1MBIT_SIZE / sizeof(uint16_t)];
-extern uint16_t sram[1024 / sizeof(uint16_t)];
+extern uint16_t sram[SRAM_FB_SIZE_16];
 
 void sram_load_from_flash(void);
 void sram_save_to_flash(void);

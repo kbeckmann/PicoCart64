@@ -12,6 +12,8 @@ add_executable(picocart64_v1
     sram.c
     utils.c
 
+    udpstream.c
+
     # Wifi
     ${PICO_LWIP_CONTRIB_PATH}/apps/ping/ping.c
 )

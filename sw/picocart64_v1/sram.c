@@ -12,8 +12,7 @@
 #include "pico/stdlib.h"
 #include "hardware/flash.h"
 
-// uint16_t sram[SRAM_1MBIT_SIZE / sizeof(uint16_t)];
-uint16_t sram[1024 / sizeof(uint16_t)];
+uint16_t sram[SRAM_FB_SIZE_16];
 
 void sram_load_from_flash(void)
 {

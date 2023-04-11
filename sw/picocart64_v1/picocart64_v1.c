@@ -22,6 +22,7 @@
 #include "picocart64_pins.h"
 #include "sram.h"
 #include "utils.h"
+#include "udpstream.h"
 
 #define UART_TX_PIN (28)
 #define UART_RX_PIN (29)		/* not available on the pico */
@@ -32,16 +33,13 @@
 
 // Priority 0 = lowest, 31 = highest
 // Use same priority to force round-robin scheduling
-#define CIC_TASK_PRIORITY     (tskIDLE_PRIORITY + 1UL)
-#define SECOND_TASK_PRIORITY  (tskIDLE_PRIORITY + 1UL)
-#define PING_TASK_PRIORITY  (tskIDLE_PRIORITY + 1UL)
+// #define SECOND_TASK_PRIORITY  (tskIDLE_PRIORITY + 1UL)
+#define STREAM_TASK_PRIORITY  (tskIDLE_PRIORITY + 1UL)
 
-static StaticTask_t cic_task;
-static StaticTask_t second_task;
-static StaticTask_t ping_task;
-static StackType_t cic_task_stack[4 * 1024 / sizeof(StackType_t)];
-static StackType_t second_task_stack[4 * 1024 / sizeof(StackType_t)];
-static StackType_t ping_task_stack[32 * 1024 / sizeof(StackType_t)];
+// static StaticTask_t second_task;
+static StaticTask_t stream_task;
+// static StackType_t second_task_stack[4 * 1024 / sizeof(StackType_t)];
+static StackType_t stream_task_stack[4 * 1024 / sizeof(StackType_t)];
 
 /*
 
@@ -74,30 +72,7 @@ void vApplicationGetTimerTaskMemory(StaticTask_t **ppxTimerTaskTCBBuffer, StackT
 	*pulTimerTaskStackSize = configTIMER_TASK_STACK_DEPTH;
 }
 
-void cic_task_entry(__unused void *params)
-{
-	printf("cic_task_entry\n");
-
-	// Load SRAM backup from external flash
-	// TODO: How do we detect if it's uninitialized (config area in flash?),
-	//       or maybe we don't have to care?
-	sram_load_from_flash();
-
-	while (1) {
-		n64_cic_run();
-
-		// cic_run returns when N64_CR goes low, i.e.
-		// user presses the reset button, or the N64 loses power.
-
-		// Commit SRAM to flash
-		sram_save_to_flash();
-
-		printf("CIC task restarting\n");
-		vPortYield();
-	}
-
-}
-
+#if 0
 void second_task_entry(__unused void *params)
 {
 	uint32_t count = 0;
@@ -131,47 +106,13 @@ void second_task_entry(__unused void *params)
 
 	}
 }
-
-#include "pico/cyw43_arch.h"
-
-#include "lwip/ip4_addr.h"
-
-#include "ping.h"
-
-#define PING_ADDR "192.168.5.18"
-
-void ping_task_entry(__unused void *params)
-{
-	if (cyw43_arch_init()) {
-		printf("failed to initialise\n");
-		return;
-	}
-	cyw43_arch_enable_sta_mode();
-	printf("Connecting to WiFi...\n");
-	if (cyw43_arch_wifi_connect_timeout_ms(WIFI_SSID, WIFI_PASSWORD, CYW43_AUTH_WPA2_AES_PSK, 30000)) {
-		printf("failed to connect.\n");
-		exit(1);
-	} else {
-		printf("Connected.\n");
-	}
-
-	ip_addr_t ping_addr;
-	ip4_addr_set_u32(&ping_addr, ipaddr_addr(PING_ADDR));
-	ping_init(&ping_addr);
-
-	while (true) {
-		// not much to do as LED is in another task, and we're using RAW (callback) lwIP API
-		vTaskDelay(10000);
-	}
-
-	cyw43_arch_deinit();
-}
+#endif
 
 void vLaunch(void)
 {
-	xTaskCreateStatic(cic_task_entry, "CICThread", configMINIMAL_STACK_SIZE, NULL, CIC_TASK_PRIORITY, cic_task_stack, &cic_task);
-	xTaskCreateStatic(second_task_entry, "SecondThread", configMINIMAL_STACK_SIZE, NULL, SECOND_TASK_PRIORITY, second_task_stack, &second_task);
-	xTaskCreateStatic(ping_task_entry, "PingThread", configMINIMAL_STACK_SIZE, NULL, PING_TASK_PRIORITY, ping_task_stack, &ping_task);
+	printf("CIC Disabled\n");
+	// xTaskCreateStatic(second_task_entry, "SecondThread", configMINIMAL_STACK_SIZE, NULL, SECOND_TASK_PRIORITY, second_task_stack, &second_task);
+	xTaskCreateStatic(udpstream_task_entry, "StreamThread", configMINIMAL_STACK_SIZE, NULL, STREAM_TASK_PRIORITY, stream_task_stack, &stream_task);
 
 	/* Start the tasks and timer running. */
 	vTaskStartScheduler();

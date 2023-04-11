@@ -41,21 +41,6 @@ RINGBUF_CREATE(ringbuf, 64, uint32_t);
 // UART TX buffer
 static uint16_t pc64_uart_tx_buf[PC64_BASE_ADDRESS_LENGTH];
 
-static inline uint32_t resolve_sram_address(uint32_t address)
-{
-	uint32_t bank = (address >> 18) & 0x3;
-	uint32_t resolved_address;
-
-	if (bank) {
-		resolved_address = address & (SRAM_256KBIT_SIZE - 1);
-		resolved_address |= bank << 15;
-	} else {
-		resolved_address = address & (sizeof(sram) - 1);
-	}
-
-	return resolved_address;
-}
-
 static inline uint32_t n64_pi_get_value(PIO pio)
 {
 	uint32_t value = pio_sm_get_blocking(pio, 0);
@@ -69,6 +54,11 @@ static inline uint32_t n64_pi_get_value(PIO pio)
 #endif
 
 	return value;
+}
+
+static inline uint32_t resolve_sram_address(uint32_t address)
+{
+	return address & ((1024 * 1024) - 1);
 }
 
 void __not_in_flash_func(n64_pi_run(void))
