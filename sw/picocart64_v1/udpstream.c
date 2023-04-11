@@ -16,25 +16,42 @@
 #define REMOTE_PORT 1111
 #define LOCAL_PORT  1112
 
+uint8_t recv_buf[1024];
+
 typedef struct {
 	ip_addr_t server_address;
 	struct udp_pcb *out_udp_pcb;
 } state_t;
 
-// Packets
+///////////////////////////
+// Packets to server
 typedef enum {
-	CMD_HELLO = 0x4142,
+	CMD_HELLO = 0x41414141,
 } cmd_type_t;
 
 typedef struct __attribute__((packed)) {
-	uint16_t type;
+	uint32_t type;
 } pkt_cmd_hello_t;
 
-typedef struct __attribute__((packed)) {
-	uint16_t type;
-} pkt_hello_t;
+///////////////////////////
 
-///////////////////
+///////////////////////////
+// Packets from server
+typedef enum {
+	RSP_FB = 0x42424242,
+} rsp_type_t;
+
+typedef struct __attribute__((packed)) {
+	uint32_t type;
+} pkt_rsp_t;
+
+typedef struct __attribute__((packed)) {
+	uint32_t type;
+	uint32_t offset;
+	uint8_t data[];				// 4-byte aligned
+} pkt_rsp_fb_t;
+
+///////////////////////////
 
 static void dump_bytes(const uint8_t *bptr, uint32_t len)
 {
@@ -61,15 +78,31 @@ static void udp_recv_cb(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip
 	state_t *state = (state_t *) arg;
 
 	// Check the result
-	if (ip_addr_cmp(addr, &state->server_address) && port == REMOTE_PORT) {
-		printf("Expected packet\n", addr, port);
-		u16_t ret = pbuf_copy_partial(p, sram, p->tot_len, 0);
-		dump_bytes(sram, ret);
+	// if (ip_addr_cmp(addr, &state->server_address) && port == REMOTE_PORT && p->tot_len >= 2) {
+	printf("Packet %d:%d len=%d\n", addr, port, p->tot_len);
+
+	pkt_rsp_fb_t pkt_rsp_fb;
+	u16_t ret = pbuf_copy_partial(p, &pkt_rsp_fb, 4, 0);
+
+	if (pkt_rsp_fb.type == RSP_FB) {
+		ret = pbuf_copy_partial(p, &pkt_rsp_fb.offset, 4, 4);
+		uint32_t copylen = p->tot_len - 8;
+		uint32_t copyend = pkt_rsp_fb.offset + p->tot_len - 4;
+		if (pkt_rsp_fb.offset < sizeof(sram) && copyend <= sizeof(sram)) {
+			printf("Good, offset=%d, copylen=%d\n", pkt_rsp_fb.offset, copylen);
+			u16_t ret = pbuf_copy_partial(p, &sram[pkt_rsp_fb.offset / 2], copylen, 8);
+		} else {
+			printf("Bad, offset=%d, copylen=%d\n", pkt_rsp_fb.offset, copylen);
+		}
 	} else {
-		printf("Unexpected packet (ip=%08x, port=%d)\n", addr, port);
-		u16_t ret = pbuf_copy_partial(p, sram, p->tot_len, 0);
-		dump_bytes(sram, ret);
+		printf("Unexpected pkt_rsp_fb.type=%08X\n", pkt_rsp_fb.type);
 	}
+	// } else {
+	// printf("Unexpected packet (ip=%d, port=%d), expected cmd=%d, addr=%d\n", addr, port, ip_addr_cmp(addr, &state->server_address), state->server_address);
+	// uint32_t copylen = p->tot_len < sizeof(recv_buf) ? p->tot_len : sizeof(recv_buf);
+	// u16_t ret = pbuf_copy_partial(p, recv_buf, copylen, 0);
+	// dump_bytes(recv_buf, ret);
+	// }
 
 	pbuf_free(p);
 }

@@ -149,7 +149,7 @@ void init_n64(void)
 	// init_interrupts();
 
 	/* Initialize peripherals */
-	display_init(RESOLUTION_320x240, DEPTH_32_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
+	display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
 	set_VI_interrupt(1, 590);
 
 	register_VI_handler(vblCallback);
@@ -204,17 +204,6 @@ void init_n64(void)
 	IO_WRITE(PI_BSD_DOM2_RLS_REG, 0x03);
 #endif
 }
-
-/**
- * @brief Grab the texture buffer given a display context
- *
- * @param[in] x
- *            The display context returned from #display_lock
- *
- * @return A pointer to the drawing surface for that display context.
- */
-#define __get_buffer( x ) __safe_buffer[(x)-1]
-extern void *__safe_buffer[3];
 
 /**
  * @brief Align a memory address to 64 byte offset
@@ -305,15 +294,7 @@ int main(void)
 		// SRAM streaming
 		volatile void *sram_source = (void *)(0x08000000);
 
-#if 0
 		dma_read_any(dest, sram_source, 320 * 240 * 2);
-#else
-		for (int y = 0; y < 240; y++) {
-			uint32_t offset_write = y * 320 * 2;
-			uint32_t offset_read = y * 320 * 2;
-			dma_read_any(dest + offset_write, sram_source + offset_read, 320 * 2);
-		}
-#endif
 
 		uint32_t t1 = TICKS_READ();
 
