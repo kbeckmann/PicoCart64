@@ -8,6 +8,8 @@
 #include <stdint.h>
 #include <libdragon.h>
 
+#include "pc64_regs.h"
+
 /* hardware definitions */
 // Pad buttons
 #define A_BUTTON(a)     ((a) & 0x8000)
@@ -265,13 +267,55 @@ void dma_read_any(void *ram_address, unsigned long read_address, unsigned long l
 	enable_interrupts();
 }
 
+static void pi_write_raw(const void *src, uint32_t base, uint32_t offset, uint32_t len)
+{
+	assert(src != NULL);
+
+	disable_interrupts();
+	dma_wait();
+
+	MEMORY_BARRIER();
+	PI_regs->ram_address = UncachedAddr(src);
+	MEMORY_BARRIER();
+	PI_regs->pi_address = offset | base;
+	MEMORY_BARRIER();
+	PI_regs->read_length = len - 1;
+	MEMORY_BARRIER();
+
+	enable_interrupts();
+	dma_wait();
+}
+
+static void pi_write_u32(const uint32_t value, uint32_t base, uint32_t offset)
+{
+	uint32_t buf[] = { value };
+
+	data_cache_hit_writeback_invalidate(buf, sizeof(buf));
+	pi_write_raw(buf, base, offset, sizeof(buf));
+}
+
+static char __attribute__((aligned(16))) write_buf[0x1000];
+
+static void pc64_uart_write(const uint8_t *buf, uint32_t len)
+{
+	// 16-bit aligned
+	assert((((uint32_t) buf) & 0x1) == 0);
+
+	uint32_t len_aligned32 = (len + 3) & (-4);
+
+	data_cache_hit_writeback_invalidate((uint8_t *) buf, len_aligned32);
+	pi_write_raw(write_buf, PC64_BASE_ADDRESS_START, 0, len_aligned32);
+
+	pi_write_u32(len, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_UART_TX);
+}
+
 /* main code entry point */
 int main(void)
 {
 	display_context_t _dc;
 	char temp[128];
 	int res = 0;
-	unsigned short buttons, previous = 0;
+	uint32_t buttons, previous = 0;
 
 	uint32_t *buf_alloc = malloc(320 * 240 * 2);
 	uint32_t *buf = ALIGN_64BYTE(buf_alloc);
@@ -294,8 +338,10 @@ int main(void)
 		// SRAM streaming
 		volatile void *sram_source = (void *)(0x08000000);
 
-		dma_read_any(dest, sram_source, 320 * 240 * 2);
+		// dma_read_any(dest, sram_source, 320 * 240 * 2);
+		dma_read_raw_async(dest, sram_source, 320 * 240 * 2);
 
+#if 0
 		uint32_t t1 = TICKS_READ();
 
 		// color = graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF);
@@ -305,12 +351,31 @@ int main(void)
 
 		sprintf(temp, "delta=%d (%d ms)", t_delta, t_delta_ms);
 		printText(_dc, temp, 5, 3);
-
+#endif
 		unlockVideo(_dc);
 
-		buttons = getButtons(0);
+		buttons = getButtons(0) | (getAnalogX(0) << 16) | (getAnalogY(0) << 24);
 
-		previous = buttons;
+		if (buttons != previous) {
+			previous = buttons;
+			pi_write_u32(buttons, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_BUTTON_STATE);
+#if 0
+			pc64_uart_write("buttons", 7);
+
+			uint32_t t1 = TICKS_READ();
+
+			// color = graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF);
+
+			uint32_t t_delta = t1 - t0;
+			uint32_t t_delta_ms = t_delta / (TICKS_PER_SECOND / 1000);
+
+			sprintf(temp, "delta=%d (%d ms)", t_delta, t_delta_ms);
+			printText(_dc, temp, 5, 3);
+
+			sprintf(temp, "buttons=%04x", buttons);
+			printText(_dc, temp, 5, 10);
+#endif
+		}
 	}
 
 	return 0;

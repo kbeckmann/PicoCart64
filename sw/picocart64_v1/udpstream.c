@@ -17,21 +17,31 @@
 #define LOCAL_PORT  1112
 
 uint8_t recv_buf[1024];
+uint32_t button_state;
+uint32_t prev_button_state;
 
 typedef struct {
 	ip_addr_t server_address;
 	struct udp_pcb *out_udp_pcb;
 } state_t;
 
+// struct udp_pcb *button_udp_pcb;
+
 ///////////////////////////
 // Packets to server
 typedef enum {
 	CMD_HELLO = 0x41414141,
+	CMD_BUTTONS = 0x43434343,
 } cmd_type_t;
 
 typedef struct __attribute__((packed)) {
 	uint32_t type;
 } pkt_cmd_hello_t;
+
+typedef struct __attribute__((packed)) {
+	uint32_t type;
+	uint32_t buttons;
+} pkt_cmd_buttons_t;
 
 ///////////////////////////
 
@@ -69,6 +79,23 @@ static void dump_bytes(const uint8_t *bptr, uint32_t len)
 	printf("\n");
 }
 
+static void cmd_buttons(state_t *state, uint32_t buttons)
+{
+	cyw43_arch_lwip_begin();
+
+	struct pbuf *p = pbuf_alloc(PBUF_TRANSPORT, sizeof(pkt_cmd_buttons_t), PBUF_RAM);
+
+	pkt_cmd_buttons_t *cmd = (pkt_cmd_buttons_t *) p->payload;
+	cmd->type = CMD_BUTTONS;
+	cmd->buttons = buttons;
+
+	udp_sendto(state->out_udp_pcb, p, &state->server_address, REMOTE_PORT);
+
+	pbuf_free(p);
+
+	cyw43_arch_lwip_end();
+}
+
 // err_t pbuf_copy(struct pbuf *p_to, const struct pbuf *p_from);
 // u16_t pbuf_copy_partial(const struct pbuf *p, void *dataptr, u16_t len, u16_t offset);
 
@@ -79,7 +106,7 @@ static void udp_recv_cb(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip
 
 	// Check the result
 	// if (ip_addr_cmp(addr, &state->server_address) && port == REMOTE_PORT && p->tot_len >= 2) {
-	printf("Packet %d:%d len=%d\n", addr, port, p->tot_len);
+	// printf("Packet %d:%d len=%d\n", addr, port, p->tot_len);
 
 	pkt_rsp_fb_t pkt_rsp_fb;
 	u16_t ret = pbuf_copy_partial(p, &pkt_rsp_fb, 4, 0);
@@ -87,9 +114,9 @@ static void udp_recv_cb(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip
 	if (pkt_rsp_fb.type == RSP_FB) {
 		ret = pbuf_copy_partial(p, &pkt_rsp_fb.offset, 4, 4);
 		uint32_t copylen = p->tot_len - 8;
-		uint32_t copyend = pkt_rsp_fb.offset + p->tot_len - 4;
+		uint32_t copyend = pkt_rsp_fb.offset + copylen;
 		if (pkt_rsp_fb.offset < sizeof(sram) && copyend <= sizeof(sram)) {
-			printf("Good, offset=%d, copylen=%d\n", pkt_rsp_fb.offset, copylen);
+			// printf("Good, offset=%d, copylen=%d\n", pkt_rsp_fb.offset, copylen);
 			u16_t ret = pbuf_copy_partial(p, &sram[pkt_rsp_fb.offset / 2], copylen, 8);
 		} else {
 			printf("Bad, offset=%d, copylen=%d\n", pkt_rsp_fb.offset, copylen);
@@ -105,6 +132,14 @@ static void udp_recv_cb(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip
 	// }
 
 	pbuf_free(p);
+
+	if (button_state != prev_button_state) {
+		// Button state changed between frames
+		printf("Buttons: %04X\n", button_state);
+		cmd_buttons(state, button_state);
+
+		prev_button_state = button_state;
+	}
 }
 
 static state_t *state_init(void)
@@ -188,4 +223,9 @@ void udpstream_task_entry(void *params)
 	while (true) {
 		vTaskDelay(10000);
 	}
+}
+
+void pc64_button_state(uint32_t state)
+{
+	button_state = state;
 }

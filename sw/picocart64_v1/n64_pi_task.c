@@ -23,6 +23,7 @@
 #include "sram.h"
 #include "stdio_async_uart.h"
 #include "utils.h"
+#include "udpstream.h"
 
 // The rom to load in normal .z64, big endian, format
 #include "rom_vars.h"
@@ -230,6 +231,10 @@ void __not_in_flash_func(n64_pi_run(void))
 						break;
 					case PC64_REGISTER_RAND_SEED:
 						pc64_rand_seed(write_word);
+						break;
+					case PC64_REGISTER_BUTTON_STATE:
+						pc64_button_state(write_word);
+						// printf("btn %d\n", write_word);
 						break;
 					default:
 						break;

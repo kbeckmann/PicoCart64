@@ -28,9 +28,14 @@ def udp_server(host='0.0.0.0', port=UDP_PORT):
 def send_fb(addr, fb):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
 
-    for offset in range(0, len(fb), 1024):
-        m = struct.pack("<II", 0x42424242, offset) + fb[offset:offset+1024]
+    # Send 1408 + 8 bytes at a time
+    chunk_len = 128 * 11
+    for offset in range(0, len(fb), chunk_len):
+        m = struct.pack("<II", 0x42424242, offset) + fb[offset:offset+chunk_len]
         s.sendto(m, addr)
+        # Throttle it a bit..
+        time.sleep(0.0001)
+
 
 
 def stop(device, thread):
@@ -72,6 +77,93 @@ def start(ip_address):
     return device
 
 
+def serve_tx(addr):
+    frame_n64 = []
+
+    # Received hello
+    while True:
+        if len(device.session.receiver.video_frames) > 0:
+            print("Got a frame")
+            last_frame = device.session.receiver.video_frames[-1]
+
+            # Convert 640x360 to 320x180
+            frame = last_frame.reformat(320, 180, format="rgb24")
+            # f = open("out_rgb24.rgb", "wb")
+            # f.write(bytes(last_frame.planes[0]))
+            # f.close()
+
+            # Convert to 565le (needed in a separate step!)
+            # frame = frame.reformat(320, 180, format="rgb565le")
+            frame = frame.reformat(320, 240, format="rgb565le")
+            # f = open("out_565le.rgb", "wb")
+            # f.write(bytes(frame.planes[0]))
+            # f.close()
+
+            # Manually convert to rgb5551
+            frame_565 = bytes(frame.planes[0])
+
+            # allocate
+            if len(frame_n64) == 0:
+                frame_n64 = bytearray(len(frame_565))
+
+            pixels = struct.unpack(f"<{len(frame_565) // 2}H", frame_565)
+            for i, x in enumerate(pixels):
+                # Remove LSB from the green channel
+                # r = (x & 0b11111_000000_00000) >> 11
+                # g = (x & 0b00000_111111_00000) >> 6
+                # b = (x & 0b00000_000000_11111)
+                # rgb = (r << 11) | (g << 6) | (b << 1) | 1
+
+                rgb = (x & 0b1111111111000000) | ((x << 1) & 0b111110) | 1
+
+                frame_n64[2*i] = rgb & 0xff
+                frame_n64[2*i+1] = (rgb >> 8) & 0xff
+
+            # f = open("out_rgb5551.rgb", "wb")
+            # f.write(frame_n64)
+            # f.close()
+
+            send_fb(addr, frame_n64)
+
+        time.sleep(0.001)
+
+# // Pad buttons
+def A_BUTTON(a):
+    return    ((a) & 0x8000)
+def B_BUTTON(a):
+    return    ((a) & 0x4000)
+def Z_BUTTON(a):
+    return    ((a) & 0x2000)
+def START_BUTTON(a):
+    return ((a) & 0x1000)
+
+# // D-Pad
+def DU_BUTTON(a):
+    return    ((a) & 0x0800)
+def DD_BUTTON(a):
+    return    ((a) & 0x0400)
+def DL_BUTTON(a):
+    return    ((a) & 0x0200)
+def DR_BUTTON(a):
+    return    ((a) & 0x0100)
+
+# // Triggers
+def TL_BUTTON(a):
+    return    ((a) & 0x0020)
+def TR_BUTTON(a):
+    return    ((a) & 0x0010)
+
+# // Yellow C buttons
+def CU_BUTTON(a):
+    return    ((a) & 0x0008)
+def CD_BUTTON(a):
+    return    ((a) & 0x0004)
+def CL_BUTTON(a):
+    return    ((a) & 0x0002)
+def CR_BUTTON(a):
+    return    ((a) & 0x0001)
+
+
 if __name__ == '__main__':
     ip_address = '192.168.5.27' # ip address of Remote Play device
     device = start(ip_address)
@@ -79,57 +171,85 @@ if __name__ == '__main__':
     # Just wait forever
     loop = asyncio.new_event_loop()
 
-
-    frame_n64 = []
+    old_joy_x = 0
+    old_joy_y = 0
+    old_btn = 0
 
     for data, addr in udp_server():
         print(data, addr)
         if data == b'AAAA':
-            # Received hello
-            while True:
-                if len(device.session.receiver.video_frames) > 0:
-                    print("Got a frame")
-                    last_frame = device.session.receiver.video_frames[-1]
+            thread = threading.Thread(target=serve_tx, args=(addr,), daemon=True)
+            thread.start()
+        elif data[:4] == b'CCCC':
+            # Buttons
+            print("BUTTONS!!!")
+            joy_x, joy_y = struct.unpack("bb", bytes(data[6:8]))
+            btn = struct.unpack("<H", data[4:6])[0]
 
-                    # Convert 640x360 to 320x180
-                    frame = last_frame.reformat(320, 180, format="rgb24")
-                    f = open("out_rgb24.rgb", "wb")
-                    f.write(bytes(last_frame.planes[0]))
-                    f.close()
+            if joy_x != old_joy_x:
+                old_joy_x = joy_x
+                device.controller.stick("left", axis="x", value=joy_x / 128.0)
 
-                    # Convert to 565le (needed in a separate step!)
-                    frame = frame.reformat(320, 180, format="rgb565le")
-                    f = open("out_565le.rgb", "wb")
-                    f.write(bytes(frame.planes[0]))
-                    f.close()
+            if joy_y != old_joy_y:
+                old_joy_y = joy_y
+                device.controller.stick("left", axis="y", value=joy_y / 128.0)
 
-                    # Manually convert to rgb5551
-                    frame_565 = bytes(frame.planes[0])
+            if btn != old_btn:
+                old_btn = btn
+                print("btn=", hex(btn))
 
-                    # allocate
-                    if len(frame_n64) == 0:
-                        frame_n64 = bytearray(len(frame_565))
+                if TL_BUTTON(btn):
+                    device.controller.button("l1", "press")
+                else:
+                    device.controller.button("l1", "release")
 
-                    pixels = struct.unpack(f"<{len(frame_565) // 2}H", frame_565)
-                    for i, x in enumerate(pixels):
-                        # Remove LSB from the green channel
-                        # r = (x & 0b11111_000000_00000) >> 11
-                        # g = (x & 0b00000_111111_00000) >> 6
-                        # b = (x & 0b00000_000000_11111)
-                        # rgb = (r << 11) | (g << 6) | (b << 1) | 1
+                if TR_BUTTON(btn):
+                    device.controller.button("r1", "press")
+                else:
+                    device.controller.button("r1", "release")
 
-                        rgb = (x & 0b1111111111000000) | ((x << 1) & 0b111110) | 1
+                if DU_BUTTON(btn):
+                    device.controller.button("up", "press")
+                else:
+                    device.controller.button("up", "release")
 
-                        frame_n64[2*i] = rgb & 0xff
-                        frame_n64[2*i+1] = (rgb >> 8) & 0xff
+                if DD_BUTTON(btn):
+                    device.controller.button("down", "press")
+                else:
+                    device.controller.button("down", "release")
 
-                    f = open("out_rgb5551.rgb", "wb")
-                    f.write(frame_n64)
-                    f.close()
+                if DL_BUTTON(btn):
+                    device.controller.button("left", "press")
+                else:
+                    device.controller.button("left", "release")
 
-                    send_fb(addr, frame_n64)
+                if DR_BUTTON(btn):
+                    device.controller.button("right", "press")
+                else:
+                    device.controller.button("right", "release")
 
-                time.sleep(0.001)
+
+                if CU_BUTTON(btn):
+                    device.controller.button("triangle", "press")
+                else:
+                    device.controller.button("triangle", "release")
+
+                if CD_BUTTON(btn):
+                    device.controller.button("cross", "press")
+                else:
+                    device.controller.button("cross", "release")
+
+                if CL_BUTTON(btn):
+                    device.controller.button("square", "press")
+                else:
+                    device.controller.button("square", "release")
+
+                if CR_BUTTON(btn):
+                    device.controller.button("circle", "press")
+                else:
+                    device.controller.button("circle", "release")
+
+
 
     loop.run_forever()
 
