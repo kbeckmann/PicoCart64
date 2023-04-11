@@ -66,6 +66,7 @@ def start(ip_address):
     user = users[0]  # Gets first user name
     receiver = QueueReceiver()
     device.create_session(user, receiver=receiver, resolution="360p", fps="low")
+    device.controller.start()
     thread = threading.Thread(target=worker, args=(device,), daemon=True)
     thread.start()
     atexit.register(
@@ -186,13 +187,22 @@ if __name__ == '__main__':
             joy_x, joy_y = struct.unpack("bb", bytes(data[6:8]))
             btn = struct.unpack("<H", data[4:6])[0]
 
-            if joy_x != old_joy_x:
+            if joy_x != old_joy_x or joy_y != old_joy_y:
                 old_joy_x = joy_x
-                device.controller.stick("left", axis="x", value=joy_x / 128.0)
-
-            if joy_y != old_joy_y:
                 old_joy_y = joy_y
-                device.controller.stick("left", axis="y", value=joy_y / 128.0)
+
+                joy_x_adjusted = joy_x / 64.0
+                joy_x_adjusted = max(-1, min(joy_x_adjusted, 1))
+                joy_y_adjusted = joy_y / 64.0
+                joy_y_adjusted = max(-1, min(joy_y_adjusted, 1))
+                print("joy_x", joy_x_adjusted)
+                print("joy_y", joy_y_adjusted)
+                
+                # Hold Z to change to right stick mode
+                if Z_BUTTON(btn):
+                    device.controller.stick("right", point=(joy_x_adjusted, joy_y_adjusted))
+                else:
+                    device.controller.stick("left", point=(joy_x_adjusted, joy_y_adjusted))
 
             if btn != old_btn:
                 old_btn = btn
