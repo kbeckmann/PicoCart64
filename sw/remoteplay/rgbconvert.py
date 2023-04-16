@@ -13,6 +13,8 @@ def capture_and_store_frame():
     camera = dxcam.create()
     frame = camera.grab(region=region)
 
+    print(f"dxcam frame shape: {frame.shape}, dtype={frame.dtype}")
+
     with open("frame.rgb888", "wb") as f:
         f.write(frame.tobytes())
         f.close()
