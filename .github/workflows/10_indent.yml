@@ -25,6 +25,7 @@ jobs:
     - name: Check for bad indentation
       run: |
         sudo apt-get install -y indent git
+        indent --version
         ./picocart64/sw/scripts/indent.sh -c
 
     - name: Check for modified files (indent changed) verbose
