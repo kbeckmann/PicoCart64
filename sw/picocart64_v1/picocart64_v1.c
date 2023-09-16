@@ -61,7 +61,7 @@ Time between ~N64_READ and bit output on AD0
 */
 
 // FreeRTOS boilerplate
-void vApplicationGetTimerTaskMemory(StaticTask_t ** ppxTimerTaskTCBBuffer, StackType_t ** ppxTimerTaskStackBuffer, uint32_t * pulTimerTaskStackSize)
+void vApplicationGetTimerTaskMemory(StaticTask_t **ppxTimerTaskTCBBuffer, StackType_t **ppxTimerTaskStackBuffer, uint32_t *pulTimerTaskStackSize)
 {
 	static StaticTask_t xTimerTaskTCB;
 	static StackType_t uxTimerTaskStack[configTIMER_TASK_STACK_DEPTH];
