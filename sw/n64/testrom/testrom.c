@@ -305,6 +305,7 @@ int main(void)
 	// Compare SRAM with the facit
 	if (memcmp(facit_buf, read_buf, sizeof(read_buf)) != 0) {
 		printf("[FAIL] SRAM (volatile) did not verify correctly.\n");
+		printf("[ !! ] Should pass if you press the N64 reset button.\n");
 
 		for (int i = 0; i < sizeof(facit_buf) / sizeof(uint32_t); i++) {
 			if (facit_buf32[i] != read_buf[i]) {
@@ -368,6 +369,8 @@ int main(void)
 		printf("[FAIL] (second time) MAGIC = 0x%08lX.\n", read_buf32[0]);
 		printf("       PicoCart64 might stall now and require a power cycle.\n");
 	}
+
+	printf("\n[ -- ] Test is finished.\n");
 
 	console_render();
 }
