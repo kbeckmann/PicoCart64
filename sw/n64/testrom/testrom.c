@@ -12,7 +12,6 @@
 #include <libdragon.h>
 
 #include "git_info.h"
-#include "shell.h"
 
 // picocart64_shared
 #include "pc64_regs.h"
@@ -155,7 +154,7 @@ static uint8_t __attribute__((aligned(16))) facit_buf[SRAM_1MBIT_SIZE];
 static uint8_t __attribute__((aligned(16))) read_buf[SRAM_1MBIT_SIZE];
 static char __attribute__((aligned(16))) write_buf[0x1000];
 
-static void pc64_uart_write(const uint8_t * buf, uint32_t len)
+static void pc64_uart_write(const uint8_t *buf, uint32_t len)
 {
 	// 16-bit aligned
 	assert((((uint32_t) buf) & 0x1) == 0);
@@ -371,18 +370,4 @@ int main(void)
 	}
 
 	console_render();
-
-	/* Start the shell if the user presses start */
-	printf("\n\nPress START to continue to the shell...\n");
-	controller_init();
-	while (true) {
-		controller_scan();
-		struct controller_data keys = get_keys_pressed();
-		if (keys.c[0].start) {
-			printf("Start pressed.\n");
-			break;
-		}
-	}
-
-	start_shell();
 }
