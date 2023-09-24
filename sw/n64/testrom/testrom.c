@@ -279,6 +279,7 @@ int main(void)
 	// Compare SRAM with the facit
 	if (memcmp(facit_buf, read_buf, sizeof(read_buf)) != 0) {
 		printf("[FAIL] SRAM was not backed up properly.\n");
+		printf("[ !! ] Should pass if you press the N64 reset button.\n");
 
 		for (int i = 0; i < sizeof(facit_buf) / sizeof(uint32_t); i++) {
 			if (facit_buf32[i] != read_buf[i]) {
@@ -304,8 +305,7 @@ int main(void)
 
 	// Compare SRAM with the facit
 	if (memcmp(facit_buf, read_buf, sizeof(read_buf)) != 0) {
-		printf("[FAIL] SRAM (volatile) did not verify correctly.\n");
-		printf("[ !! ] Should pass if you press the N64 reset button.\n");
+		printf("[FAIL] Volatile SRAM did not verify correctly.\n");
 
 		for (int i = 0; i < sizeof(facit_buf) / sizeof(uint32_t); i++) {
 			if (facit_buf32[i] != read_buf[i]) {
@@ -314,7 +314,7 @@ int main(void)
 			}
 		}
 	} else {
-		printf("[ OK ] (volatile) SRAM verified correctly.\n");
+		printf("[ OK ] Volatile SRAM verified correctly.\n");
 	}
 
 	///////////////////////////////////////////////////////////////////////////

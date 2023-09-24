@@ -81,13 +81,17 @@ void cic_task_entry(__unused void *params)
 	sram_load_from_flash();
 
 	while (1) {
-		n64_cic_run();
+		// n64_cic_run returns when N64_CR goes low.
+		// This happens when the N64 loses power, but the cart is still powered.
+		// When the user presses the reset button, the callback is called.
+		n64_cic_run(sram_save_to_flash);
 
-		// cic_run returns when N64_CR goes low, i.e.
-		// user presses the reset button, or the N64 loses power.
-
-		// Commit SRAM to flash
-		sram_save_to_flash();
+		// Commit SRAM to flash after N64 loses power.
+		// NOTE: Don't do this when being powered from it.
+		//       Unless we find a way to detect if we're USB powered,
+		//       this should not be done.
+		// TODO: A dual bank backup area could work around this.
+		// sram_save_to_flash();
 
 		printf("CIC task restarting\n");
 		vPortYield();

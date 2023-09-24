@@ -477,7 +477,7 @@ static void InitRam(unsigned char isPal)
 	}
 }
 
-void n64_cic_run(void)
+void n64_cic_run(cic_reset_cb_t cic_reset_cb)
 {
 	unsigned char isPal;
 
@@ -536,6 +536,9 @@ void n64_cic_run(void)
 		case 3:
 			// 11 (reset)
 			WriteBit(0);
+			if (cic_reset_cb) {
+				cic_reset_cb();
+			}
 			break;
 
 		case 1:
