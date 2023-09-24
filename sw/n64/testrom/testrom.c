@@ -223,11 +223,14 @@ static void configure_sram(void)
 	IO_WRITE(PI_BSD_DOM2_RLS_REG, 0x03);
 
 #else
-	// Fast SRAM access (should match SDK values)
-	IO_WRITE(PI_BSD_DOM2_LAT_REG, 0x40);
+
+	// Fast SRAM access (matches default values from SDK)
+	IO_WRITE(PI_BSD_DOM2_LAT_REG, 0x05);
 	IO_WRITE(PI_BSD_DOM2_PWD_REG, 0x0C);
-	IO_WRITE(PI_BSD_DOM2_PGS_REG, 0x07);
-	IO_WRITE(PI_BSD_DOM2_RLS_REG, 0x03);
+	IO_WRITE(PI_BSD_DOM2_PGS_REG, 0x0D);
+	IO_WRITE(PI_BSD_DOM2_RLS_REG, 0x02);
+
+	// LAT: 0x04 works when banked mode is disabled
 #endif
 }
 
