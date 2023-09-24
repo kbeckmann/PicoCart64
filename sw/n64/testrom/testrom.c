@@ -282,7 +282,7 @@ int main(void)
 		printf("[ !! ] Should pass if you press the N64 reset button.\n");
 
 		for (int i = 0; i < sizeof(facit_buf) / sizeof(uint32_t); i++) {
-			if (facit_buf32[i] != read_buf[i]) {
+			if (facit_buf32[i] != read_buf32[i]) {
 				printf("       Error @%d: facit %08lX != sram %08lX\n", i, facit_buf32[i], read_buf32[i]);
 				break;
 			}
@@ -308,7 +308,7 @@ int main(void)
 		printf("[FAIL] Volatile SRAM did not verify correctly.\n");
 
 		for (int i = 0; i < sizeof(facit_buf) / sizeof(uint32_t); i++) {
-			if (facit_buf32[i] != read_buf[i]) {
+			if (facit_buf32[i] != read_buf32[i]) {
 				printf("       Error @%d: facit %08lX != sram %08lX\n", i, facit_buf32[i], read_buf32[i]);
 				break;
 			}
