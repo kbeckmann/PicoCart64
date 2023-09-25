@@ -53,7 +53,7 @@ static inline uint32_t sram_resolve_address_shifted(uint32_t pi_address)
 	return resolved_address >> 1;
 #else
 	// Banked mode, faster implementation
-	return ((pi_address << 15) >> 16) | ((pi_address & 0xc0000) >> 4);
+	return (((pi_address >> 18) << 30) | (pi_address << 15)) >> 16;
 #endif
 }
 
