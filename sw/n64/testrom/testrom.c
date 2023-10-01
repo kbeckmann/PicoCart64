@@ -239,6 +239,7 @@ int main(void)
 	uint32_t *facit_buf32 = (uint32_t *) facit_buf;
 	uint32_t *read_buf32 = (uint32_t *) read_buf;
 	uint16_t *read_buf16 = (uint16_t *) read_buf;
+	int fail_count = 0;
 
 	configure_sram();
 
@@ -256,6 +257,7 @@ int main(void)
 	if (read_buf32[0] == PC64_MAGIC) {
 		printf("[ OK ] MAGIC = 0x%08lX.\n", read_buf32[0]);
 	} else {
+		fail_count++;
 		printf("[FAIL] MAGIC = 0x%08lX.\n", read_buf32[0]);
 	}
 
@@ -281,7 +283,7 @@ int main(void)
 
 	// Compare SRAM with the facit
 	if (memcmp(facit_buf, read_buf, sizeof(read_buf)) != 0) {
-		printf("[FAIL] SRAM was not backed up properly.\n");
+		printf("[////] SRAM was not backed up properly.\n");
 		printf("[ !! ] Should pass if you press the N64 reset button.\n");
 
 		for (int i = 0; i < sizeof(facit_buf) / sizeof(uint32_t); i++) {
@@ -308,6 +310,7 @@ int main(void)
 
 	// Compare SRAM with the facit
 	if (memcmp(facit_buf, read_buf, sizeof(read_buf)) != 0) {
+		fail_count++;
 		printf("[FAIL] Volatile SRAM did not verify correctly.\n");
 
 		for (int i = 0; i < sizeof(facit_buf) / sizeof(uint32_t); i++) {
@@ -328,7 +331,7 @@ int main(void)
 	pc64_rand_seed(0);
 
 	// Compare buffer with RNG
-	printf("[ -- ] RNG Test: ");
+	printf("[ -- ] PicoCart64 RNG stress-test: ");
 	bool rng_ok = true;
 	for (int j = 0; j < 64 && rng_ok; j++) {
 		// Read back 1Mbit of RAND values
@@ -351,6 +354,7 @@ int main(void)
 	if (rng_ok) {
 		printf("\n[ OK ] Random stress test verified correctly.\n");
 	} else {
+		fail_count++;
 		printf("\n[FAIL] Random stress test failed.\n");
 	}
 
@@ -369,11 +373,39 @@ int main(void)
 	if (read_buf32[0] == PC64_MAGIC) {
 		printf("[ OK ] (second time) MAGIC = 0x%08lX.\n", read_buf32[0]);
 	} else {
+		fail_count++;
 		printf("[FAIL] (second time) MAGIC = 0x%08lX.\n", read_buf32[0]);
 		printf("       PicoCart64 might stall now and require a power cycle.\n");
 	}
 
-	printf("\n[ -- ] Test is finished.\n");
+	if (fail_count == 0) {
+		printf("\n[ OK ] Test is finished. All tests passed.\n");
+	} else {
+		printf("\n[FAIL] Test is finished. %d tests failed.\n", fail_count);
+	}
+	printf("\n");
 
-	console_render();
+	// Draw something that moves forever
+	int count = 0;
+	while (1) {
+		display_context_t disp = display_get();
+		const int width = 60;
+		const int height = 240;
+
+		count++;
+
+		int x = count % 256;
+		if (x < 128)
+			x = 255 - x;
+
+		if (fail_count > 0) {
+			graphics_draw_box(disp, 0, 0, width, height, graphics_make_color(x, 0, 0, 255));
+			graphics_draw_box(disp, 0, count % (height - 10), width, 10, graphics_make_color(127, 127, 127, 255));
+		} else {
+			graphics_draw_box(disp, 0, 0, width, height, graphics_make_color(0, x, 0, 255));
+			graphics_draw_box(disp, 0, count % 230, width, 10, graphics_make_color(127, 127, 127, 255));
+		}
+
+		display_show(disp);
+	}
 }

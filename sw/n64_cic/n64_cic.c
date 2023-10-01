@@ -1,35 +1,36 @@
-/**
- * SPDX-License-Identifier: MIT License
- *
- * Copyright (c) 2019 Jan Goldacker
- * Copyright (c) 2021-2022 Konrad Beckmann <konrad.beckmann@gmail.com>
- */
+// Original code sourced from https://github.com/Polprzewodnikowy/SummerCart64/blob/main/sw/controller/src/cic.c
+// which is based on https://github.com/jago85/UltraCIC_C
+// This file ports that code to FreeRTOS and integrates with the PicoCart64 codebase.
 
-/*
+// MIT License
 
-This file is part of PicoCart64.
+// Copyright (c) 2019 Jan Goldacker
+// Copyright (c) 2022 Mateusz Faderewski
+// Copyright (c) 2023 Konrad Beckmann
 
-This is a port of:
-https://github.com/jago85/UltraCIC_C/blob/master/cic_c.c
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
 
-Generic CIC implementation for N64
-----------------------------------------------------------
-This should run on every MCU which is fast enough to
-handle the IO operations.
-You just have to implement the low level gpio functions:
-    - ReadBit() and
-    - WriteBit().
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
 
-Hardware connections
-Data Clock Input (DCLK): CIC Pin 14
-Data Line, Bidir (DIO):  CIC Pin 15
-
-*/
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
 #include <stdio.h>
 #include <string.h>
 
 #include "FreeRTOS.h"
+#include "semphr.h"
 #include "task.h"
 
 #include "pico/stdlib.h"
@@ -39,10 +40,11 @@ Data Line, Bidir (DIO):  CIC Pin 15
 #include "sram.h"
 #include "picocart64_pins.h"
 
-// #define DEBUG
-
-#define REGION_NTSC (0)
-#define REGION_PAL  (1)
+typedef enum {
+	REGION_NTSC,
+	REGION_PAL,
+	__REGION_MAX
+} cic_region_t;
 
 #if CONFIG_REGION_NTSC == 1
 #define GET_REGION() (REGION_NTSC)
@@ -52,499 +54,447 @@ Data Line, Bidir (DIO):  CIC Pin 15
 #error Please pass -DREGION=PAL or NTSC to your cmake command line.
 #endif
 
-/* SEEDs */
+static volatile bool cic_enabled = false;
+static volatile bool cic_detect_enabled;
 
-// 6102/7101
-#define CIC6102_SEED 0x3F
+static volatile uint8_t cic_next_rd;
+static volatile uint8_t cic_next_wr;
 
-// 6101
-#define CIC6101_SEED 0x3F
+static volatile bool cic_disabled = false;
+static volatile bool cic_dd_mode = false;
+static volatile uint8_t cic_seed = 0x3F;
+static volatile uint8_t cic_checksum[6] = { 0xA5, 0x36, 0xC0, 0xF1, 0xD8, 0x59 };
 
-// 6103/7103
-#define CIC6103_SEED 0x78
+SemaphoreHandle_t xSemaphore = NULL;
+StaticSemaphore_t xSemaphoreBuffer;
 
-// 6105/7105
-#define CIC6105_SEED 0x91
+static uint8_t cic_ram[32];
+static uint8_t cic_x105_ram[30];
 
-// 6106/7106
-#define CIC6106_SEED 0x85
-
-// 7102
-#define CIC7102_SEED 0x3F
-
-/* CHECKSUMs */
-
-// 6102/7101
-#define CIC6102_CHECKSUM 0xa, 0x5, 0x3, 0x6, 0xc, 0x0, 0xf, 0x1, 0xd, 0x8, 0x5, 0x9
-
-// 6101
-#define CIC6101_CHECKSUM 0x4, 0x5, 0xC, 0xC, 0x7, 0x3, 0xE, 0xE, 0x3, 0x1, 0x7, 0xA
-
-// 6103/7103
-#define CIC6103_CHECKSUM 0x5, 0x8, 0x6, 0xf, 0xd, 0x4, 0x7, 0x0, 0x9, 0x8, 0x6, 0x7
-
-// 6105/7105
-#define CIC6105_CHECKSUM 0x8, 0x6, 0x1, 0x8, 0xA, 0x4, 0x5, 0xB, 0xC, 0x2, 0xD, 0x3
-
-// 6106/7106
-#define CIC6106_CHECKSUM 0x2, 0xB, 0xB, 0xA, 0xD, 0x4, 0xE, 0x6, 0xE, 0xB, 0x7, 0x4
-
-// 7102
-#define CIC7102_CHECKSUM 0x4, 0x4, 0x1, 0x6, 0x0, 0xE, 0xC, 0x5, 0xD, 0x9, 0xA, 0xF
-
-static void EncodeRound(unsigned char index);
-static void CicRound(unsigned char *);
-static void Cic6105Algo(void);
-
-/* Select SEED and CHECKSUM here */
-const unsigned char _CicSeed = CIC6102_SEED;
-// const unsigned char _CicSeed = CIC6105_SEED;
-
-const unsigned char _CicChecksum[] = {
-	CIC6102_CHECKSUM
-		// CIC6105_CHECKSUM
+static const uint8_t cic_ram_init[2][32] = { {
+											  0x0E, 0x00, 0x09, 0x0A, 0x01, 0x08, 0x05, 0x0A, 0x01, 0x03, 0x0E, 0x01, 0x00, 0x0D, 0x0E, 0x0C,
+											  0x00, 0x0B, 0x01, 0x04, 0x0F, 0x08, 0x0B, 0x05, 0x07, 0x0C, 0x0D, 0x06, 0x01, 0x0E, 0x09, 0x08}, {
+																																				0x0E, 0x00, 0x04, 0x0F, 0x05, 0x01,
+																																				0x02, 0x01, 0x07, 0x01, 0x09, 0x08,
+																																				0x05, 0x07, 0x05, 0x0A,
+																																				0x00, 0x0B, 0x01, 0x02, 0x03, 0x0F,
+																																				0x08, 0x02, 0x07, 0x01, 0x09, 0x08,
+																																				0x01, 0x01, 0x05, 0x0C}
 };
 
-/* NTSC initial RAM */
-const unsigned char _CicRamInitNtsc[] = {
-	0xE, 0x0, 0x9, 0xA, 0x1, 0x8, 0x5, 0xA, 0x1, 0x3, 0xE, 0x1, 0x0, 0xD, 0xE, 0xC,
-	0x0, 0xB, 0x1, 0x4, 0xF, 0x8, 0xB, 0x5, 0x7, 0xC, 0xD, 0x6, 0x1, 0xE, 0x9, 0x8
-};
-
-/* PAL initial RAM */
-const unsigned char _CicRamInitPal[] = {
-	0xE, 0x0, 0x4, 0xF, 0x5, 0x1, 0x2, 0x1, 0x7, 0x1, 0x9, 0x8, 0x5, 0x7, 0x5, 0xA,
-	0x0, 0xB, 0x1, 0x2, 0x3, 0xF, 0x8, 0x2, 0x7, 0x1, 0x9, 0x8, 0x1, 0x1, 0x5, 0xC
-};
-
-/* Memory for the CIC algorithm */
-unsigned char _CicMem[32];
-
-/* Memory for the 6105 algorithm */
-unsigned char _6105Mem[32];
-
-/* YOU HAVE TO IMPLEMENT THE LOW LEVEL GPIO FUNCTIONS ReadBit() and WriteBit() */
-
-static bool check_running(void)
+static void cic_irq_reset_falling(void)
 {
-	if (gpio_get(N64_COLD_RESET) == 0) {
-		// Reset the CIC
-		return false;
-	}
-
-	return true;
-}
-
-static unsigned char ReadBit(void)
-{
-	unsigned char res;
-	unsigned char vin;
-
-	// wait for DCLK to go low
-	do {
-		vin = gpio_get(N64_CIC_DCLK);
-		vPortYield();
-	} while (vin && check_running());
-
-	// Read the data bit
-	res = gpio_get(N64_CIC_DIO);
-
-	// wait for DCLK to go high
-	do {
-		vin = gpio_get(N64_CIC_DCLK);
-		vPortYield();
-	} while ((!vin) && check_running());
-
-	return res ? 1 : 0;
-}
-
-static void WriteBit(unsigned char b)
-{
-	unsigned char vin;
-
-	// wait for DCLK to go low
-	do {
-		vin = gpio_get(N64_CIC_DCLK);
-		vPortYield();
-	} while (vin && check_running());
-
-	if (b == 0) {
-		// Drive low
-		gpio_set_dir(N64_CIC_DIO, GPIO_OUT);
-		gpio_put(N64_CIC_DIO, 0);
-	}
-	// wait for DCLK to go high
-	do {
-		vin = gpio_get(N64_CIC_DCLK);
-		vPortYield();
-	} while ((!vin) && check_running());
-
-	// Disable output
+	cic_enabled = false;
 	gpio_set_dir(N64_CIC_DIO, GPIO_IN);
+	// led_clear_error(LED_ERROR_CIC);
 }
 
-/* Writes the lowes 4 bits of the byte */
-static void WriteNibble(unsigned char n)
+static void cic_irq_reset_rising(void)
 {
-	WriteBit(n & 0x08);
-	WriteBit(n & 0x04);
-	WriteBit(n & 0x02);
-	WriteBit(n & 0x01);
-}
-
-// Write RAM nibbles until index hits a 16 Byte border
-static void WriteRamNibbles(unsigned char index)
-{
-	do {
-		WriteNibble(_CicMem[index]);
-		index++;
-		vPortYield();
-	} while ((index & 0x0f) != 0);
-}
-
-/* Reads 4 bits and returns them in the lowes 4 bits of a byte */
-static unsigned char ReadNibble(void)
-{
-	unsigned char res = 0;
-	unsigned char i;
-	for (i = 0; i < 4; i++) {
-		res <<= 1;
-		res |= ReadBit();
+	if (!cic_disabled) {
+		cic_enabled = true;
 	}
-
-	return res;
 }
 
-/* Encrypt and output the seed */
-static void WriteSeed(void)
+static void cic_irq_reset(uint gpio, uint32_t event_mask)
 {
-	_CicMem[0x0a] = 0xb;
-	_CicMem[0x0b] = 0x5;
-	_CicMem[0x0c] = _CicSeed >> 4;
-	_CicMem[0x0d] = _CicSeed;
-	_CicMem[0x0e] = _CicSeed >> 4;
-	_CicMem[0x0f] = _CicSeed;
+	if (gpio_get(N64_COLD_RESET)) {
+		cic_irq_reset_rising();
+	} else {
+		cic_irq_reset_falling();
+	}
+}
 
-	EncodeRound(0x0a);
-	EncodeRound(0x0a);
+static void cic_irq_clk_falling(void)
+{
+	if (cic_enabled) {
+		if (!cic_next_wr) {
+			gpio_put(N64_CIC_DIO, 0);
+			gpio_set_dir(N64_CIC_DIO, GPIO_OUT);
+		}
+		cic_next_rd = gpio_get(N64_CIC_DIO) ? 1 : 0;
 
-#ifdef DEBUG
+		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+		xSemaphoreGiveFromISR(xSemaphore, &xHigherPriorityTaskWoken);
+		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+	}
+}
 
-	unsigned char index = 0x0a;
-	printf("Seed: ");
+static void cic_irq_clk_rising(void)
+{
+	gpio_set_dir(N64_CIC_DIO, GPIO_IN);
+	if (cic_detect_enabled) {
+		cic_detect_enabled = false;
+		if (!gpio_get(N64_CIC_DIO)) {
+			cic_enabled = false;
+		}
+	}
+}
+
+static void cic_irq_clk(uint gpio, uint32_t event_mask)
+{
+	if (gpio_get(N64_CIC_DCLK)) {
+		cic_irq_clk_rising();
+	} else {
+		cic_irq_clk_falling();
+	}
+}
+
+static uint8_t cic_read(void)
+{
+	cic_next_wr = 1;
+	xSemaphoreTake(xSemaphore, portMAX_DELAY);
+	return cic_next_rd;
+}
+
+static void cic_write(uint8_t bit)
+{
+	cic_next_wr = bit;
+	xSemaphoreTake(xSemaphore, portMAX_DELAY);
+}
+
+static void cic_start_detect(void)
+{
+	cic_detect_enabled = cic_dd_mode;
+}
+
+static uint8_t cic_read_nibble(void)
+{
+	uint8_t data = 0;
+	for (int i = 0; i < 4; i++) {
+		data = ((data << 1) | cic_read());
+	}
+	return data;
+}
+
+static void cic_write_nibble(uint8_t data)
+{
+	cic_write(data & 0x08);
+	cic_write(data & 0x04);
+	cic_write(data & 0x02);
+	cic_write(data & 0x01);
+}
+
+static void cic_write_ram_nibbles(uint8_t index)
+{
 	do {
-		printf("%X ", (_CicMem[index]));
-		index++;
-	} while ((index & 0x0f) != 0);
-	printf("\n");
-
-#endif
-
-	WriteRamNibbles(0x0a);
+		cic_write_nibble(cic_ram[index++]);
+	} while ((index & 0x0F) != 0);
 }
 
-/* Encrypt and output the checksum */
-static void WriteChecksum(void)
+static void cic_encode_round(uint8_t index)
 {
-	unsigned char i;
-	for (i = 0; i < 12; i++)
-		_CicMem[i + 4] = _CicChecksum[i];
-
-	// wait for DCLK to go low
-	// (doesn't seem to be necessary)
-	// int vin;
-	// do {
-	//     vin = gpio_get(N64_CIC_DCLK);
-	// } while ((vin & 1) && check_running());
-
-	// "encrytion" key
-	// initial value doesn't matter
-	//_CicMem[0x00] = 0;
-	//_CicMem[0x01] = 0xd;
-	//_CicMem[0x02] = 0;
-	//_CicMem[0x03] = 0;
-
-	EncodeRound(0x00);
-	EncodeRound(0x00);
-	EncodeRound(0x00);
-	EncodeRound(0x00);
-
-#ifdef DEBUG
-
-	unsigned char index = 0;
-	printf("Checksum: ");
+	uint8_t data = cic_ram[index++];
 	do {
-		printf("%X ", (_CicMem[index]));
-		index++;
-	} while ((index & 0x0f) != 0);
-	printf("\n");
-
-#endif
-
-	// signal that we are done to the pif
-	// (test with WriteBit(1) also worked)
-	WriteBit(0);
-
-	// Write 16 nibbles
-	WriteRamNibbles(0);
+		data = ((((data + 1) & 0x0F) + cic_ram[index]) & 0x0F);
+		cic_ram[index++] = data;
+	} while ((index & 0x0F) != 0);
 }
 
-/* seed and checksum encryption algorithm */
-static void EncodeRound(unsigned char index)
+static void cic_write_id(cic_region_t region)
 {
-	unsigned char a;
-
-	a = _CicMem[index];
-	index++;
-
-	do {
-		a = (a + 1) & 0x0f;
-		a = (a + _CicMem[index]) & 0x0f;
-		_CicMem[index] = a;
-		index++;
-		vPortYield();
-	} while ((index & 0x0f) != 0);
+	cic_start_detect();
+	cic_write(cic_dd_mode ? 1 : 0);
+	cic_write(region == REGION_PAL ? 1 : 0);
+	cic_write(0);
+	cic_write(1);
 }
 
-/* Exchange value of a and b */
-static void Exchange(unsigned char *a, unsigned char *b)
+static void cic_write_id_failed(void)
 {
-	unsigned char tmp;
-	tmp = *a;
+	// uint8_t current_region = rtc_get_region();
+	// uint8_t next_region = (current_region == REGION_NTSC) ? REGION_PAL : REGION_NTSC;
+	// rtc_set_region(next_region);
+	// led_blink_error(LED_ERROR_CIC);
+}
+
+static void cic_write_seed(void)
+{
+	cic_ram[0x0A] = 0x0B;
+	cic_ram[0x0B] = 0x05;
+	cic_ram[0x0C] = (cic_seed >> 4);
+	cic_ram[0x0D] = cic_seed;
+	cic_ram[0x0E] = (cic_seed >> 4);
+	cic_ram[0x0F] = cic_seed;
+	cic_encode_round(0x0A);
+	cic_encode_round(0x0A);
+	cic_write_ram_nibbles(0x0A);
+}
+
+static void cic_write_checksum(void)
+{
+	for (int i = 0; i < 4; i++) {
+		cic_ram[i] = 0x00;
+	}
+	for (int i = 0; i < 6; i++) {
+		cic_ram[(i * 2) + 4] = ((cic_checksum[i] >> 4) & 0x0F);
+		cic_ram[(i * 2) + 5] = (cic_checksum[i] & 0x0F);
+	}
+	cic_encode_round(0x00);
+	cic_encode_round(0x00);
+	cic_encode_round(0x00);
+	cic_encode_round(0x00);
+	cic_write(0);
+	cic_write_ram_nibbles(0x00);
+}
+
+static void cic_init_ram(cic_region_t region)
+{
+	if (region < __REGION_MAX) {
+		for (int i = 0; i < 32; i++) {
+			cic_ram[i] = cic_ram_init[region][i];
+		}
+	}
+	cic_ram[0x01] = cic_read_nibble();
+	cic_ram[0x11] = cic_read_nibble();
+}
+
+static void cic_exchange_bytes(uint8_t *a, uint8_t *b)
+{
+	uint8_t tmp = *a;
 	*a = *b;
 	*b = tmp;
 }
 
-// translated from PIC asm code (thx to Mike Ryan for the PIC implementation)
-// this implementation saves program memory in LM8
-
-/* CIC compare mode memory alternation algorithm */
-static void CicRound(unsigned char *m)
+static void cic_round(uint8_t *m)
 {
-	unsigned char a;
-	unsigned char b, x;
+	uint8_t a, b, x;
 
 	x = m[15];
 	a = x;
 
 	do {
 		b = 1;
-		a += m[b] + 1;
+		a += (m[b] + 1);
 		m[b] = a;
 		b++;
-		a += m[b] + 1;
-		Exchange(&a, &m[b]);
-		m[b] = ~m[b];
+		a += (m[b] + 1);
+		cic_exchange_bytes(&a, &m[b]);
+		m[b] = ~(m[b]);
 		b++;
-		a &= 0xf;
-		a += (m[b] & 0xf) + 1;
+		a &= 0x0F;
+		a += ((m[b] & 0x0F) + 1);
 		if (a < 16) {
-			Exchange(&a, &m[b]);
+			cic_exchange_bytes(&a, &m[b]);
 			b++;
 		}
 		a += m[b];
 		m[b] = a;
 		b++;
 		a += m[b];
-		Exchange(&a, &m[b]);
+		cic_exchange_bytes(&a, &m[b]);
 		b++;
-		a &= 0xf;
+		a &= 0x0F;
 		a += 8;
-		if (a < 16)
+		if (a < 16) {
 			a += m[b];
-		Exchange(&a, &m[b]);
+		}
+		cic_exchange_bytes(&a, &m[b]);
 		b++;
 		do {
-			a += m[b] + 1;
+			a += (m[b] + 1);
 			m[b] = a;
 			b++;
-			b &= 0xf;
+			b &= 0x0F;
 		} while (b != 0);
-		a = x + 0xf;
-		x = a & 0xf;
-
-		vPortYield();
-	} while (x != 15);
+		a = (x + 0x0F);
+		x = (a & 0x0F);
+	} while (x != 0x0F);
 }
 
-// Big Thx to Mike Ryan, John McMaster, marshallh for publishing their work
-
-/* CIC 6105 algorithm */
-static void Cic6105Algo(void)
+static void cic_compare_mode(cic_region_t region)
 {
-	unsigned char A = 5;
-	unsigned char carry = 1;
-	unsigned char i;
-	for (i = 0; i < 30; ++i) {
-		if (!(_6105Mem[i] & 1))
-			A += 8;
-		if (!(A & 2))
-			A += 4;
-		A = (A + _6105Mem[i]) & 0xf;
-		_6105Mem[i] = A;
-		if (!carry)
-			A += 7;
-		A = (A + _6105Mem[i]) & 0xF;
-		A = A + _6105Mem[i] + carry;
-		if (A >= 0x10) {
+	cic_round(&cic_ram[0x10]);
+	cic_round(&cic_ram[0x10]);
+	cic_round(&cic_ram[0x10]);
+
+	uint8_t index = (cic_ram[0x17] & 0x0F);
+	if (index == 0) {
+		index = 1;
+	}
+	index |= 0x10;
+
+	do {
+		cic_read();
+		cic_write(cic_ram[index] & 0x01);
+		if (region == REGION_PAL) {
+			index--;
+		} else {
+			index++;
+		}
+	} while (index & 0x0F);
+}
+
+static void cic_x105_algorithm(void)
+{
+	uint8_t a = 5;
+	uint8_t carry = 1;
+
+	for (int i = 0; i < 30; ++i) {
+		if (!(cic_x105_ram[i] & 0x01)) {
+			a += 8;
+		}
+		if (!(a & 0x02)) {
+			a += 4;
+		}
+		a = ((a + cic_x105_ram[i]) & 0x0F);
+		cic_x105_ram[i] = a;
+		if (!carry) {
+			a += 7;
+		}
+		a = ((a + cic_x105_ram[i]) & 0x0F);
+		a = (a + cic_x105_ram[i] + carry);
+		if (a >= 0x10) {
 			carry = 1;
-			A -= 0x10;
+			a -= 0x10;
 		} else {
 			carry = 0;
 		}
-		A = (~A) & 0xf;
-		_6105Mem[i] = A;
+		a = (~(a) & 0x0F);
+		cic_x105_ram[i] = a;
 	}
 }
 
-/* CIC compare mode */
-static void CompareMode(unsigned char isPal)
+static void cic_x105_mode(void)
 {
-	unsigned char ramPtr;
-	// don't care about the low ram as we don't check this
-//  CicRound(&_CicMem[0x00]);
-//  CicRound(&_CicMem[0x00]);
-//  CicRound(&_CicMem[0x00]);
+	cic_write_nibble(0x0A);
+	cic_write_nibble(0x0A);
 
-	// only need to calculate the high ram
-	CicRound(&_CicMem[0x10]);
-	CicRound(&_CicMem[0x10]);
-	CicRound(&_CicMem[0x10]);
-
-	// 0x17 determines the start index (but never 0)
-	ramPtr = _CicMem[0x17] & 0xf;
-	if (ramPtr == 0)
-		ramPtr = 1;
-	ramPtr |= 0x10;
-
-	do {
-		// read the bit from PIF (don't care about the value)
-		ReadBit();
-
-		// send out the lowest bit of the currently indexed ram
-		WriteBit(_CicMem[ramPtr] & 0x01);
-
-		// PAL or NTSC?
-		if (!isPal) {
-			// NTSC
-			ramPtr++;
-		} else {
-			// PAL
-			ramPtr--;
-		}
-
-		// repeat until the end is reached
-	} while (ramPtr & 0xf);
-}
-
-/* CIC 6105 mode */
-static void Cic6105Mode(void)
-{
-	unsigned char ramPtr;
-
-	// write 0xa 0xa
-	WriteNibble(0xa);
-	WriteNibble(0xa);
-
-	// receive 30 nibbles
-	for (ramPtr = 0; ramPtr < 30; ramPtr++) {
-		_6105Mem[ramPtr] = ReadNibble();
+	for (int i = 0; i < 30; i++) {
+		cic_x105_ram[i] = cic_read_nibble();
 	}
 
-	// execute the algorithm
-	Cic6105Algo();
+	cic_x105_algorithm();
 
-	// send bit 0
-	WriteBit(0);
+	cic_write(0);
 
-	// send 30 nibbles
-	for (ramPtr = 0; ramPtr < 30; ramPtr++) {
-		WriteNibble(_6105Mem[ramPtr]);
+	for (int i = 0; i < 30; i++) {
+		cic_write_nibble(cic_x105_ram[i]);
 	}
 }
 
-/* Load initial ram depending on region */
-static void InitRam(unsigned char isPal)
+static void cic_soft_reset(cic_reset_cb_t cic_reset_cb)
 {
-	unsigned char i;
+	uint32_t t0 = xTaskGetTickCount();
 
-	if (!isPal) {
-		for (i = 0; i < 32; i++)
-			_CicMem[i] = _CicRamInitNtsc[i];
-	} else {
-		for (i = 0; i < 32; i++)
-			_CicMem[i] = _CicRamInitPal[i];
+	printf("[cic_soft_reset]\n");
+
+	cic_read();
+
+	// Notify external listener
+	if (cic_reset_cb) {
+		cic_reset_cb();
 	}
+	// Delay up to 1000ms is possible, but 500ms seems to be the norm.
+	// https://n64brew.dev/wiki/PIF-NUS#Console_Reset
+	// vTaskDelay(pdMS_TO_TICKS(500));
+
+	gpio_put(N64_CIC_DIO, 0);
+	gpio_set_dir(N64_CIC_DIO, GPIO_OUT);
+
+	uint32_t t1 = xTaskGetTickCount();
+
+	printf("[cic_soft_reset done took=%d ms]\n", t1 - t0);
 }
 
-void n64_cic_run(cic_reset_cb_t cic_reset_cb)
+void n64_cic_reset_parameters(void)
 {
-	unsigned char isPal;
+	cic_disabled = false;
+	cic_dd_mode = false;
+	cic_seed = 0x3F;
+	cic_checksum[0] = 0xA5;
+	cic_checksum[1] = 0x36;
+	cic_checksum[2] = 0xC0;
+	cic_checksum[3] = 0xF1;
+	cic_checksum[4] = 0xD8;
+	cic_checksum[5] = 0x59;
+}
 
-	// Reset the state
-	memset(_CicMem, 0, sizeof(_CicMem));
-	memset(_6105Mem, 0, sizeof(_6105Mem));
+void n64_cic_set_parameters(uint32_t *args)
+{
+	cic_disabled = (args[0] >> 24) & (1 << 0);
+	cic_seed = (args[0] >> 16) & 0xFF;
+	cic_checksum[0] = (args[0] >> 8) & 0xFF;
+	cic_checksum[1] = args[0] & 0xFF;
+	cic_checksum[2] = (args[1] >> 24) & 0xFF;
+	cic_checksum[3] = (args[1] >> 16) & 0xFF;
+	cic_checksum[4] = (args[1] >> 8) & 0xFF;
+	cic_checksum[5] = args[1] & 0xFF;
+}
 
-	// printf("CIC Emulator core running!\r\n");
+void n64_cic_set_dd_mode(bool enabled)
+{
+	cic_dd_mode = enabled;
+}
 
-	// Wait for reset to be released
-	while (gpio_get(N64_COLD_RESET) == 0) {
+void n64_cic_hw_init(void)
+{
+	gpio_set_irq_enabled_with_callback(N64_COLD_RESET, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &cic_irq_reset);
+	gpio_set_irq_enabled_with_callback(N64_CIC_DCLK, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &cic_irq_clk);
+}
+
+void n64_cic_task(cic_reset_cb_t cic_reset_cb)
+{
+	xSemaphore = xSemaphoreCreateBinaryStatic(&xSemaphoreBuffer);
+
+	gpio_set_dir(N64_CIC_DIO, GPIO_IN);
+
+	while (!gpio_get(N64_COLD_RESET)) {
 		vPortYield();
 	}
+	// printf("#");
 
-	// read the region setting
-	isPal = GET_REGION();
+	// cic_irq_reset(0, 0);
+	cic_enabled = true;
 
-	// send out the corresponding id
-	unsigned char hello = 0x1;
-	if (isPal) {
-		hello |= 0x4;
-	}
-	// printf("W: %02X\n", hello);
-	WriteNibble(hello);
+	// printf("A");
 
-	// encode and send the seed
-	WriteSeed();
+	cic_region_t region = GET_REGION();
 
-	// encode and send the checksum
-	WriteChecksum();
+	// TODO: Implement soft region switching
+	// cic_region_t region = rtc_get_region();
+	// if (region >= __REGION_MAX) {
+	//  region = REGION_NTSC;
+	//  rtc_set_region(region);
+	// }
 
-	// init the ram corresponding to the region
-	InitRam(isPal);
+	cic_write_id(region);
 
-	// read the initial values from the PIF
-	_CicMem[0x01] = ReadNibble();
-	_CicMem[0x11] = ReadNibble();
+	// hw_tim_setup(TIM_ID_CIC, 500, cic_write_id_failed);
+	cic_write_seed();
+	// hw_tim_stop(TIM_ID_CIC);
 
-	while (check_running()) {
-		vPortYield();
-		// read mode (2 bit)
-		unsigned char cmd = 0;
-		cmd |= (ReadBit() << 1);
-		cmd |= ReadBit();
+	cic_write_checksum();
+	cic_init_ram(region);
+
+	while (1) {
+		uint8_t cmd = 0;
+		cmd |= (cic_read() << 1);
+		cmd |= cic_read();
+
 		switch (cmd) {
-		case 0:
-			// 00 (compare)
-			CompareMode(isPal);
-			break;
-
-		case 2:
-			// 10 (6105)
-			Cic6105Mode();
-			break;
-
-		case 3:
-			// 11 (reset)
-			WriteBit(0);
-			if (cic_reset_cb) {
-				cic_reset_cb();
+		case 0:{
+				cic_compare_mode(region);
+				break;
 			}
-			break;
+
+		case 2:{
+				cic_x105_mode();
+				break;
+			}
+
+		case 3:{
+				cic_soft_reset(cic_reset_cb);
+				break;
+			}
 
 		case 1:
-			// 01 (die)
-		default:
-			return;
+		default:{
+				while (1) {
+					vPortYield();
+				}
+				break;
+			}
 		}
 	}
 }

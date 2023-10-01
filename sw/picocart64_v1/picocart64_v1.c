@@ -30,10 +30,9 @@
 
 #define ENABLE_N64_PI 1
 
-// Priority 0 = lowest, 31 = highest
-// Use same priority to force round-robin scheduling
-#define CIC_TASK_PRIORITY     (tskIDLE_PRIORITY + 1UL)
-#define SECOND_TASK_PRIORITY  (tskIDLE_PRIORITY + 1UL)
+// Priority 0 = lowest, 3 = highest
+#define CIC_TASK_PRIORITY     (3UL)
+#define SECOND_TASK_PRIORITY  (1UL)
 
 static StaticTask_t cic_task;
 static StaticTask_t second_task;
@@ -80,24 +79,15 @@ void cic_task_entry(__unused void *params)
 	//       or maybe we don't have to care?
 	sram_load_from_flash();
 
-	while (1) {
-		// n64_cic_run returns when N64_CR goes low.
-		// This happens when the N64 loses power, but the cart is still powered.
-		// When the user presses the reset button, the callback is called.
-		n64_cic_run(sram_save_to_flash);
+	n64_cic_hw_init();
+	// n64_cic_reset_parameters();
+	// n64_cic_set_parameters(params);
+	// n64_cic_set_dd_mode(false);
 
-		// Commit SRAM to flash after N64 loses power.
-		// NOTE: Don't do this when being powered from it.
-		//       Unless we find a way to detect if we're USB powered,
-		//       this should not be done.
-		// TODO: A dual bank backup area could work around this.
-		// sram_save_to_flash();
-
-		printf("CIC task restarting\n");
-		vPortYield();
-	}
-
+	// TODO: Performing the write to flash in a separate task is the way to go
+	n64_cic_task(sram_save_to_flash);
 }
+
 
 void second_task_entry(__unused void *params)
 {

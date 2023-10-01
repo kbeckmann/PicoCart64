@@ -27,6 +27,7 @@ SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
 C_DIRECTORIES="
     n64
+    n64_cic
     picocart64_v1
     picocart64_shared
     stdio_async_uart
