@@ -31,10 +31,9 @@
 
 #define ENABLE_N64_PI 1
 
-// Priority 0 = lowest, 31 = highest
-// Use same priority to force round-robin scheduling
-// #define SECOND_TASK_PRIORITY  (tskIDLE_PRIORITY + 1UL)
-#define STREAM_TASK_PRIORITY  (tskIDLE_PRIORITY + 1UL)
+// Priority 0 = lowest, 3 = highest
+#define CIC_TASK_PRIORITY     (3UL)
+#define STREAM_TASK_PRIORITY  (1UL)
 
 // static StaticTask_t second_task;
 static StaticTask_t stream_task;
@@ -70,6 +69,24 @@ void vApplicationGetTimerTaskMemory(StaticTask_t **ppxTimerTaskTCBBuffer, StackT
 	*ppxTimerTaskTCBBuffer = &xTimerTaskTCB;
 	*ppxTimerTaskStackBuffer = uxTimerTaskStack;
 	*pulTimerTaskStackSize = configTIMER_TASK_STACK_DEPTH;
+}
+
+void cic_task_entry(__unused void *params)
+{
+	printf("cic_task_entry\n");
+
+	// Load SRAM backup from external flash
+	// TODO: How do we detect if it's uninitialized (config area in flash?),
+	//       or maybe we don't have to care?
+	sram_load_from_flash();
+
+	n64_cic_hw_init();
+	// n64_cic_reset_parameters();
+	// n64_cic_set_parameters(params);
+	// n64_cic_set_dd_mode(false);
+
+	// TODO: Performing the write to flash in a separate task is the way to go
+	n64_cic_task(sram_save_to_flash);
 }
 
 #if 0

@@ -124,23 +124,29 @@ void __not_in_flash_func(n64_pi_run(void))
 			} while (1);
 		} else if (last_addr >= CART_SRAM_START && last_addr <= CART_SRAM_END) {
 			// Domain 2, Address 2 Cartridge SRAM
-			do {
-				// Pre-fetch from the address
-				next_word = sram[resolve_sram_address(last_addr) >> 1];
 
+			// Calculate start pointer
+			uint16_t *sram_ptr = &sram[sram_resolve_address_shifted(last_addr)];
+
+			do {
 				// Read command/address
 				addr = n64_pi_get_value(pio);
 
 				if ((addr & 0xffff0000) == 0xffff0000) {
-					// We got a WRITE
-					// 0b11111111_11111111_xxxxxxxx_xxxxxxxx
-					sram[resolve_sram_address(last_addr) >> 1] = addr & 0xFFFF;
-					last_addr += 2;
+					// WRITE
+					*(sram_ptr++) = addr & 0xFFFF;
+
+					// More readable:
+					// sram[sram_resolve_address_shifted(last_addr)] = addr & 0xFFFF;
+					// last_addr += 2;
 				} else if (addr == 0) {
 					// READ
-					pio_sm_put(pio, 0, next_word);
-					last_addr += 2;
-					next_word = sram[resolve_sram_address(last_addr) >> 1];
+					pio_sm_put(pio, 0, *(sram_ptr++));
+
+					// More readable:
+					// next_word = sram[sram_resolve_address_shifted(last_addr)];
+					// pio_sm_put(pio, 0, next_word);
+					// last_addr += 2;
 				} else {
 					// New address
 					break;
