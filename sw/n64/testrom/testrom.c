@@ -388,7 +388,9 @@ int main(void)
 	// Draw something that moves forever
 	int count = 0;
 	while (1) {
-		display_context_t disp = display_get();
+		display_context_t disp = 0;
+		while (!(disp = display_lock())) ;
+
 		const int width = 60;
 		const int height = 240;
 
