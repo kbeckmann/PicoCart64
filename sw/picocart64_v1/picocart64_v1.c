@@ -88,7 +88,6 @@ void cic_task_entry(__unused void *params)
 	n64_cic_task(sram_save_to_flash);
 }
 
-
 void second_task_entry(__unused void *params)
 {
 	uint32_t count = 0;
