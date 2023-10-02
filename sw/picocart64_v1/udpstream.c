@@ -183,6 +183,7 @@ void udpstream_task_entry(void *params)
 {
 	int ret = 0;
 
+	printf("Calling cyw43_arch_init()\n");
 	if (cyw43_arch_init()) {
 		printf("cyw43_arch_init() failed\n");
 		goto error;

@@ -1,275 +1,131 @@
-// Copyright (c) 2023 Konrad Beckmann
-// SPDX-License-Identifier: MIT
-// Based on https://github.com/DragonMinded/libdragon/blob/trunk/examples/vtest/vtest.c
+/**
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Copyright (c) 2022 Konrad Beckmann <konrad.beckmann@gmail.com>
+ * Copyright (c) 2022 Christopher Bonhage <me@christopherbonhage.com>
+ *
+ * Based on https://github.com/meeq/SaveTest-N64
+ */
 
-#include <stdio.h>
-#include <malloc.h>
 #include <string.h>
 #include <stdint.h>
 #include <libdragon.h>
 
+#include "git_info.h"
+
+// picocart64_shared
 #include "pc64_regs.h"
+#include "pc64_rand.h"
+#include "n64_defs.h"
 
-/* hardware definitions */
-// Pad buttons
-#define A_BUTTON(a)     ((a) & 0x8000)
-#define B_BUTTON(a)     ((a) & 0x4000)
-#define Z_BUTTON(a)     ((a) & 0x2000)
-#define START_BUTTON(a) ((a) & 0x1000)
-
-// D-Pad
-#define DU_BUTTON(a)    ((a) & 0x0800)
-#define DD_BUTTON(a)    ((a) & 0x0400)
-#define DL_BUTTON(a)    ((a) & 0x0200)
-#define DR_BUTTON(a)    ((a) & 0x0100)
-
-// Triggers
-#define TL_BUTTON(a)    ((a) & 0x0020)
-#define TR_BUTTON(a)    ((a) & 0x0010)
-
-// Yellow C buttons
-#define CU_BUTTON(a)    ((a) & 0x0008)
-#define CD_BUTTON(a)    ((a) & 0x0004)
-#define CL_BUTTON(a)    ((a) & 0x0002)
-#define CR_BUTTON(a)    ((a) & 0x0001)
-
-#define PAD_DEADZONE     5
-#define PAD_ACCELERATION 10
-#define PAD_CHECK_TIME   40
-
-unsigned short gButtons = 0;
-struct controller_data gKeys;
-
-volatile int gTicks;			/* incremented every vblank */
-
-/* input - do getButtons() first, then getAnalogX() and/or getAnalogY() */
-unsigned short getButtons(int pad)
-{
-	// Read current controller status
-	controller_scan();
-	gKeys = get_keys_pressed();
-	return (unsigned short)(gKeys.c[0].data >> 16);
-}
-
-unsigned char getAnalogX(int pad)
-{
-	return (unsigned char)gKeys.c[pad].x;
-}
-
-unsigned char getAnalogY(int pad)
-{
-	return (unsigned char)gKeys.c[pad].y;
-}
-
-display_context_t lockVideo(int wait)
-{
-	display_context_t dc;
-
-	if (wait)
-		while (!(dc = display_lock())) ;
-	else
-		dc = display_lock();
-	return dc;
-}
-
-void unlockVideo(display_context_t dc)
-{
-	if (dc)
-		display_show(dc);
-}
-
-/* text functions */
-void drawText(display_context_t dc, char *msg, int x, int y)
-{
-	if (dc)
-		graphics_draw_text(dc, x, y, msg);
-}
-
-void printText(display_context_t dc, char *msg, int x, int y)
-{
-	if (dc)
-		graphics_draw_text(dc, x * 8, y * 8, msg);
-}
-
-#define REGISTER_BASE       0xA4400000
-
-/**
- * @brief Update the framebuffer pointer in the VI
- *
- * @param[in] dram_val
- *            The new framebuffer to use for display.  Should be aligned and uncached.
- */
-static void __write_dram_register(void const *const dram_val)
-{
-	uint32_t *reg_base = (uint32_t *) REGISTER_BASE;
-
-	reg_base[1] = (uint32_t) dram_val;
-	MEMORY_BARRIER();
-}
-
-/* vblank callback */
-void vblCallback(void)
-{
-	gTicks++;
-	// volatile void *fpga_source = (void *) (0x10000000 + 32 * 1024 * 1024);
-	// __write_dram_register(fpga_source);
-}
-
-void delay(int cnt)
-{
-	int then = gTicks + cnt;
-	while (then > gTicks) ;
-}
-
-typedef uint8_t u8;
-typedef uint16_t u16;
-typedef uint32_t u32;
-typedef uint64_t u64;
-
-typedef int8_t s8;
-typedef int16_t s16;
-typedef int32_t s32;
-typedef int64_t s64;
-
-typedef volatile uint8_t vu8;
-typedef volatile uint16_t vu16;
-typedef volatile uint32_t vu32;
-typedef volatile uint64_t vu64;
-
-typedef volatile int8_t vs8;
-typedef volatile int16_t vs16;
-typedef volatile int32_t vs32;
-typedef volatile int64_t vs64;
-
-typedef float f32;
-typedef double f64;
-
-/* initialize console hardware */
-void init_n64(void)
-{
-	/* enable interrupts (on the CPU) */
-	// init_interrupts();
-
-	/* Initialize peripherals */
-	display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
-	set_VI_interrupt(1, 590);
-
-	register_VI_handler(vblCallback);
-
-	controller_init();
-
-	// PI registers
-#define PI_BASE_REG   0x04600000
-#define PI_STATUS_REG (PI_BASE_REG+0x10)
-#define	PI_STATUS_ERROR		0x04
-#define	PI_STATUS_IO_BUSY	0x02
-#define	PI_STATUS_DMA_BUSY	0x01
-
-#define PI_BSD_DOM1_LAT_REG	(PI_BASE_REG+0x14)
-#define PI_BSD_DOM1_PWD_REG	(PI_BASE_REG+0x18)
-#define PI_BSD_DOM1_PGS_REG	(PI_BASE_REG+0x1C)
-#define PI_BSD_DOM1_RLS_REG	(PI_BASE_REG+0x20)
-#define PI_BSD_DOM2_LAT_REG	(PI_BASE_REG+0x24)
-#define PI_BSD_DOM2_PWD_REG	(PI_BASE_REG+0x28)
-#define PI_BSD_DOM2_PGS_REG	(PI_BASE_REG+0x2C)
-#define PI_BSD_DOM2_RLS_REG	(PI_BASE_REG+0x30)
-
-	// MIPS addresses
-#define KSEG0 0x80000000
-#define KSEG1 0xA0000000
-
-	// Memory translation stuff
-#define	PHYS_TO_K1(x)       ((u32)(x)|KSEG1)
-#define	IO_WRITE(addr,data) (*(vu32 *)PHYS_TO_K1(addr)=(u32)(data))
-#define	IO_READ(addr)       (*(vu32 *)PHYS_TO_K1(addr))
-
-	// Initialize the PI
-	IO_WRITE(PI_STATUS_REG, 3);
-
-#if 0
-	// Slowish
-	IO_WRITE(PI_BSD_DOM2_LAT_REG, 0x05);
-	IO_WRITE(PI_BSD_DOM2_PWD_REG, 0x0C);
-	IO_WRITE(PI_BSD_DOM2_PGS_REG, 0x0D);
-	IO_WRITE(PI_BSD_DOM2_RLS_REG, 0x02);
-#elif 0
-	// SPEEED
-	IO_WRITE(PI_BSD_DOM2_LAT_REG, 0x05);
-	IO_WRITE(PI_BSD_DOM2_PWD_REG, 0x03);
-	IO_WRITE(PI_BSD_DOM2_PGS_REG, 0x0F);
-	IO_WRITE(PI_BSD_DOM2_RLS_REG, 0x02);
-#else
-	// Fast SRAM access (should match SDK values)
-	IO_WRITE(PI_BSD_DOM2_LAT_REG, 0x40);
-	IO_WRITE(PI_BSD_DOM2_PWD_REG, 0x0C);
-	IO_WRITE(PI_BSD_DOM2_PGS_REG, 0x07);
-	IO_WRITE(PI_BSD_DOM2_RLS_REG, 0x03);
-#endif
-}
-
-/**
- * @brief Align a memory address to 64 byte offset
- * 
- * @param[in] x
- *            Unaligned memory address
- *
- * @return An aligned address guaranteed to be >= the unaligned address
- */
-#define ALIGN_64BYTE(x)     ((void *)(((uint32_t)(x)+63) & 0xFFFFFFC0))
-
-/**
- * @brief Register definition for the PI interface
- * @ingroup lowlevel
- */
 typedef struct PI_regs_s {
-	/** @brief Uncached address in RAM where data should be found */
 	volatile void *ram_address;
-	/** @brief Address of data on peripheral */
 	uint32_t pi_address;
-	/** @brief How much data to read from RAM into the peripheral */
 	uint32_t read_length;
-	/** @brief How much data to write to RAM from the peripheral */
 	uint32_t write_length;
-	/** @brief Status of the PI, including DMA busy */
-	uint32_t status;
 } PI_regs_t;
+static volatile PI_regs_t *const PI_regs = (PI_regs_t *) 0xA4600000;
 
-static volatile struct PI_regs_s *const PI_regs = (struct PI_regs_s *)0xa4600000;
+// SRAM constants
+#define SRAM_256KBIT_SIZE         0x00008000
+#define SRAM_768KBIT_SIZE         0x00018000
+#define SRAM_1MBIT_SIZE           0x00020000
+#define SRAM_BANK_SIZE            SRAM_256KBIT_SIZE
+#define SRAM_256KBIT_BANKS        1
+#define SRAM_768KBIT_BANKS        3
+#define SRAM_1MBIT_BANKS          4
 
-/**
- * @brief Read from a peripheral
- *
- * This function should be used when reading from the cartridge.
- *
- * @param[out] ram_address
- *             Pointer to a buffer to place read data
- * @param[in]  pi_address
- *             Memory address of the peripheral to read from
- * @param[in]  len
- *             Length in bytes to read into ram_address
- */
-void dma_read_any(void *ram_address, unsigned long read_address, unsigned long len)
+static void verify_memory_range(uint32_t base, uint32_t offset, uint32_t len)
 {
-	assert(len > 0);
+	uint32_t start = base | offset;
+	uint32_t end = start + len - 1;
+
+	switch (base) {
+	case CART_DOM2_ADDR1_START:
+		assert(start >= CART_DOM2_ADDR1_START);
+		assert(start <= CART_DOM2_ADDR1_END);
+		assert(end >= CART_DOM2_ADDR1_START);
+		assert(end <= CART_DOM2_ADDR1_END);
+		break;
+
+	case CART_DOM1_ADDR1_START:
+		assert(start >= CART_DOM1_ADDR1_START);
+		assert(start <= CART_DOM1_ADDR1_END);
+		assert(end >= CART_DOM1_ADDR1_START);
+		assert(end <= CART_DOM1_ADDR1_END);
+		break;
+
+	case CART_DOM2_ADDR2_START:
+		assert(start >= CART_DOM2_ADDR2_START);
+		assert(start <= CART_DOM2_ADDR2_END);
+		assert(end >= CART_DOM2_ADDR2_START);
+		assert(end <= CART_DOM2_ADDR2_END);
+		break;
+
+	case CART_DOM1_ADDR2_START:
+		assert(start >= CART_DOM1_ADDR2_START);
+		assert(start <= CART_DOM1_ADDR2_END);
+		assert(end >= CART_DOM1_ADDR2_START);
+		assert(end <= CART_DOM1_ADDR2_END);
+		break;
+
+	case CART_DOM1_ADDR3_START:
+		assert(start >= CART_DOM1_ADDR3_START);
+		assert(start <= CART_DOM1_ADDR3_END);
+		assert(end >= CART_DOM1_ADDR3_START);
+		assert(end <= CART_DOM1_ADDR3_END);
+		break;
+
+	case PC64_BASE_ADDRESS_START:
+		assert(start >= PC64_BASE_ADDRESS_START);
+		assert(start <= PC64_BASE_ADDRESS_END);
+		assert(end >= PC64_BASE_ADDRESS_START);
+		assert(end <= PC64_BASE_ADDRESS_END);
+		break;
+
+	case PC64_RAND_ADDRESS_START:
+		assert(start >= PC64_RAND_ADDRESS_START);
+		assert(start <= PC64_RAND_ADDRESS_END);
+		assert(end >= PC64_RAND_ADDRESS_START);
+		assert(end <= PC64_RAND_ADDRESS_END);
+		break;
+
+	case PC64_CIBASE_ADDRESS_START:
+		assert(start >= PC64_CIBASE_ADDRESS_START);
+		assert(start <= PC64_CIBASE_ADDRESS_END);
+		assert(end >= PC64_CIBASE_ADDRESS_START);
+		assert(end <= PC64_CIBASE_ADDRESS_END);
+		break;
+
+	default:
+		assert(!"Unsupported base");
+	}
+}
+
+static void pi_read_raw(void *dest, uint32_t base, uint32_t offset, uint32_t len)
+{
+	assert(dest != NULL);
+	verify_memory_range(base, offset, len);
 
 	disable_interrupts();
+	dma_wait();
 
-	while (dma_busy()) ;
 	MEMORY_BARRIER();
-	PI_regs->ram_address = ram_address;
+	PI_regs->ram_address = UncachedAddr(dest);
 	MEMORY_BARRIER();
-	PI_regs->pi_address = read_address;
+	PI_regs->pi_address = offset | base;
 	MEMORY_BARRIER();
 	PI_regs->write_length = len - 1;
 	MEMORY_BARRIER();
-	while (dma_busy()) ;
 
 	enable_interrupts();
+	dma_wait();
 }
 
 static void pi_write_raw(const void *src, uint32_t base, uint32_t offset, uint32_t len)
 {
 	assert(src != NULL);
+	verify_memory_range(base, offset, len);
 
 	disable_interrupts();
 	dma_wait();
@@ -294,6 +150,8 @@ static void pi_write_u32(const uint32_t value, uint32_t base, uint32_t offset)
 	pi_write_raw(buf, base, offset, sizeof(buf));
 }
 
+static uint8_t __attribute__((aligned(16))) facit_buf[SRAM_1MBIT_SIZE];
+static uint8_t __attribute__((aligned(16))) read_buf[SRAM_1MBIT_SIZE];
 static char __attribute__((aligned(16))) write_buf[0x1000];
 
 static void pc64_uart_write(const uint8_t *buf, uint32_t len)
@@ -309,74 +167,247 @@ static void pc64_uart_write(const uint8_t *buf, uint32_t len)
 	pi_write_u32(len, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_UART_TX);
 }
 
-/* main code entry point */
+static void configure_sram(void)
+{
+	// PI registers
+#define PI_BASE_REG          0x04600000
+#define PI_STATUS_REG        (PI_BASE_REG+0x10)
+#define	PI_STATUS_ERROR      0x04
+#define PI_STATUS_IO_BUSY    0x02
+#define PI_STATUS_DMA_BUSY   0x01
+
+#define PI_BSD_DOM1_LAT_REG  (PI_BASE_REG+0x14)
+#define PI_BSD_DOM1_PWD_REG  (PI_BASE_REG+0x18)
+#define PI_BSD_DOM1_PGS_REG  (PI_BASE_REG+0x1C)
+#define PI_BSD_DOM1_RLS_REG  (PI_BASE_REG+0x20)
+#define PI_BSD_DOM2_LAT_REG  (PI_BASE_REG+0x24)
+#define PI_BSD_DOM2_PWD_REG  (PI_BASE_REG+0x28)
+#define PI_BSD_DOM2_PGS_REG  (PI_BASE_REG+0x2C)
+#define PI_BSD_DOM2_RLS_REG  (PI_BASE_REG+0x30)
+
+	// MIPS addresses
+#define KSEG0 0x80000000
+#define KSEG1 0xA0000000
+
+	// Memory translation stuff
+#define	PHYS_TO_K1(x)       ((uint32_t)(x)|KSEG1)
+#define	IO_WRITE(addr,data) (*(volatile uint32_t *)PHYS_TO_K1(addr)=(uint32_t)(data))
+#define	IO_READ(addr)       (*(volatile uint32_t *)PHYS_TO_K1(addr))
+
+	// Initialize the PI
+	IO_WRITE(PI_STATUS_REG, 3);
+
+	// SDK default, 0x80371240
+	//                  DCBBAA
+	// AA = LAT
+	// BB = PWD
+	//  C = PGS
+	//  D = RLS
+	//
+	// 1 cycle = 1/62.5 MHz = 16ns
+	// Time = (register+1)*16ns
+	// LAT = tL = 0x40 = 65 cycles
+	// PWM = tP = 0x12 = 19 cycles
+	// PGS      = 0x07 = 512 bytes page size
+	// RLS = tR = 0x03 = 4 cycles
+
+#if 0
+	IO_WRITE(PI_BSD_DOM1_LAT_REG, 0x40);
+	IO_WRITE(PI_BSD_DOM1_PWD_REG, 0x12);
+	IO_WRITE(PI_BSD_DOM1_PGS_REG, 0x07);
+	IO_WRITE(PI_BSD_DOM1_RLS_REG, 0x03);
+
+	IO_WRITE(PI_BSD_DOM2_LAT_REG, 0x40);
+	IO_WRITE(PI_BSD_DOM2_PWD_REG, 0x12);
+	IO_WRITE(PI_BSD_DOM2_PGS_REG, 0x07);
+	IO_WRITE(PI_BSD_DOM2_RLS_REG, 0x03);
+
+#else
+
+	// Fast SRAM access (matches default values from SDK)
+	IO_WRITE(PI_BSD_DOM2_LAT_REG, 0x05);
+	IO_WRITE(PI_BSD_DOM2_PWD_REG, 0x0C);
+	IO_WRITE(PI_BSD_DOM2_PGS_REG, 0x0D);
+	IO_WRITE(PI_BSD_DOM2_RLS_REG, 0x02);
+
+	// LAT: 0x04 works when banked mode is disabled
+#endif
+}
+
 int main(void)
 {
-	display_context_t _dc;
-	char temp[128];
-	int res = 0;
-	uint32_t buttons, previous = 0;
+	uint32_t *facit_buf32 = (uint32_t *) facit_buf;
+	uint32_t *read_buf32 = (uint32_t *) read_buf;
+	uint16_t *read_buf16 = (uint16_t *) read_buf;
+	int fail_count = 0;
 
-	uint32_t *buf_alloc = malloc(320 * 240 * 2);
-	uint32_t *buf = ALIGN_64BYTE(buf_alloc);
+	configure_sram();
 
-	init_n64();
+	display_init(RESOLUTION_320x240, DEPTH_32_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
+	console_init();
+	// debug_init_isviewer();
 
-	int frames = 0;
-	while (1) {
-		frames++;
+	printf("PicoCart64 Test ROM (git rev %08X)\n\n", GIT_REV);
 
-		_dc = lockVideo(1);
+	///////////////////////////////////////////////////////////////////////////
 
-#define CACHED_ADDR(x)    ((void *)(((uint32_t)(x)) & (~0xA0000000)))
+	// Verify PicoCart64 Magic
+	data_cache_hit_writeback_invalidate(read_buf, sizeof(read_buf));
+	pi_read_raw(read_buf, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_MAGIC, sizeof(uint32_t));
+	if (read_buf32[0] == PC64_MAGIC) {
+		printf("[ OK ] MAGIC = 0x%08lX.\n", read_buf32[0]);
+	} else {
+		fail_count++;
+		printf("[FAIL] MAGIC = 0x%08lX.\n", read_buf32[0]);
+	}
 
-		// uint32_t *dest = (uint32_t *) CACHED_ADDR(__get_buffer(_dc));
-		void *dest = (void *)_dc->buffer;
+	///////////////////////////////////////////////////////////////////////////
 
-		uint32_t t0 = TICKS_READ();
+	// Print Hello from the N64
+	strcpy(write_buf, "Hello from the N64!\r\n");
+	pc64_uart_write((const uint8_t *)write_buf, strlen(write_buf));
+	printf("[ -- ] Wrote hello over UART.\n");
 
-		// SRAM streaming
-		volatile void *sram_source = (void *)(0x08000000);
+	///////////////////////////////////////////////////////////////////////////
 
-		// dma_read_any(dest, sram_source, 320 * 240 * 2);
-		dma_read_raw_async(dest, sram_source, 320 * 240 * 2);
+	// Initialize a random sequence
+	pc64_rand_seed(0);
+	data_cache_hit_writeback_invalidate(facit_buf, sizeof(facit_buf));
+	for (int i = 0; i < sizeof(facit_buf) / sizeof(uint32_t); i++) {
+		facit_buf32[i] = pc64_rand32();
+	}
 
-#if 0
-		uint32_t t1 = TICKS_READ();
+	// Read back 1Mbit of SRAM
+	data_cache_hit_writeback_invalidate(read_buf, sizeof(read_buf));
+	pi_read_raw(read_buf, CART_DOM2_ADDR2_START, 0, sizeof(read_buf));
 
-		// color = graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF);
+	// Compare SRAM with the facit
+	if (memcmp(facit_buf, read_buf, sizeof(read_buf)) != 0) {
+		printf("[////] SRAM was not backed up properly.\n");
+		printf("[ !! ] Should pass if you press the N64 reset button.\n");
 
-		uint32_t t_delta = t1 - t0;
-		uint32_t t_delta_ms = t_delta / (TICKS_PER_SECOND / 1000);
+		for (int i = 0; i < sizeof(facit_buf) / sizeof(uint32_t); i++) {
+			if (facit_buf32[i] != read_buf32[i]) {
+				printf("       Error @%d: facit %08lX != sram %08lX\n", i, facit_buf32[i], read_buf32[i]);
+				break;
+			}
+		}
+	} else {
+		printf("[ OK ] SRAM was backed up properly.\n");
+	}
 
-		sprintf(temp, "delta=%d (%d ms)", t_delta, t_delta_ms);
-		printText(_dc, temp, 5, 3);
-#endif
-		unlockVideo(_dc);
+	///////////////////////////////////////////////////////////////////////////
 
-		buttons = getButtons(0) | (getAnalogX(0) << 16) | (getAnalogY(0) << 24);
+	// Write 1Mbit of SRAM
+	data_cache_hit_writeback_invalidate(facit_buf, sizeof(facit_buf));
+	pi_write_raw(facit_buf, CART_DOM2_ADDR2_START, 0, sizeof(facit_buf));
 
-		if (buttons != previous) {
-			previous = buttons;
-			pi_write_u32(buttons, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_BUTTON_STATE);
-#if 0
-			pc64_uart_write("buttons", 7);
+	printf("[ -- ] Wrote test pattern to SRAM.\n");
 
-			uint32_t t1 = TICKS_READ();
+	// Read it back and verify
+	data_cache_hit_writeback_invalidate(read_buf, sizeof(read_buf));
+	pi_read_raw(read_buf, CART_DOM2_ADDR2_START, 0, sizeof(read_buf));
 
-			// color = graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF);
+	// Compare SRAM with the facit
+	if (memcmp(facit_buf, read_buf, sizeof(read_buf)) != 0) {
+		fail_count++;
+		printf("[FAIL] Volatile SRAM did not verify correctly.\n");
 
-			uint32_t t_delta = t1 - t0;
-			uint32_t t_delta_ms = t_delta / (TICKS_PER_SECOND / 1000);
+		for (int i = 0; i < sizeof(facit_buf) / sizeof(uint32_t); i++) {
+			if (facit_buf32[i] != read_buf32[i]) {
+				printf("       Error @%d: facit %08lX != sram %08lX\n", i, facit_buf32[i], read_buf32[i]);
+				break;
+			}
+		}
+	} else {
+		printf("[ OK ] Volatile SRAM verified correctly.\n");
+	}
 
-			sprintf(temp, "delta=%d (%d ms)", t_delta, t_delta_ms);
-			printText(_dc, temp, 5, 3);
+	///////////////////////////////////////////////////////////////////////////
 
-			sprintf(temp, "buttons=%04x", buttons);
-			printText(_dc, temp, 5, 10);
-#endif
+	// Stress test: Read pseudo-random numbers from PicoCart64 RAND address space
+	// Reset random seed
+	pi_write_u32(0, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_RAND_SEED);
+	pc64_rand_seed(0);
+
+	// Compare buffer with RNG
+	printf("[ -- ] PicoCart64 RNG stress-test: ");
+	bool rng_ok = true;
+	for (int j = 0; j < 64 && rng_ok; j++) {
+		// Read back 1Mbit of RAND values
+		data_cache_hit_writeback_invalidate(read_buf, sizeof(read_buf));
+		pi_read_raw(read_buf, PC64_RAND_ADDRESS_START, 0, sizeof(read_buf));
+		printf(".");
+		fflush(stdout);
+
+		for (int i = 0; i < sizeof(read_buf) / sizeof(uint16_t); i++) {
+			uint16_t value = pc64_rand16();
+
+			if (value != read_buf16[i]) {
+				printf("\n       Error @%d: ours %04X != theirs %04X", i, value, read_buf16[i]);
+				rng_ok = false;
+				break;
+			}
 		}
 	}
 
-	return 0;
+	if (rng_ok) {
+		printf("\n[ OK ] Random stress test verified correctly.\n");
+	} else {
+		fail_count++;
+		printf("\n[FAIL] Random stress test failed.\n");
+	}
+
+	///////////////////////////////////////////////////////////////////////////
+
+	// Read 1Mbit of 64DD IPL ROM
+	data_cache_hit_writeback_invalidate(read_buf, sizeof(read_buf));
+	pi_read_raw(read_buf, CART_DOM1_ADDR1_START, 0, sizeof(read_buf));
+	printf("[ -- ] Read from the N64DD address space.\n");
+
+	// Verify the PicoCart64 Magic *again*
+	// This is done to ensure that the PicoCart64 is still alive and well,
+	// and hasn't crashed or locked itself up.
+	data_cache_hit_writeback_invalidate(read_buf, sizeof(read_buf));
+	pi_read_raw(read_buf, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_MAGIC, sizeof(uint32_t));
+	if (read_buf32[0] == PC64_MAGIC) {
+		printf("[ OK ] (second time) MAGIC = 0x%08lX.\n", read_buf32[0]);
+	} else {
+		fail_count++;
+		printf("[FAIL] (second time) MAGIC = 0x%08lX.\n", read_buf32[0]);
+		printf("       PicoCart64 might stall now and require a power cycle.\n");
+	}
+
+	if (fail_count == 0) {
+		printf("\n[ OK ] Test is finished. All tests passed.\n");
+	} else {
+		printf("\n[FAIL] Test is finished. %d tests failed.\n", fail_count);
+	}
+	printf("\n");
+
+	// Draw something that moves forever
+	int count = 0;
+	while (1) {
+		display_context_t disp = 0;
+		while (!(disp = display_lock())) ;
+
+		const int width = 60;
+		const int height = 240;
+
+		count++;
+
+		int x = count % 256;
+		if (x < 128)
+			x = 255 - x;
+
+		if (fail_count > 0) {
+			graphics_draw_box(disp, 0, 0, width, height, graphics_make_color(x, 0, 0, 255));
+			graphics_draw_box(disp, 0, count % (height - 10), width, 10, graphics_make_color(127, 127, 127, 255));
+		} else {
+			graphics_draw_box(disp, 0, 0, width, height, graphics_make_color(0, x, 0, 255));
+			graphics_draw_box(disp, 0, count % 230, width, 10, graphics_make_color(127, 127, 127, 255));
+		}
+
+		display_show(disp);
+	}
 }
