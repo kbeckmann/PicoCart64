@@ -57,12 +57,8 @@ static inline uint32_t n64_pi_get_value(PIO pio)
 	return value;
 }
 
-static inline uint32_t resolve_sram_address(uint32_t address)
-{
-	return address & ((1024 * 1024) - 1);
-}
-
-void __not_in_flash_func(n64_pi_run(void))
+//void __not_in_flash_func(n64_pi_run(void))
+void n64_pi_run(void)
 {
 	// Init PIO
 	PIO pio = pio0;

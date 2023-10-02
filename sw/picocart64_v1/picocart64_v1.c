@@ -35,10 +35,11 @@
 #define CIC_TASK_PRIORITY     (3UL)
 #define STREAM_TASK_PRIORITY  (1UL)
 
-// static StaticTask_t second_task;
+static StaticTask_t cic_task;
 static StaticTask_t stream_task;
-// static StackType_t second_task_stack[4 * 1024 / sizeof(StackType_t)];
-static StackType_t stream_task_stack[4 * 1024 / sizeof(StackType_t)];
+static __attribute__((section(".stack1.task1")))
+StackType_t cic_task_stack[1 *1024 / sizeof(StackType_t)];
+static StackType_t stream_task_stack[32 *1024 / sizeof(StackType_t)];
 
 /*
 
@@ -75,10 +76,7 @@ void cic_task_entry(__unused void *params)
 {
 	printf("cic_task_entry\n");
 
-	// Load SRAM backup from external flash
-	// TODO: How do we detect if it's uninitialized (config area in flash?),
-	//       or maybe we don't have to care?
-	sram_load_from_flash();
+	memset(sram, 0x7f, sizeof(sram));
 
 	n64_cic_hw_init();
 	// n64_cic_reset_parameters();
@@ -86,50 +84,19 @@ void cic_task_entry(__unused void *params)
 	// n64_cic_set_dd_mode(false);
 
 	// TODO: Performing the write to flash in a separate task is the way to go
-	n64_cic_task(sram_save_to_flash);
+	n64_cic_task(NULL);
 }
 
-#if 0
-void second_task_entry(__unused void *params)
+void vApplicationMallocFailedHook(void)
 {
-	uint32_t count = 0;
-
-	printf("second_task_entry\n");
-
-	while (true) {
-		vTaskDelay(1000);
-		count++;
-
-		// Set to 1 to print stack watermarks.
-		// Printing is synchronous and interferes with the CIC emulation.
-#if 1
-		// printf("Second task heartbeat: %d\n", count);
-		// vPortYield();
-
-		if (count > 10) {
-			printf("watermark: %d\n", uxTaskGetStackHighWaterMark(NULL));
-			vPortYield();
-
-			printf("watermark second_task: %d\n", uxTaskGetStackHighWaterMark((TaskHandle_t) & second_task));
-			vPortYield();
-
-			printf("watermark cic_task: %d\n", uxTaskGetStackHighWaterMark((TaskHandle_t) & cic_task));
-			vPortYield();
-
-			printf("watermark ping_task: %d\n", uxTaskGetStackHighWaterMark((TaskHandle_t) & ping_task));
-			vPortYield();
-		}
-#endif
-
-	}
+	printf("vApplicationMallocFailedHook\n");
+	for (;;) ;
 }
-#endif
 
 void vLaunch(void)
 {
-	printf("CIC Disabled\n");
-	// xTaskCreateStatic(second_task_entry, "SecondThread", configMINIMAL_STACK_SIZE, NULL, SECOND_TASK_PRIORITY, second_task_stack, &second_task);
-	xTaskCreateStatic(udpstream_task_entry, "StreamThread", configMINIMAL_STACK_SIZE, NULL, STREAM_TASK_PRIORITY, stream_task_stack, &stream_task);
+	xTaskCreateStatic(cic_task_entry, "CICThread", sizeof(cic_task_stack) / 4, NULL, CIC_TASK_PRIORITY, cic_task_stack, &cic_task);
+	xTaskCreateStatic(udpstream_task_entry, "StreamThread", sizeof(stream_task_stack) / 4, NULL, STREAM_TASK_PRIORITY, stream_task_stack, &stream_task);
 
 	/* Start the tasks and timer running. */
 	vTaskStartScheduler();

@@ -183,6 +183,7 @@ void udpstream_task_entry(void *params)
 {
 	int ret = 0;
 
+	printf("Calling cyw43_arch_init()\n");
 	if (cyw43_arch_init()) {
 		printf("cyw43_arch_init() failed\n");
 		goto error;
@@ -221,7 +222,9 @@ void udpstream_task_entry(void *params)
 
  error:
 	while (true) {
-		vTaskDelay(10000);
+		// This is not good... Should use pico_cyw43_arch_lwip_sys_freertos but it needs some extra work.
+		cyw43_arch_poll();
+		// vTaskDelay(10000);
 	}
 }
 

@@ -71,7 +71,30 @@ SECTIONS
         /* bit of a hack right now to exclude all floating point and time critical (e.g. memset, memcpy) code from
          * FLASH ... we will include any thing excluded here in .data below by default */
         *(.init)
-        *(EXCLUDE_FILE(*libgcc.a: *libc.a:*lib_a-mem*.o *libm.a:) .text*)
+        
+        *(EXCLUDE_FILE(
+            *libgcc.a: 
+            *libc.a:*lib_a-mem*.o 
+            *libm.a: 
+
+            */n64_cic.c.obj
+            */n64_pi_task.c.obj
+            */n64_pi_task.c.obj
+            */n64_pi.c.obj
+            */picocart64_v1.c.obj
+            */sram.c.obj
+            */udpstream.c.obj
+            */utils.c.obj
+            */pc64_rand.c.obj
+            */stdio_async_uart.c.obj
+
+            */compile_time_choice.S.obj
+            */pico-sdk/src/common/*
+            */pico-sdk/src/rp2_common/*
+            */freertos-kernel/*
+
+        ) .text*)
+        
         *(.fini)
         /* Pull all c'tors into .text */
         *crtbegin.o(.ctors)
@@ -132,6 +155,24 @@ SECTIONS
         *(vtable)
 
         *(.time_critical*)
+
+        *(
+            */n64_cic.c.obj
+            */n64_pi_task.c.obj
+            */n64_pi_task.c.obj
+            */n64_pi.c.obj
+            */picocart64_v1.c.obj
+            */sram.c.obj
+            */udpstream.c.obj
+            */utils.c.obj
+            */pc64_rand.c.obj
+            */stdio_async_uart.c.obj
+
+            */compile_time_choice.S.obj
+            */pico-sdk/src/common/*
+            */pico-sdk/src/rp2_common/*
+            */freertos-kernel/*
+        )
 
         /* remaining .text and .rodata; i.e. stuff we exclude above because we want it in RAM */
         *(.text*)
