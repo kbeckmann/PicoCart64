@@ -22,6 +22,7 @@
 #include "picocart64_pins.h"
 #include "sram.h"
 #include "utils.h"
+#include "udpstream.h"
 
 #define UART_TX_PIN (28)
 #define UART_RX_PIN (29)		/* not available on the pico */
@@ -32,12 +33,12 @@
 
 // Priority 0 = lowest, 3 = highest
 #define CIC_TASK_PRIORITY     (3UL)
-#define SECOND_TASK_PRIORITY  (1UL)
+#define STREAM_TASK_PRIORITY  (1UL)
 
-static StaticTask_t cic_task;
-static StaticTask_t second_task;
-static StackType_t cic_task_stack[4 * 1024 / sizeof(StackType_t)];
-static StackType_t second_task_stack[4 * 1024 / sizeof(StackType_t)];
+// static StaticTask_t second_task;
+static StaticTask_t stream_task;
+// static StackType_t second_task_stack[4 * 1024 / sizeof(StackType_t)];
+static StackType_t stream_task_stack[4 * 1024 / sizeof(StackType_t)];
 
 /*
 
@@ -60,7 +61,7 @@ Time between ~N64_READ and bit output on AD0
 */
 
 // FreeRTOS boilerplate
-void vApplicationGetTimerTaskMemory(StaticTask_t ** ppxTimerTaskTCBBuffer, StackType_t ** ppxTimerTaskStackBuffer, uint32_t * pulTimerTaskStackSize)
+void vApplicationGetTimerTaskMemory(StaticTask_t **ppxTimerTaskTCBBuffer, StackType_t **ppxTimerTaskStackBuffer, uint32_t *pulTimerTaskStackSize)
 {
 	static StaticTask_t xTimerTaskTCB;
 	static StackType_t uxTimerTaskStack[configTIMER_TASK_STACK_DEPTH];
@@ -88,6 +89,7 @@ void cic_task_entry(__unused void *params)
 	n64_cic_task(sram_save_to_flash);
 }
 
+#if 0
 void second_task_entry(__unused void *params)
 {
 	uint32_t count = 0;
@@ -100,7 +102,7 @@ void second_task_entry(__unused void *params)
 
 		// Set to 1 to print stack watermarks.
 		// Printing is synchronous and interferes with the CIC emulation.
-#if 0
+#if 1
 		// printf("Second task heartbeat: %d\n", count);
 		// vPortYield();
 
@@ -113,16 +115,21 @@ void second_task_entry(__unused void *params)
 
 			printf("watermark cic_task: %d\n", uxTaskGetStackHighWaterMark((TaskHandle_t) & cic_task));
 			vPortYield();
+
+			printf("watermark ping_task: %d\n", uxTaskGetStackHighWaterMark((TaskHandle_t) & ping_task));
+			vPortYield();
 		}
 #endif
 
 	}
 }
+#endif
 
 void vLaunch(void)
 {
-	xTaskCreateStatic(cic_task_entry, "CICThread", configMINIMAL_STACK_SIZE, NULL, CIC_TASK_PRIORITY, cic_task_stack, &cic_task);
-	xTaskCreateStatic(second_task_entry, "SecondThread", configMINIMAL_STACK_SIZE, NULL, SECOND_TASK_PRIORITY, second_task_stack, &second_task);
+	printf("CIC Disabled\n");
+	// xTaskCreateStatic(second_task_entry, "SecondThread", configMINIMAL_STACK_SIZE, NULL, SECOND_TASK_PRIORITY, second_task_stack, &second_task);
+	xTaskCreateStatic(udpstream_task_entry, "StreamThread", configMINIMAL_STACK_SIZE, NULL, STREAM_TASK_PRIORITY, stream_task_stack, &stream_task);
 
 	/* Start the tasks and timer running. */
 	vTaskStartScheduler();

@@ -12,29 +12,14 @@
 #include "pico/stdlib.h"
 #include "hardware/flash.h"
 
-uint16_t __aligned(4) sram[SRAM_1MBIT_SIZE / sizeof(uint16_t)];
-
-// sram_backup will be aligned to 4096 to match the flash sector erase size
-uint16_t __aligned(4096) __attribute__((section(".n64_sram"))) sram_backup[SRAM_1MBIT_SIZE / sizeof(uint16_t)];
+uint16_t sram[SRAM_FB_SIZE_16];
 
 void sram_load_from_flash(void)
 {
-	// uint32_t offset = ((uint32_t) sram_backup) - XIP_BASE;
-	// uint32_t count = sizeof(sram);
-
-	// printf("Loading %p...%p into %p\n", offset, offset + count, sram);
-
-	memcpy(sram, sram_backup, sizeof(sram));
+	// Not supported anymore
 }
 
 void sram_save_to_flash(void)
 {
-	uint32_t offset = ((uint32_t) sram_backup) - XIP_BASE;
-	uint32_t count = sizeof(sram);
-
-	// printf("Erasing %p...%p\n", offset, offset + count);
-	flash_range_erase(offset, count);
-
-	// printf("Writing %p...%p from %p\n", offset, offset + count, sram);
-	flash_range_program(offset, (const uint8_t *)sram, count);
+	// Not supported anymore
 }

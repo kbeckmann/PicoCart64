@@ -1,8 +1,21 @@
+
+if (TARGET pico_cyw43_arch)
+    message("YES this is right")
+else()
+    message(FATAL_ERROR "NO this is wrong")
+endif()
+
+
 add_executable(picocart64_v1
     n64_pi_task.c
     picocart64_v1.c
     sram.c
     utils.c
+
+    udpstream.c
+
+    # Wifi
+    ${PICO_LWIP_CONTRIB_PATH}/apps/ping/ping.c
 )
 
 if(NOT DEFINED REGION)
@@ -41,6 +54,10 @@ target_compile_definitions(picocart64_v1 PRIVATE
     PICO_STDOUT_MUTEX=0
     CONFIG_REGION_NTSC=${CONFIG_REGION_NTSC}
     CONFIG_REGION_PAL=${CONFIG_REGION_PAL}
+
+    # Wifi
+    WIFI_SSID=\"${WIFI_SSID}\"
+    WIFI_PASSWORD=\"${WIFI_PASSWORD}\"
 )
 
 # Generate git_info.h
@@ -59,6 +76,9 @@ target_include_directories(picocart64_v1 PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}
     ${CMAKE_CURRENT_LIST_DIR}/../generated
     ${CMAKE_CURRENT_BINARY_DIR}
+
+    # Wifi
+    ${PICO_LWIP_CONTRIB_PATH}/apps/ping
 )
 
 add_dependencies(picocart64_v1 update_git_info)
@@ -72,6 +92,10 @@ target_link_libraries(picocart64_v1
     pico_stdlib
     stdio_async_uart
     hardware_flash
+
+    # PicoW WiFi
+    pico_cyw43_arch_lwip_threadsafe_background
+
     FreeRTOS-Kernel-Static # FreeRTOS kernel, static allocations
 )
 

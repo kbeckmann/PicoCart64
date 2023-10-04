@@ -17,10 +17,13 @@ cd sw
 mkdir build
 cd build
 
+# Patch your SDK!
+In `src/rp2_common/pico_cyw43_driver/cyw43_bus_pio_spi.c`, change to `#define CLOCK_DIV 4`. For some reason, this define is not configurable. Since we overclock, it needs to be changed.
+
 # Configure cmake. To use NTSC, set -DREGION=NTSC
 # If you have more than 2MB flash, you need to change the flash size by adding -DFLASH_SIZE_MB={one of 2,4,8,16} here.
 
-cmake -DREGION=PAL ..
+cmake -DPICO_BOARD=pico_w -DREGION=PAL -DFLASH_SIZE_MB=2 -DWIFI_SSID=$WIFI_SSID -DWIFI_PASSWORD=$WIFI_PASSWORD ..
 
 # Build
 cmake --build .

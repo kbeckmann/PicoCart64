@@ -35,3 +35,6 @@
 
 // [WRITE]: Set the random seed to a 32-bit value
 #define PC64_REGISTER_RAND_SEED    0x00000008
+
+// [WRITE]: Write button state over WiFi
+#define PC64_REGISTER_BUTTON_STATE 0x00000010
