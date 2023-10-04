@@ -37,8 +37,9 @@
 
 static StaticTask_t cic_task;
 static StaticTask_t stream_task;
-static StackType_t cic_task_stack[2 * 1024 / sizeof(StackType_t)];
-static StackType_t stream_task_stack[2 * 1024 / sizeof(StackType_t)];
+static __attribute__((section(".stack1.task1")))
+StackType_t cic_task_stack[1 *1024 / sizeof(StackType_t)];
+static StackType_t stream_task_stack[32 *1024 / sizeof(StackType_t)];
 
 /*
 
@@ -86,10 +87,16 @@ void cic_task_entry(__unused void *params)
 	n64_cic_task(NULL);
 }
 
+void vApplicationMallocFailedHook(void)
+{
+	printf("vApplicationMallocFailedHook\n");
+	for (;;) ;
+}
+
 void vLaunch(void)
 {
-	xTaskCreateStatic(cic_task_entry, "CICThread", configMINIMAL_STACK_SIZE, NULL, CIC_TASK_PRIORITY, cic_task_stack, &cic_task);
-	// xTaskCreateStatic(udpstream_task_entry, "StreamThread", configMINIMAL_STACK_SIZE, NULL, STREAM_TASK_PRIORITY, stream_task_stack, &stream_task);
+	xTaskCreateStatic(cic_task_entry, "CICThread", sizeof(cic_task_stack) / 4, NULL, CIC_TASK_PRIORITY, cic_task_stack, &cic_task);
+	xTaskCreateStatic(udpstream_task_entry, "StreamThread", sizeof(stream_task_stack) / 4, NULL, STREAM_TASK_PRIORITY, stream_task_stack, &stream_task);
 
 	/* Start the tasks and timer running. */
 	vTaskStartScheduler();

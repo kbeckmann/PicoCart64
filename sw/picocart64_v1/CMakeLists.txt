@@ -94,7 +94,10 @@ target_link_libraries(picocart64_v1
     hardware_flash
 
     # PicoW WiFi
-    pico_cyw43_arch_lwip_threadsafe_background
+    #pico_cyw43_arch_lwip_threadsafe_background
+    #pico_cyw43_arch_lwip_sys_freertos
+    pico_cyw43_arch_lwip_poll
+    
 
     FreeRTOS-Kernel-Static # FreeRTOS kernel, static allocations
 )

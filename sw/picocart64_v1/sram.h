@@ -8,7 +8,9 @@
 
 #include <stdint.h>
 
-#define SRAM_FB_SIZE_16 (320 * 240)
+// #define SRAM_FB_SIZE_16 (320 * 240)
+#define SRAM_FB_SIZE_16 (320 * 120)
+// #define SRAM_FB_SIZE_16 (1024)
 
 extern uint16_t sram[SRAM_FB_SIZE_16];
 
@@ -17,7 +19,8 @@ static inline uint32_t sram_resolve_address_shifted(uint32_t pi_address)
 	// Banked mode disabled
 
 	uint32_t resolved_address;
-	resolved_address = pi_address & (sizeof(sram) - 1);
+	resolved_address = pi_address & (1024 - 1);
+	// resolved_address = pi_address & (sizeof(sram) - 1);
 	return resolved_address >> 1;
 }
 

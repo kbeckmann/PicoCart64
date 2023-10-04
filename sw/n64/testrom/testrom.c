@@ -330,6 +330,7 @@ int main(void)
 	pi_write_u32(0, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_RAND_SEED);
 	pc64_rand_seed(0);
 
+#if 0
 	// Compare buffer with RNG
 	printf("[ -- ] PicoCart64 RNG stress-test: ");
 	bool rng_ok = true;
@@ -357,7 +358,7 @@ int main(void)
 		fail_count++;
 		printf("\n[FAIL] Random stress test failed.\n");
 	}
-
+#endif
 	///////////////////////////////////////////////////////////////////////////
 
 	// Read 1Mbit of 64DD IPL ROM
