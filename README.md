@@ -3,7 +3,7 @@ Nintendo 64 flash cart using a Raspberry Pi Pico / RP2040. So far, all of the wo
 
 Join the Discord server to participate in the discussion and development of this project.
 
-[![Join the Discord!](https://discordapp.com/api/guilds/989902502063398982/widget.png?style=banner3)](https://discord.gg/B8n57fGd)
+[![Join the Discord!](https://discordapp.com/api/guilds/989902502063398982/widget.png?style=banner3)](https://discord.gg/CGTjxkVr7P)
 
 There are a few versions:
 - PicoCart64 v1 lite - The _lite_ version using a Raspberry Pi Pico board capable of booting homebrew. This is the most user friendly option as of now.
