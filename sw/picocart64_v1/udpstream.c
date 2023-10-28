@@ -63,7 +63,7 @@ typedef struct __attribute__((packed)) {
 
 ///////////////////////////
 
-static void dump_bytes(const uint8_t *bptr, uint32_t len)
+static void dump_bytes(const uint8_t * bptr, uint32_t len)
 {
 	unsigned int i = 0;
 
@@ -79,7 +79,7 @@ static void dump_bytes(const uint8_t *bptr, uint32_t len)
 	printf("\n");
 }
 
-static void cmd_buttons(state_t *state, uint32_t buttons)
+static void cmd_buttons(state_t * state, uint32_t buttons)
 {
 	cyw43_arch_lwip_begin();
 
@@ -100,7 +100,7 @@ static void cmd_buttons(state_t *state, uint32_t buttons)
 // u16_t pbuf_copy_partial(const struct pbuf *p, void *dataptr, u16_t len, u16_t offset);
 
 // NTP data received
-static void udp_recv_cb(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr, u16_t port)
+static void udp_recv_cb(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t * addr, u16_t port)
 {
 	state_t *state = (state_t *) arg;
 
@@ -164,7 +164,7 @@ static state_t *state_init(void)
 	return state;
 }
 
-static void cmd_hello(state_t *state)
+static void cmd_hello(state_t * state)
 {
 	cyw43_arch_lwip_begin();
 
