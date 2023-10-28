@@ -39,7 +39,7 @@ for x in $C_DIRECTORIES; do
 
     SIMPLE_BACKUP_SUFFIX="~picocart64~" indent $C_SOURCES $H_SOURCES -nbad -bap -bbo -hnl -br -brs -c33 -cd33 -ncdb -ce -ci4 -cli0 -d0 -di1 -nfc1 -i4 -ip0 -l180 -lp -npcs -nprs -npsl -sai -saf -saw -ncs -nsc -sob -nfca -cp33  -ss -ts4 -il1
 
-    if [[ $CLEANUP ]]; then
+    if [ "$CLEANUP" ]; then
         # Delete backup files with '~picocart64~' suffix
         find "$SCRIPTPATH/../$x" -type f -name '*~picocart64~' -exec rm -f {} ';'
     fi
