@@ -35,6 +35,8 @@ static volatile PI_regs_t *const PI_regs = (PI_regs_t *) 0xA4600000;
 #define SRAM_768KBIT_BANKS        3
 #define SRAM_1MBIT_BANKS          4
 
+#define PC64_SRAM_SIZE            SRAM_256KBIT_SIZE
+
 static void verify_memory_range(uint32_t base, uint32_t offset, uint32_t len)
 {
 	uint32_t start = base | offset;
@@ -150,8 +152,8 @@ static void pi_write_u32(const uint32_t value, uint32_t base, uint32_t offset)
 	pi_write_raw(buf, base, offset, sizeof(buf));
 }
 
-static uint8_t __attribute__((aligned(16))) facit_buf[SRAM_1MBIT_SIZE];
-static uint8_t __attribute__((aligned(16))) read_buf[SRAM_1MBIT_SIZE];
+static uint8_t __attribute__((aligned(16))) facit_buf[PC64_SRAM_SIZE];
+static uint8_t __attribute__((aligned(16))) read_buf[PC64_SRAM_SIZE];
 static char __attribute__((aligned(16))) write_buf[0x1000];
 
 static void pc64_uart_write(const uint8_t *buf, uint32_t len)

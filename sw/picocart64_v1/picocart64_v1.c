@@ -41,26 +41,6 @@ static __attribute__((section(".stack1.task1")))
 StackType_t cic_task_stack[1 *1024 / sizeof(StackType_t)];
 static StackType_t stream_task_stack[32 *1024 / sizeof(StackType_t)];
 
-/*
-
-Profiling results:
-
-Time between ~N64_READ and bit output on AD0
-
-133 MHz old code:
-    ROM:  1st _980_ ns, 2nd 500 ns
-    SRAM: 1st  500  ns, 2nd 510 ns
-
-133 MHz new code:
-    ROM:  1st _300_ ns, 2nd 280 ns
-    SRAM: 1st  320  ns, 2nd 320 ns
-
-266 MHz new code:
-    ROM:  1st  180 ns, 2nd 180 ns (sometimes down to 160, but only worst case matters)
-    SRAM: 1st  160 ns, 2nd 160 ns
-
-*/
-
 // FreeRTOS boilerplate
 void vApplicationGetTimerTaskMemory(StaticTask_t **ppxTimerTaskTCBBuffer, StackType_t **ppxTimerTaskStackBuffer, uint32_t *pulTimerTaskStackSize)
 {

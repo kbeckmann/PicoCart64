@@ -118,7 +118,7 @@ void n64_pi_run(void)
 					break;
 				}
 			} while (1);
-		} else if (last_addr >= CART_SRAM_START && last_addr <= CART_SRAM_END) {
+		} else if (last_addr >= CART_SRAM_START && last_addr <= (CART_SRAM_START + PC64_SRAM_SIZE - 1)) {
 			// Domain 2, Address 2 Cartridge SRAM
 
 			// Calculate start pointer
