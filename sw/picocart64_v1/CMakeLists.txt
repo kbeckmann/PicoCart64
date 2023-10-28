@@ -1,8 +1,9 @@
 
 if (TARGET pico_cyw43_arch)
-    message("YES this is right")
+    message("Building for pico_w")
 else()
-    message(FATAL_ERROR "NO this is wrong")
+    message("Building for pico. To build for pico_w, use -DPICO_BOARD=pico_w")
+    message(FATAL_ERROR "NO this is wrong. TODO: Make this more configurable")
 endif()
 
 
