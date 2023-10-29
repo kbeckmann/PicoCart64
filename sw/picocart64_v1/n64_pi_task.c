@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "pico/stdlib.h"
 #include "pico/stdio.h"
@@ -19,9 +20,9 @@
 #include "pc64_rand.h"
 #include "pc64_regs.h"
 #include "picocart64_pins.h"
-#include "ringbuf.h"
+// #include "ringbuf.h"
 #include "sram.h"
-#include "stdio_async_uart.h"
+// #include "stdio_async_uart.h"
 #include "utils.h"
 
 // The rom to load in normal .z64, big endian, format
@@ -36,7 +37,7 @@ uint16_t rom_mapping[MAPPING_TABLE_LEN];
 static const uint16_t *rom_file_16 = (uint16_t *) rom_chunks;
 #endif
 
-RINGBUF_CREATE(ringbuf, 64, uint32_t);
+// RINGBUF_CREATE(ringbuf, 64, uint32_t);
 
 // UART TX buffer
 static uint16_t pc64_uart_tx_buf[PC64_BASE_ADDRESS_LENGTH];
@@ -227,7 +228,7 @@ void n64_pi_run(void)
 
 					switch (last_addr - PC64_CIBASE_ADDRESS_START) {
 					case PC64_REGISTER_UART_TX:
-						stdio_uart_out_chars((const char *)pc64_uart_tx_buf, write_word & (sizeof(pc64_uart_tx_buf) - 1));
+						write(1, (const char *)pc64_uart_tx_buf, write_word & (sizeof(pc64_uart_tx_buf) - 1));
 						break;
 					case PC64_REGISTER_RAND_SEED:
 						pc64_rand_seed(write_word);

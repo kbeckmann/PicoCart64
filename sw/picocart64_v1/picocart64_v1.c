@@ -14,8 +14,6 @@
 #include "pico/multicore.h"
 #include "hardware/irq.h"
 
-#include "stdio_async_uart.h"
-
 #include "n64_cic.h"
 #include "git_info.h"
 #include "n64_pi_task.h"
@@ -60,7 +58,7 @@ Time between ~N64_READ and bit output on AD0
 */
 
 // FreeRTOS boilerplate
-void vApplicationGetTimerTaskMemory(StaticTask_t ** ppxTimerTaskTCBBuffer, StackType_t ** ppxTimerTaskStackBuffer, uint32_t * pulTimerTaskStackSize)
+void vApplicationGetTimerTaskMemory(StaticTask_t **ppxTimerTaskTCBBuffer, StackType_t **ppxTimerTaskStackBuffer, uint32_t *pulTimerTaskStackSize)
 {
 	static StaticTask_t xTimerTaskTCB;
 	static StackType_t uxTimerTaskStack[configTIMER_TASK_STACK_DEPTH];
@@ -97,6 +95,8 @@ void second_task_entry(__unused void *params)
 	while (true) {
 		vTaskDelay(1000);
 		count++;
+
+		printf("Hi %d\n", count);
 
 		// Set to 1 to print stack watermarks.
 		// Printing is synchronous and interferes with the CIC emulation.
@@ -160,8 +160,12 @@ int main(void)
 	// Enable pull up on N64_CIC_DIO since there is no external one.
 	gpio_pull_up(N64_CIC_DIO);
 
-	// Init UART on pin 28/29
+	// Enable STDIO over USB
+	stdio_init_all();
+
+	// Enable Asynchronous STDIO UART on pin 28/29
 	stdio_async_uart_init_full(UART_ID, BAUD_RATE, UART_TX_PIN, UART_RX_PIN);
+
 	printf("PicoCart64 Boot (git rev %08x)\r\n", GIT_REV);
 
 #if ENABLE_N64_PI

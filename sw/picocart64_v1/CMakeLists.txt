@@ -76,7 +76,7 @@ target_link_libraries(picocart64_v1
 )
 
 # disable usb output (interrupt heavy)
-pico_enable_stdio_usb(picocart64_v1 0)
+pico_enable_stdio_usb(picocart64_v1 1)
 
 # disable uart output
 pico_enable_stdio_uart(picocart64_v1 0)

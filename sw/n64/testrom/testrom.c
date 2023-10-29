@@ -154,7 +154,7 @@ static uint8_t __attribute__((aligned(16))) facit_buf[SRAM_1MBIT_SIZE];
 static uint8_t __attribute__((aligned(16))) read_buf[SRAM_1MBIT_SIZE];
 static char __attribute__((aligned(16))) write_buf[0x1000];
 
-static void pc64_uart_write(const uint8_t * buf, uint32_t len)
+static void pc64_uart_write(const uint8_t *buf, uint32_t len)
 {
 	// 16-bit aligned
 	assert((((uint32_t) buf) & 0x1) == 0);
@@ -384,6 +384,10 @@ int main(void)
 		printf("\n[FAIL] Test is finished. %d tests failed.\n", fail_count);
 	}
 	printf("\n");
+
+	// Print again with the cart
+	strcpy(write_buf, "Test is finished!\r\n");
+	pc64_uart_write((const uint8_t *)write_buf, strlen(write_buf));
 
 	// Draw something that moves forever
 	int count = 0;

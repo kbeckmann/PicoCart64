@@ -249,14 +249,14 @@ static void cic_init_ram(cic_region_t region)
 	cic_ram[0x11] = cic_read_nibble();
 }
 
-static void cic_exchange_bytes(uint8_t * a, uint8_t * b)
+static void cic_exchange_bytes(uint8_t *a, uint8_t *b)
 {
 	uint8_t tmp = *a;
 	*a = *b;
 	*b = tmp;
 }
 
-static void cic_round(uint8_t * m)
+static void cic_round(uint8_t *m)
 {
 	uint8_t a, b, x;
 
@@ -410,7 +410,7 @@ void n64_cic_reset_parameters(void)
 	cic_checksum[5] = 0x59;
 }
 
-void n64_cic_set_parameters(uint32_t * args)
+void n64_cic_set_parameters(uint32_t *args)
 {
 	cic_disabled = (args[0] >> 24) & (1 << 0);
 	cic_seed = (args[0] >> 16) & 0xFF;
