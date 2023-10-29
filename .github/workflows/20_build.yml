@@ -4,11 +4,13 @@ on:
     branches:
       - main
       - develop
+      - unstable
       - ci
   pull_request:
     branches:
       - main
       - develop
+      - unstable
 
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
