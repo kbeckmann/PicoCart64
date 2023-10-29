@@ -89,8 +89,71 @@ void n64_pi_run(void)
 		// Handle access based on memory region
 		// Note that the if-cases are ordered in priority from
 		// most timing critical to least.
+
+#if 0
+		if (last_addr == 0x10000000) {
+			// Domain 1, Address 2 Cartridge ROM
+
+			// 0x8037FF40 in big-endian
+			next_word = 0x8037;
+			addr = n64_pi_get_value(pio);
+			// if (addr == 0) {
+			// READ
+			pio_sm_put(pio, 0, next_word);
+			// }
+			last_addr += 2;
+
+			// 0x8037FF40 in big-endian
+			// next_word = 0xFF40;
+			next_word = 0x2040;
+			addr = n64_pi_get_value(pio);
+			// if (addr == 0) {
+			// READ
+			pio_sm_put(pio, 0, next_word);
+			// }
+			last_addr += 2;
+
+			goto hack;
+		} else
+#endif
+
 		if (last_addr >= CART_DOM1_ADDR2_START && last_addr <= CART_DOM1_ADDR2_END) {
 			// Domain 1, Address 2 Cartridge ROM
+
+#if CONFIG_ROM_HEADER_OVERRIDE != 0
+			if (last_addr == 0x10000000) {
+				// Special case to patch PI access speed paramenters
+
+				// 16 MSB
+				next_word = CONFIG_ROM_HEADER_OVERRIDE >> 16;
+				addr = n64_pi_get_value(pio);
+				if (addr == 0) {
+					// READ
+					pio_sm_put(pio, 0, next_word);
+				} else if ((addr & 0xffff0000) == 0xffff0000) {
+					// WRITE, ignore
+				} else {
+					// New address
+					continue;
+				}
+				last_addr += 2;
+
+				// 16 LSB
+				next_word = CONFIG_ROM_HEADER_OVERRIDE & 0xFFFF;
+				addr = n64_pi_get_value(pio);
+				if (addr == 0) {
+					// READ
+					pio_sm_put(pio, 0, next_word);
+				} else if ((addr & 0xffff0000) == 0xffff0000) {
+					// WRITE, ignore
+				} else {
+					// New address
+					continue;
+				}
+				last_addr += 2;
+			}
+#endif
+
 			do {
 				// Pre-fetch from the address
 #if COMPRESSED_ROM

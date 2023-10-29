@@ -20,6 +20,7 @@
 #include "picocart64_pins.h"
 #include "sram.h"
 #include "utils.h"
+#include "stdio_async_uart.h"
 
 #define UART_TX_PIN (28)
 #define UART_RX_PIN (29)		/* not available on the pico */
@@ -136,9 +137,7 @@ int main(void)
 	// The external flash should be rated to 133MHz,
 	// but since it's used with a 2x clock divider,
 	// 266 MHz is safe in this regard.
-
-	// set_sys_clock_khz(133000, true);
-	set_sys_clock_khz(266000, true);	// Required for SRAM @ 200ns
+	set_sys_clock_khz(CONFIG_CPU_FREQ_MHZ * 1000, true);
 
 	// Init GPIOs before starting the second core and FreeRTOS
 	for (int i = 0; i <= 27; i++) {
@@ -167,6 +166,8 @@ int main(void)
 	stdio_async_uart_init_full(UART_ID, BAUD_RATE, UART_TX_PIN, UART_RX_PIN);
 
 	printf("PicoCart64 Boot (git rev %08x)\r\n", GIT_REV);
+	printf("  CPU_FREQ_MHZ=%d\n", CONFIG_CPU_FREQ_MHZ);
+	printf("  ROM_HEADER_OVERRIDE=%08lX\n", CONFIG_ROM_HEADER_OVERRIDE);
 
 #if ENABLE_N64_PI
 	// Launch the N64 PI implementation in the second core
