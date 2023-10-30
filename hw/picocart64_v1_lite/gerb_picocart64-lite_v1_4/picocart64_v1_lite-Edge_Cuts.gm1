@@ -1,11 +1,11 @@
-G04 #@! TF.GenerationSoftware,KiCad,Pcbnew,(6.0.7)*
-G04 #@! TF.CreationDate,2022-08-14T23:45:14+02:00*
+G04 #@! TF.GenerationSoftware,KiCad,Pcbnew,7.0.8*
+G04 #@! TF.CreationDate,2023-10-30T20:32:02+01:00*
 G04 #@! TF.ProjectId,picocart64_v1_lite,7069636f-6361-4727-9436-345f76315f6c,rev?*
 G04 #@! TF.SameCoordinates,Original*
 G04 #@! TF.FileFunction,Profile,NP*
 %FSLAX46Y46*%
 G04 Gerber Fmt 4.6, Leading zero omitted, Abs format (unit mm)*
-G04 Created by KiCad (PCBNEW (6.0.7)) date 2022-08-14 23:45:14*
+G04 Created by KiCad (PCBNEW 7.0.8) date 2023-10-30 20:32:02*
 %MOMM*%
 %LPD*%
 G01*
