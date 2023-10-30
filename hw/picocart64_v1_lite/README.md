@@ -1,4 +1,4 @@
-# PicoCart64-lite v1.2
+# PicoCart64-lite v1.4
 
 ## Errata
 
