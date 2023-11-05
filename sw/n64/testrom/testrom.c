@@ -263,6 +263,16 @@ int main(void)
 
 	///////////////////////////////////////////////////////////////////////////
 
+	// Read the Flash JEDEC ID
+	data_cache_hit_writeback_invalidate(read_buf, sizeof(read_buf));
+	pi_read_raw(read_buf, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_FLASH_JEDEC_ID, sizeof(uint32_t));
+	printf("[ -- ] Flash JEDEC ID = 0x%08lX.\n", read_buf32[0]);
+
+	if (read_buf32[0]) {
+		printf("[ ?? ] Non-standard flash detected\n");
+	}
+	///////////////////////////////////////////////////////////////////////////
+
 	// Print Hello from the N64
 	strcpy(write_buf, "Hello from the N64!\r\n");
 	pc64_uart_write((const uint8_t *)write_buf, strlen(write_buf));
