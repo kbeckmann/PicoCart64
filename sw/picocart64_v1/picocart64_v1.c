@@ -12,6 +12,7 @@
 
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
+#include "hardware/flash.h"
 #include "hardware/irq.h"
 
 #include "stdio_async_uart.h"
@@ -38,6 +39,8 @@ static StaticTask_t cic_task;
 static StaticTask_t second_task;
 static StackType_t cic_task_stack[4 * 1024 / sizeof(StackType_t)];
 static StackType_t second_task_stack[4 * 1024 / sizeof(StackType_t)];
+
+uint32_t g_flash_jedec_id;
 
 /*
 
@@ -130,8 +133,22 @@ void vLaunch(void)
 
 #include "rom_vars.h"
 
+uint32_t flash_get_jedec_id(void)
+{
+	const uint8_t read_jedec_id = 0x9f;
+	uint8_t txbuf[4] = { read_jedec_id };
+	uint8_t rxbuf[4] = { 0 };
+	txbuf[0] = read_jedec_id;
+	flash_do_cmd(txbuf, rxbuf, 4);
+
+	return rxbuf[1] | (rxbuf[2] << 8) | (rxbuf[3] << 16);
+}
+
 int main(void)
 {
+	// First, let's probe the Flash ID
+	g_flash_jedec_id = flash_get_jedec_id();
+
 	// Overclock!
 	// The external flash should be rated to 133MHz,
 	// but since it's used with a 2x clock divider,

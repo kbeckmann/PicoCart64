@@ -23,6 +23,7 @@
 #include "sram.h"
 #include "stdio_async_uart.h"
 #include "utils.h"
+#include "picocart64_v1.h"
 
 // The rom to load in normal .z64, big endian, format
 #include "rom_vars.h"
@@ -200,6 +201,9 @@ void n64_pi_run(void)
 					switch (last_addr - PC64_CIBASE_ADDRESS_START) {
 					case PC64_REGISTER_MAGIC:
 						next_word = PC64_MAGIC;
+						break;
+					case PC64_REGISTER_FLASH_JEDEC_ID:
+						next_word = g_flash_jedec_id;
 						break;
 					default:
 						next_word = 0;

@@ -26,7 +26,7 @@
 #define PC64_CIBASE_ADDRESS_LENGTH 0x00001000
 #define PC64_CIBASE_ADDRESS_END    (PC64_CIBASE_ADDRESS_START + PC64_CIBASE_ADDRESS_LENGTH - 1)
 
-// [Read]: Returns PC64_MAGIC
+// [READ]: Returns PC64_MAGIC
 #define PC64_REGISTER_MAGIC        0x00000000
 #define PC64_MAGIC                 0xDEAD6400
 
@@ -35,3 +35,6 @@
 
 // [WRITE]: Set the random seed to a 32-bit value
 #define PC64_REGISTER_RAND_SEED    0x00000008
+
+// [READ]: Returns the JEDEC ID of the flash chip
+#define PC64_REGISTER_FLASH_JEDEC_ID 0x0000000C
