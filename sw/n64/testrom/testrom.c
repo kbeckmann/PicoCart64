@@ -268,7 +268,7 @@ int main(void)
 	pi_read_raw(read_buf, PC64_CIBASE_ADDRESS_START, PC64_REGISTER_FLASH_JEDEC_ID, sizeof(uint32_t));
 	printf("[ -- ] Flash JEDEC ID = 0x%08lX.\n", read_buf32[0]);
 
-	if (read_buf32[0]) {
+	if (read_buf32[0] != 0x001540ef) {
 		printf("[ ?? ] Non-standard flash detected\n");
 	}
 	///////////////////////////////////////////////////////////////////////////
