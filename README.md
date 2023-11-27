@@ -14,6 +14,11 @@ The following concerns PicoCart64 v1 lite, unless noted.
 
 # How to build a PicoCart64 v1 lite
 
+## Purchasing an unpopulated PCB
+
+> [!NOTE]
+> PicoCart64 Lite v1.4 PCBs are now available for purchase from [Solder Party's shop](https://lectronz.com/products/picocart64-lite).
+
 ## Getting the raw PCB
 
 Check out the `develop` branch and navigate to `hw/picocart64_v1_lite/`. Compress the `gerb_picocart64-lite_v1_3` to a `.zip` file.
