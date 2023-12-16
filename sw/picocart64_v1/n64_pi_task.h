@@ -6,4 +6,12 @@
 
 #pragma once
 
+/**
+ * @file n64_pi_task.h
+ * @brief Header file for the N64 PI task
+ */
+
+/**
+ * @brief Executes the N64 PI task.
+ */
 void n64_pi_run(void);
