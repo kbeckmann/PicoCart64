@@ -82,7 +82,7 @@ function compileUF2(headerAndMappingU8, payload) {
     let offset = 0;
 
     // Calculate the output size
-    var blocks = Math.floor(((payload.fileSize + 255) / 256) + 0x8000 / 256);
+    var blocks = Math.ceil(payload.fileSize / 256 + 0x8000 / 256);
     var outSize = blocks * 512;
     var dataOut = new Uint8Array(outSize);
 
@@ -96,35 +96,41 @@ function compileUF2(headerAndMappingU8, payload) {
     };
 
     // Write header
-    for (i = 0; i < headerAndMappingU8.length / 256; i++) {
-        block.payload = headerAndMappingU8.slice(i * 256, (i + 1) * 256);
+    i = 0;
+    while (i < headerAndMappingU8.length) {
+        len = Math.min(headerAndMappingU8.length - i, 256)
+        block.payload = headerAndMappingU8.slice(i, i + len);
         encodeBlock(block, dataOut, offset);
         block.blockNumber++;
         block.flashAddress += 256;
         offset += 512;
+        i += len
     }
 
     // Write payload
     payload.seek(0);
-    while (!payload.isEOF()) {
-        block.payload = payload.readBytes(256);
+    i = 0;
+    while (i < payload.fileSize) {
+        len = Math.min(payload.fileSize - i, 256)
+        block.payload = payload.readBytes(len);
         encodeBlock(block, dataOut, offset);
         block.blockNumber++;
         block.flashAddress += 256;
         offset += 512;
+        i += len
     }
 
     return dataOut;
 }
 
 // Compares two Uint8Array
-function Uint8ArrayCompare(buf1, buf2) {
-    if (buf1.byteLength != buf2.byteLength) {
+function Uint8ArrayHasPrefix(buf, prefix) {
+    if (buf.byteLength < prefix.byteLength) {
         return false;
     }
 
-    for (var i = 0; i < buf1.byteLength; i++) {
-        if (buf1[i] != buf2[i]) {
+    for (var i = 0; i < prefix.byteLength; i++) {
+        if (buf[i] != prefix[i]) {
             return false;
         }
     }
@@ -135,7 +141,7 @@ function Uint8ArrayCompare(buf1, buf2) {
 // Returns the index of the Uint8Array needle in the array of Uint8Arrays haystack
 function indexOfUint8Array(needle, haystack) {
     for (var i = 0; i < haystack.length; i++) {
-        if (Uint8ArrayCompare(haystack[i], needle)) {
+        if (Uint8ArrayHasPrefix(haystack[i], needle)) {
             return i;
         }
     }
@@ -152,7 +158,7 @@ function generateAndSaveUF2(rom, compress) {
         var headerAndMappingU8 = new Uint8Array(headerAndMapping, 0);
         headerAndMappingU8.set(stringToUint8Array("picocartcompress"));
 
-        var mappingU16 = new Uint16Array(headerAndMapping, 16, Math.floor((0x8000 - 16) / 2));
+        var mapping = new DataView(headerAndMapping, 16);
 
         chunk_size_pot = 10
         chunk_size = 1 << chunk_size_pot
@@ -163,10 +169,11 @@ function generateAndSaveUF2(rom, compress) {
         unique_chunks = []
         chunk_mapping = []
         chunk_idx = 0
-        num_chunks = Math.floor(rom.fileSize / chunk_size)
+        num_chunks = Math.ceil(rom.fileSize / chunk_size)
         rom.seek(0)
         for (var i = 0; i < num_chunks; i++) {
-            chunk_data = rom.slice(i * chunk_size, chunk_size)._u8array;
+            len = Math.min(rom.fileSize - i*chunk_size, chunk_size)
+            chunk_data = rom.slice(i * chunk_size, len)._u8array;
 
             // Check if chunk_data is in unique_chunks
             var index = indexOfUint8Array(chunk_data, unique_chunks);
@@ -183,12 +190,13 @@ function generateAndSaveUF2(rom, compress) {
 
         // Flatten chunk_mapping into a Uint8Array
         for (var i = 0; i < chunk_mapping.length; i++) {
-            mappingU16[i] = chunk_mapping[i];
+            mapping.setUint16(i*2, chunk_mapping[i], true); // little-endian
         }
 
         // Flatten unique_chunks into a Uint8Array
-        var compressedROM = new Uint8Array(chunk_size * unique_chunks.length);
-        for (var i = 0; i < unique_chunks.length; i++) {
+        ucn = unique_chunks.length
+        var compressedROM = new Uint8Array(chunk_size * (ucn - 1) + unique_chunks[ucn - 1].byteLength);
+        for (var i = 0; i < ucn; i++) {
             compressedROM.set(unique_chunks[i], chunk_size * i);
         }
 
