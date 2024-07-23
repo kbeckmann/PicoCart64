@@ -82,7 +82,9 @@ function compileUF2(headerAndMappingU8, payload) {
     let offset = 0;
 
     // Calculate the output size
-    var blocks = Math.floor(((payload.fileSize + 255) / 256) + 0x8000 / 256);
+    var headerAndMappingSize = headerAndMappingU8.length;
+    var totalSize = headerAndMappingSize + payload.fileSize;
+    var blocks = Math.floor((totalSize + 255) / 256);
     var outSize = blocks * 512;
     var dataOut = new Uint8Array(outSize);
 
@@ -95,19 +97,13 @@ function compileUF2(headerAndMappingU8, payload) {
         boardFamily: familyMap['Raspberry Pi RP2040'],
     };
 
-    // Write header
-    for (i = 0; i < headerAndMappingU8.length / 256; i++) {
-        block.payload = headerAndMappingU8.slice(i * 256, (i + 1) * 256);
-        encodeBlock(block, dataOut, offset);
-        block.blockNumber++;
-        block.flashAddress += 256;
-        offset += 512;
-    }
-
-    // Write payload
+    // Write header and payload at once
+    var headerAndPayloadU8 = new Uint8Array(totalSize);
+    headerAndPayloadU8.set(headerAndMappingU8, 0);
     payload.seek(0);
-    while (!payload.isEOF()) {
-        block.payload = payload.readBytes(256);
+    headerAndPayloadU8.set(payload.readBytes(payload.fileSize), headerAndMappingSize);
+    for (i = 0; i < headerAndPayloadU8.length / 256; i++) {
+        block.payload = headerAndPayloadU8.slice(i * 256, (i + 1) * 256);
         encodeBlock(block, dataOut, offset);
         block.blockNumber++;
         block.flashAddress += 256;
@@ -148,11 +144,11 @@ function generateAndSaveUF2(rom, compress) {
     var blob;
 
     if (compress) {
-        var headerAndMapping = new ArrayBuffer(0x8000);
+        var headerAndMapping = new ArrayBuffer(16 + 0x8000);
         var headerAndMappingU8 = new Uint8Array(headerAndMapping, 0);
         headerAndMappingU8.set(stringToUint8Array("picocartcompress"));
 
-        var mappingU16 = new Uint16Array(headerAndMapping, 16, Math.floor((0x8000 - 16) / 2));
+        var mappingU16 = new Uint16Array(headerAndMapping, 16, Math.floor(0x8000 / 2));
 
         chunk_size_pot = 10
         chunk_size = 1 << chunk_size_pot
@@ -210,7 +206,7 @@ function generateAndSaveUF2(rom, compress) {
 
         uf2data = compileUF2(headerAndMappingU8, new MarcFile(compressedROM));
     } else {
-        var headerAndMapping = new ArrayBuffer(0x8000);
+        var headerAndMapping = new ArrayBuffer(16 + 0x8000);
         var headerAndMappingU8 = new Uint8Array(headerAndMapping, 0);
         headerAndMappingU8.set(stringToUint8Array("picocart        "));
         uf2data = compileUF2(headerAndMappingU8, rom);
