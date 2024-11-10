@@ -263,7 +263,7 @@ SECTIONS
         *(.n64_rom.header)
         . = 16;
         *(.n64_rom.mapping)
-        . = 32768;
+        . = (32768 + 16);
         *(.n64_rom)
     } > N64_ROM
 }

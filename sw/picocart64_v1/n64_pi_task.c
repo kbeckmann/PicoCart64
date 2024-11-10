@@ -129,7 +129,7 @@ void n64_pi_run(void)
 			do {
 				// Pre-fetch from the address
 #if COMPRESSED_ROM
-				uint32_t chunk_index = rom_mapping[(last_addr & 0xFFFFFF) >> COMPRESSION_SHIFT_AMOUNT];
+				uint16_t chunk_index = rom_mapping[(last_addr & 0xFFFFFF) >> COMPRESSION_SHIFT_AMOUNT];
 				const uint16_t *chunk_16 = (const uint16_t *)rom_chunks[chunk_index];
 				next_word = swap8(chunk_16[(last_addr & COMPRESSION_MASK) >> 1]);
 #else
